@@ -345,6 +345,7 @@ fun decodePolishedPartyMon(raw: ByteArray, off: Int, cfg: Gen2Config): Mon? {
         // An egg keeps its species in the struct: shown as the game's own egg (species byte 0xFF, the companion's 255).
         species = if (egg) 0xFF else id,
         level = level,
+        shiny = !egg && polishedShiny(u8(raw, off + 20)),
         hp = be16(raw, off + 34),
         maxHp = be16(raw, off + 36),
         status = u8(raw, off + 32).toLong(),
@@ -355,7 +356,6 @@ fun decodePolishedPartyMon(raw: ByteArray, off: Int, cfg: Gen2Config): Mon? {
         isEgg = egg,
         heldItem = u8(raw, off + 1),
         personality = gbMonKey(id, be16(raw, off + 6), be16(raw, off + 17)),
-        shiny = !egg && polishedShiny(u8(raw, off + 20)),
     )
 }
 
@@ -369,6 +369,8 @@ fun decodePolishedBattleMon(raw: ByteArray): BattleMon? {
     return BattleMon(
         species = polishedSpeciesId(species, u8(raw, 10)),
         level = level,
+        // Its personality (+9): the nature's low bits, shiny bit 7.
+        shiny = polishedShiny(u8(raw, 9)),
         type1 = u8(raw, 33),
         type2 = u8(raw, 34),
         hp = be16(raw, 19),
@@ -378,8 +380,6 @@ fun decodePolishedBattleMon(raw: ByteArray): BattleMon? {
         pp = IntArray(4) { u8(raw, 11 + it) and 0x3F },
         item = u8(raw, 1),
         stats = IntArray(5) { be16(raw, 23 + 2 * it) },
-        // Its personality (+9): the nature's low bits, shiny bit 7.
-        shiny = polishedShiny(u8(raw, 9)),
     )
 }
 const val POLISHED_BATTLE_MON_SIZE = 35
@@ -424,6 +424,7 @@ fun decodeGen2PartyMon(raw: ByteArray, off: Int, cfg: Gen2Config, egg: Boolean =
         // An egg: Gen 2 keeps its species in the struct (EGG is only in wPartySpecies) - shown as the egg (Gen2Art's 253).
         species = if (egg) GEN2_EGG else species,
         level = level,
+        shiny = !egg && gen2ShinyDvs(u8(raw, off + 21), u8(raw, off + 22)),
         hp = be16(raw, off + 34),
         maxHp = be16(raw, off + 36),
         status = u8(raw, off + 32).toLong(),   // Gen 3's bits: sleep 0-2, PSN, BRN, FRZ, PAR
@@ -434,7 +435,6 @@ fun decodeGen2PartyMon(raw: ByteArray, off: Int, cfg: Gen2Config, egg: Boolean =
         isEgg = egg,
         heldItem = u8(raw, off + 1),
         personality = gen2MonKey(raw, off),   // no personality in Gen 2: the switch's key (GbPartySwitch)
-        shiny = !egg && gen2ShinyDvs(u8(raw, off + 21), u8(raw, off + 22)),
     )
 }
 
@@ -461,6 +461,7 @@ fun decodeGen2BattleMon(raw: ByteArray, speciesCount: Int = 251): BattleMon? {
     return BattleMon(
         species = species,
         level = u8(raw, 13),
+        shiny = gen2ShinyDvs(u8(raw, 6), u8(raw, 7)),
         type1 = u8(raw, 30),
         type2 = u8(raw, 31),
         hp = be16(raw, 16),
@@ -471,7 +472,6 @@ fun decodeGen2BattleMon(raw: ByteArray, speciesCount: Int = 251): BattleMon? {
         item = u8(raw, 1),
         // Attack, Defense, Speed, Sp. Atk, Sp. Def - BattleMon's order is Gen 3's.
         stats = IntArray(5) { be16(raw, 20 + 2 * it) },
-        shiny = gen2ShinyDvs(u8(raw, 6), u8(raw, 7)),
     )
 }
 
