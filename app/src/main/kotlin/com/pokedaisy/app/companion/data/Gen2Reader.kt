@@ -618,6 +618,8 @@ fun readGen2Telemetry(r: MemoryReader, cfg: Gen2Config): Telemetry {
         frameCounter = frames,
         inBattle = inBattle,
         isDoubleBattle = false,
+        // wBattleMode: 1 a wild Pokémon, 2 a trainer's.
+        isTrainerBattle = if (inBattle) battle == 2 else null,
         mapGroup = group,
         mapNum = num,
         regionMapSectionId = gen2Landmark(cfg, group, num, u8(backup, 0), u8(backup, 1)),

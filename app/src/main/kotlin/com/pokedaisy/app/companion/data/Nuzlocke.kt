@@ -121,6 +121,18 @@ data class NuzlockeSample(
     val foeDex: Int = foeSpecies,
 ) {
     companion object {
+        /**
+         * A party Pokémon's id in the run: its personality - but a Game Boy game has none, and the party read's stand-in
+         * ([gbMonKey]: species, OT ID, DVs) changes when the Pokémon evolves, so there the run keeps OT ID + DVs alone
+         * (neither changes; two of the player's Pokémon share both 1 time in 65536).
+         */
+        fun runId(personality: Long, game: GameKind?): Long =
+            if (game.isGameBoyGame) personality and 0xFFFFFFFFL else personality
+
+        /** The area an encounter is counted in: the map section (a town-map place in Gen 2, 4 and 5); Gen 1 reports each
+         * map, so its maps are grouped by their town-map name ([gen1Area]: Mt. Moon's floors, a town's houses). */
+        fun areaOf(area: Int, game: GameKind?): Int = if (game.isGen1) gen1Area(area) else area
+
         fun of(s: SnapshotView): NuzlockeSample {
             // A foe the game's tables can't name, or at no real level, is a battle read wrong (Celia's battlers, a
             // scripted battle's Lv0 foe): no foe, so no encounter, rather than one with a made-up Pokémon.
@@ -128,11 +140,11 @@ data class NuzlockeSample(
             return NuzlockeSample(
                 inBattle = s.inBattle,
                 trainer = s.isTrainerBattle,
-                area = s.regionMapSectionId,
+                area = areaOf(s.regionMapSectionId, s.game),
                 areaName = s.location.mapSecName,
                 foeSpecies = foe?.species ?: 0,
                 foeName = foe?.name.orEmpty(),
-                party = s.party.map { NuzlockePartyMon(it.personality, it.species, it.shownName, it.level, it.hp, it.maxHp, it.isEgg) },
+                party = s.party.map { NuzlockePartyMon(runId(it.personality, s.game), it.species, it.shownName, it.level, it.hp, it.maxHp, it.isEgg) },
                 caught = s.pokedex?.caught,
                 menuUp = s.battleInputState == BATTLE_INPUT_ACTION_SELECT || s.battleInputState == BATTLE_INPUT_MOVE_SELECT ||
                     s.battleInputState == BATTLE_INPUT_BAG_OPEN || s.battleInputState == BATTLE_INPUT_PARTY_OPEN,

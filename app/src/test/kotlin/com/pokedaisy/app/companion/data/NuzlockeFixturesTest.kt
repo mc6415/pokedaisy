@@ -76,8 +76,96 @@ class NuzlockeFixturesTest {
     fun theGamesItFollows() {
         val n = com.pokedaisy.app.companion.Nuzlocke
         assertTrue(n.supports(GameKind.FIRERED) && n.supports(GameKind.EMERALD) && n.supports(GameKind.UNBOUND))
-        // A roguelike walks the same areas every run; the Game Boy and DS readers don't tell wild from trainer yet.
-        assertFalse(n.supports(GameKind.EMERALD_ROGUE))
-        assertFalse(n.supports(GameKind.YELLOW) || n.supports(GameKind.CRYSTAL) || n.supports(GameKind.PLATINUM) || n.supports(null))
+        // The Game Boy and DS games too, now their readers tell wild from trainer.
+        assertTrue(n.supports(GameKind.YELLOW) && n.supports(GameKind.CRYSTAL) && n.supports(GameKind.POLISHED_CRYSTAL))
+        assertTrue(n.supports(GameKind.PLATINUM) && n.supports(GameKind.HEARTGOLD) && n.supports(GameKind.BLACK2))
+        // A roguelike walks the same areas every run.
+        assertFalse(n.supports(GameKind.EMERALD_ROGUE) || n.supports(null))
+    }
+
+    /**
+     * The Game Boy and DS battle captures: each tells a wild battle from a trainer's (Gen 1's wIsInBattle, Gen 2's
+     * wBattleMode, Gen 4's battle type, Gen 5's competitor), and gives a foe and a party with ids.
+     */
+    @Test
+    fun gameBoyAndDsCapturesGiveTheTrackerWhatItReads() {
+        romLanguage = 'E'
+        romGameCode = ""
+        data class Capture(val fixture: String, val game: GameKind, val trainer: Boolean, val read: (MemoryReader) -> Telemetry)
+        fun gen1(f: String, g: GameKind, c: Gen1Config) = Capture(f, g, false) { readGen1Telemetry(it, c) }
+        fun gen2(f: String, g: GameKind, c: Gen2Config, trainer: Boolean = false) =
+            Capture(f, g, trainer) { activeGen2 = c; readGen2Telemetry(it, c) }
+        val captures = listOf(
+            gen1("yellow_battle", GameKind.YELLOW, GEN1_YELLOW), gen1("red_battle", GameKind.RED, GEN1_RED),
+            gen1("blue_battle", GameKind.BLUE, GEN1_BLUE), gen1("purered_battle", GameKind.PURE_RED, GEN1_PURE_RED),
+            gen1("pureblue_battle", GameKind.PURE_BLUE, GEN1_PURE_BLUE), gen1("yellow_legacy_battle", GameKind.YELLOW_LEGACY, GEN1_YELLOW_LEGACY),
+            gen2("crystal_battle", GameKind.CRYSTAL, GEN2_CRYSTAL), gen2("gold_battle", GameKind.GOLD, GEN2_GOLD),
+            gen2("gold_trainer", GameKind.GOLD, GEN2_GOLD, trainer = true), gen2("silver_battle", GameKind.SILVER, GEN2_SILVER),
+            gen2("crystal_clear_battle", GameKind.CRYSTAL_CLEAR, GEN2_CRYSTAL_CLEAR_V2_6_0),
+            gen2("crystal_clear_trainer", GameKind.CRYSTAL_CLEAR, GEN2_CRYSTAL_CLEAR_V2_6_0, trainer = true),
+            gen2("crystal_legacy_battle", GameKind.CRYSTAL_LEGACY, GEN2_CRYSTAL_LEGACY),
+            gen2("prism_battle", GameKind.PRISM, GEN2_PRISM), gen2("prism_trainer", GameKind.PRISM, GEN2_PRISM, trainer = true),
+            gen2("polished_crystal_battle", GameKind.POLISHED_CRYSTAL, GEN2_POLISHED_CRYSTAL),
+            gen2("polished_crystal_trainer", GameKind.POLISHED_CRYSTAL, GEN2_POLISHED_CRYSTAL, trainer = true),
+            Capture("platinum_battle", GameKind.PLATINUM, true) { readGen4Telemetry(it, GEN4_PLATINUM_US) },
+            Capture("black_battle", GameKind.BLACK, true) { readGen5Telemetry(it, GEN5_BLACK) },
+            Capture("black_wild", GameKind.BLACK, false) { readGen5Telemetry(it, GEN5_BLACK) },
+            Capture("white_wild", GameKind.WHITE, false) { readGen5Telemetry(it, GEN5_WHITE) },
+            Capture("black2_wild", GameKind.BLACK2, false) { readGen5Telemetry(it, GEN5_BLACK2) },
+        )
+        for (c in captures) {
+            activeGame = c.game
+            val t = c.read(FixtureMemoryReader.load(c.fixture))
+            assertTrue(c.fixture, t.inBattle)
+            assertEquals(c.fixture, c.trainer, t.isTrainerBattle)
+            // The player's Black save (black*, white*) has three Pokémon whose personality really is 0 (LATIOS, SUICUNE,
+            // TERRAKION: as a save editor makes them) - the tracker can't tell such ones apart and leaves them out.
+            assertTrue(c.fixture, t.party.isNotEmpty() && t.party.any { it.personality != 0L })
+            if (!c.fixture.startsWith("black_") && !c.fixture.startsWith("white_")) assertTrue(c.fixture, t.party.all { it.personality != 0L })
+            val foe = t.battleMons[BATTLE_POS_OPPONENT_LEFT]
+            assertTrue("${c.fixture}: ${foe.species} Lv${foe.level}", foe.species != 0 && foe.level in 1..100)
+        }
+        activeGen2 = GEN2_CRYSTAL
+    }
+
+    /** A real wild battle of each generation, through the companion's snapshot into the tracker: the area's first encounter. */
+    @Test
+    fun aWildBattleIsTheAreasEncounter() {
+        romLanguage = 'E'
+        romGameCode = ""
+        val wild = listOf<Triple<String, GameKind, (MemoryReader) -> Telemetry>>(
+            Triple("yellow_battle", GameKind.YELLOW) { readGen1Telemetry(it, GEN1_YELLOW) },
+            Triple("crystal_battle", GameKind.CRYSTAL) { activeGen2 = GEN2_CRYSTAL; readGen2Telemetry(it, GEN2_CRYSTAL) },
+            Triple("polished_crystal_battle", GameKind.POLISHED_CRYSTAL) { activeGen2 = GEN2_POLISHED_CRYSTAL; readGen2Telemetry(it, GEN2_POLISHED_CRYSTAL) },
+            Triple("black2_wild", GameKind.BLACK2) { readGen5Telemetry(it, GEN5_BLACK2) },
+        )
+        for ((fixture, game, read) in wild) {
+            activeGame = game
+            val v = buildSnapshotView(read(FixtureMemoryReader.load(fixture))).copy(game = game)
+            val sample = NuzlockeSample.of(v)
+            assertTrue(fixture, sample.foeSpecies != 0 && sample.trainer == false && sample.areaName.isNotBlank())
+            val tracker = NuzlockeTracker()
+            val events = (0..NuzlockeTracker.FOE_SAMPLES + 1).flatMap { tracker.feed(sample) }
+            assertTrue("$fixture: $events", events.any { it is NuzlockeEvent.FirstEncounter })
+            val e = tracker.run.encounters.single()
+            assertEquals(fixture, sample.foeSpecies, e.species)
+            assertEquals(fixture, NuzlockeOutcome.NOW, e.outcome)
+        }
+        activeGen2 = GEN2_CRYSTAL
+    }
+
+    /** A Game Boy Pokémon keeps its run id when it evolves (OT ID + DVs, not the species), and Gen 1's maps count by place. */
+    @Test
+    fun gameBoyIdsSurviveEvolutionAndGen1MapsGroup() {
+        val bulbasaur = gbMonKey(1, 0x1234, 0xABCD)
+        val ivysaur = gbMonKey(2, 0x1234, 0xABCD)
+        assertTrue(bulbasaur != ivysaur)
+        assertEquals(NuzlockeSample.runId(bulbasaur, GameKind.YELLOW), NuzlockeSample.runId(ivysaur, GameKind.YELLOW))
+        assertEquals(bulbasaur, NuzlockeSample.runId(bulbasaur, GameKind.FIRERED))   // a real personality stays as it is
+        // Every Gen 1 map with a town-map name counts as the first map of that name: one area per place.
+        val byName = mapSecDataYellow.entries.groupBy({ it.value.name }, { it.key })
+        val multi = byName.values.first { it.size > 1 }
+        assertEquals(1, multi.map { NuzlockeSample.areaOf(it, GameKind.YELLOW) }.toSet().size)
+        assertEquals(multi[1], NuzlockeSample.areaOf(multi[1], GameKind.CRYSTAL))     // Gen 2's are places already
     }
 }

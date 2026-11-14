@@ -402,6 +402,8 @@ fun readGen1Telemetry(r: MemoryReader, cfg: Gen1Config): Telemetry {
         frameCounter = frames,
         inBattle = inBattle,
         isDoubleBattle = false,
+        // wIsInBattle: 1 a wild Pokémon, 2 a trainer's.
+        isTrainerBattle = if (inBattle) battle == 2 else null,
         mapGroup = 0,
         mapNum = map,
         regionMapSectionId = map,

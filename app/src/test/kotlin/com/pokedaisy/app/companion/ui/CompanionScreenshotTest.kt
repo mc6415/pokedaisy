@@ -257,6 +257,28 @@ open class CompanionScreenshotTest {
         } finally { CompanionStatusBar.shown = false }
     }
 
+    /** The NUZLOCKE tab in Yellow's look (the Game Boy games follow runs too): a run over the yellow fixture's party. */
+    @Test fun yellowNuzlocke() {
+        activeGame = GameKind.YELLOW
+        val party = com.pokedaisy.app.companion.data.readGen1Telemetry(FixtureMemoryReader.load("yellow"), com.pokedaisy.app.companion.data.GEN1_YELLOW).party
+        com.pokedaisy.app.companion.Nuzlocke.preview(
+            com.pokedaisy.app.companion.data.NuzlockeRun(
+                encounters = listOf(
+                    com.pokedaisy.app.companion.data.NuzlockeEncounter(12, "ROUTE 1", 16, com.pokedaisy.app.companion.data.NuzlockeOutcome.CAUGHT),
+                    com.pokedaisy.app.companion.data.NuzlockeEncounter(51, "VIRIDIAN FOREST", 10, com.pokedaisy.app.companion.data.NuzlockeOutcome.MISSED),
+                ),
+                mons = party.mapIndexed { i, m ->
+                    com.pokedaisy.app.companion.data.NuzlockeMon(
+                        com.pokedaisy.app.companion.data.NuzlockeSample.runId(m.personality, GameKind.YELLOW), m.species,
+                        m.nickname ?: "MON", m.level, areaName = if (i == 0) "" else "ROUTE 1", dead = i == 2,
+                        diedIn = if (i == 2) "MT.MOON" else "", diedLevel = if (i == 2) m.level else 0,
+                    )
+                },
+            ),
+        )
+        try { yellow("yellow", "NUZLOCKE") } finally { com.pokedaisy.app.companion.Nuzlocke.load(false, null, {}, {}) }
+    }
+
     @Test fun yellowSettingsStatusBar() {
         CompanionStatusBar.shown = true
         try { yellow("yellow", "SETTINGS", statusBar = true) } finally { CompanionStatusBar.shown = false }

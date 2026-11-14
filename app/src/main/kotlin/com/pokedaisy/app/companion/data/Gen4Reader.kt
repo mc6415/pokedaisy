@@ -841,6 +841,7 @@ fun readGen4Telemetry(r: MemoryReader, cfg: Gen4Config): Telemetry {
         repelSteps = cfg.repelStepsOff?.let { u8(r.readCoreMemory(body + it, 1), 0) },
         enemyParty = if (battle?.trainer == true) battle.foes else emptyList(),
         battleFoes = battle?.foes ?: emptyList(),
+        isTrainerBattle = battle?.trainer,
         enemyActive = if (battle?.trainer == true) enemyActive else -1,
         regionMapTile = map?.block ?: pgCell,
         townsVisited = map?.firstArrivals ?: flypoints,
