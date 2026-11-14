@@ -39,6 +39,8 @@ enum {
     GB_HOURS,             // Crystal: hHours (HRAM)
     GB_CLEAR,             // Crystal Clear: per-tile attributes and compressed connected maps
     PC_METATILES, PC_ATTRIBUTES, PC_SCRATCH, PC_MAP_ATTR_BANK, PC_LOADED_PALS,
+    GB_TEXT_BIT,          // Gen 2: GB_FONT_LOADED's text-state bit; 0 = Crystal's TEXT_STATE_F (6). Gold / Silver: 7 of
+                          // wUnusedReanchorBGMapFlags, set and cleared where Crystal's is (ReanchorBGMap_NoOAMUpdate, CloseText)
     GB_CONFIG
 };
 

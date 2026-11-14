@@ -14,7 +14,7 @@ change to any of the places listed under "Where it's decided" updates its rows h
 | Red / Blue (GB) | USA/Europe | n/a | ✅ | ✅ ¹ | ✅ ⁸ | — | ✅ ¹³ | — | n/a | n/a | ✅ ¹³ | ✅ ¹³ | — | n/a | n/a | — | — |
 | Red / Blue (GB) | DE (Rote Edition / Blaue Edition) | n/a | ✅ | ✅ ¹ | ✅ ⁸ | — | ✅ ¹³ | — | n/a | n/a | ✅ ¹³ | ✅ ¹³ | — | n/a | n/a | — | — |
 | PureRed / PureBlue (GB) | 2.7.6 | n/a | ✅ | ✅ ¹ | ✅ ⁸ | — | ✅ ¹³ | — | n/a | n/a | ✅ ¹³ | ✅ ¹³ | — | n/a | n/a | — | — |
-| Gold / Silver (GBC) | USA/Europe | n/a | ✅ | ✅ ¹ | ✅ ⁸ | — | — | — | n/a | n/a | n/a | n/a | — | n/a | — | — | — |
+| Gold / Silver (GBC) | USA/Europe | ✅ ¹² | ✅ | ✅ ¹ | ✅ ⁸ | — | — | — | n/a | n/a | n/a | n/a | — | n/a | — | — | — |
 | Gold / Silver (GBC) | DE (Goldene Edition, Silberne Edition) | n/a | ✅ | ✅ ¹ | ✅ ⁸ | — | — | — | n/a | n/a | n/a | n/a | — | n/a | — | — | — |
 | Crystal (GBC) | USA, USA/Europe rev 1, AU | ✅ ¹² | ✅ | ✅ ¹ | ✅ ⁸ | — | ✅ ¹³ | — | n/a | n/a | ✅ ¹³ | ✅ ¹³ | — | n/a | — | — | — |
 | Crystal (GBC) | DE (Kristall) | ✅ ¹² | ✅ | ✅ ¹ | ✅ ⁸ | — | ✅ ¹³ | — | n/a | n/a | ✅ ¹³ | ✅ ¹³ | — | n/a | — | — | — |
@@ -194,6 +194,14 @@ change to any of the places listed under "Where it's decided" updates its rows h
     New Bark Town (its name sign up), in and out of a house, the START menu, OPTION, SAVE, a wild battle and RUN: every
     map frame exact but those the game wrote VRAM or a palette in mid-frame. Crystal Clear (all four builds) has the same
     over its own tables: palette maps a byte per tile, 256 blocks, its compressed connected maps, its own object sprites.
+    Gold / Silver (USA, Europe; 2026-11-14) have Crystal's over pokegold's symbols (`GB_GOLD_SILVER`: one row, both carts'
+    addresses equal) - the same object, map-object, event and sprite layouts and palette maps (bank 02) - but no
+    TEXT_STATE_F: their text state is wUnusedReanchorBGMapFlags bit 7, which the game sets as it loads and leaves set on
+    the plain field until a text box first closes, so it counts only with font tiles on screen (`GB_TEXT_BIT`,
+    `gbTextNow`); without that OPTION drew black strips (no field colours ever kept). Checked headless from the `gold`
+    fixture's save: Route 29 east across the connection into New Bark Town and back, the START menu, OPTION (the field's
+    strips, its colours), a wild battle (plain bars) and RUN, every map frame exact (4332 in Gold, 1902 in Silver) but
+    those the game wrote VRAM or a palette in mid-frame. The German carts aren't on it.
     Polished Crystal has it on 3.2.3's normal build only (CRC32 `f98367e4`; Keegan's profile, first in the libretro core, now
     the app's too): its own structs and LZ (`pk_wide_gb_polished.inc`, addresses from the release's `.sym` by
     `scripts/gen_polished_wide.py`). Checked headless on the new-game save: a walk round its route and grass, the START menu and OPTION

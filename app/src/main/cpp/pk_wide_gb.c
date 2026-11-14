@@ -67,6 +67,17 @@ static const struct GbGame { uint32_t crc; int gen; uint32_t a[GB_CONFIG]; } GB_
     { 0x616D85DEu, 2, { 0, 0, 0xC800, 0xD194, 0xDCB7, 0xD196, 0xD199, 0xD19E, 0xD1A8, 0xD1DC, 0xD19D, 0xD22D, 0xD0ED, 0, 0,
                         GB_LINEAR(0x25, 0x4000), 0, 0xCF74, 0xDA72, 0xD1E6, 0x13, 0xD4D6, 0xD71E, 0xD81E, 0xD154, 0xD82E,
                         GB_LINEAR(0x05, 0x4736), GB_LINEAR(0x01, 0x4276), 0xFF9E, 0xFFCF, 0xD269, 0xFF94 } },
+    // Pokémon Gold / Silver (USA, Europe): pret/pokegold's symbols (pokegold.sym = pokesilver.sym for every one of these;
+    // both builds are the carts byte for byte). Crystal's engine with its own RAM: the same object / map-object / event
+    // layouts, palette maps (in bank 02), sprite and movement tables, CheckObjectTime and VBLANK_CUTSCENE. Gold has no
+    // TEXT_STATE_F: its text state is wUnusedReanchorBGMapFlags bit 7 (D565), set and cleared at the same two places.
+#define GB_GOLD_SILVER { 0, 0, 0xC700, 0xD07D, 0xDA02, 0xD07F, 0xD082, 0xD087, 0xD091, 0xD0C5, 0xD086, 0xD116, 0xD565, 0, 0, \
+                         GB_LINEAR(0x25, 0x40ED), 0, 0xCEAB, 0xD7B7, 0xD0CF, 0x02, 0xD1FD, 0xD445, 0xD545, 0xD05D, 0xD555, \
+                         GB_LINEAR(0x05, 0x47DE), GB_LINEAR(0x01, 0x4274), 0xFFA0, 0xFFD1, 0xD157, 0xFF96, \
+                         [GB_TEXT_BIT] = 7 }
+    { 0x6BDE3C3Eu, 2, GB_GOLD_SILVER },
+    { 0x8AD48636u, 2, GB_GOLD_SILVER },
+#undef GB_GOLD_SILVER
     // Pokémon Crystal Legacy v1.3.1: its pokecrystal.sym (its build is the patched cart byte for byte).
     { 0x12E97FB4u, 2, { 0, 0, 0xC800, 0xD19F, 0xDCC2, 0xD1A1, 0xD1A4, 0xD1A9, 0xD1B3, 0xD1E7, 0xD1A8, 0xD238, 0xD0F8, 0, 0,
                         GB_LINEAR(0x25, 0x4000), 0, 0xCF74, 0xDA7D, 0xD1F1, 0x13, 0xD4E1, 0xD729, 0xD829, 0xD15F, 0xD839,
@@ -405,7 +416,7 @@ static void gbTake(struct GbSnap* s) {
           gbRamCopy(s->vars, A[GB_VAR_SPRITES], 11);
           s->scx = gbHram(A[GB_HSCX]);
           s->scy = gbHram(A[GB_HSCX] + 1);
-          s->text = (gbRam(A[GB_FONT_LOADED]) >> 6) & 1;
+          s->text = (gbRam(A[GB_FONT_LOADED]) >> (A[GB_TEXT_BIT] ? A[GB_TEXT_BIT] : 6)) & 1;
           s->startItem = gbRam(A[GB_START_ITEM]);
           s->ok = true;
           return;
@@ -418,7 +429,7 @@ static void gbTake(struct GbSnap* s) {
         gbRamCopy(s->masks, A[GB_OBJECT_MASKS], 16);
         gbRamCopy(s->used, A[GB_USED_SPRITES], (int) sizeof(s->used));
         gbRamCopy(s->vars, A[GB_VAR_SPRITES], (int) sizeof(s->vars));
-        s->text = (gbRam(A[GB_FONT_LOADED]) >> 6) & 1;   // TEXT_STATE_F: a text box or a menu is up
+        s->text = (gbRam(A[GB_FONT_LOADED]) >> (A[GB_TEXT_BIT] ? A[GB_TEXT_BIT] : 6)) & 1;   // TEXT_STATE_F: a text box or a menu is up
         s->startItem = gbRam(A[GB_START_ITEM]);
         s->ok = gbRom(s->blockset, 256 * 16) != NULL && gbRom(s->palMap, A[GB_CLEAR] ? 256 : 128) != NULL;
         return;
@@ -629,6 +640,7 @@ static inline int gbScreenTile(int i, int j, uint8_t* attr) {
 
 static uint16_t gbScreen[18][20];    // this frame's screen tiles (gbScreenTile), read once
 static int gbScreenMap;              // ... how many are map tiles
+static int gbScreenFont;             // ... how many are font tiles (VRAM bank 0, GB_MAP_TILES up): a text box or menu
 
 /** Every map tile on screen is the world's at (tx, ty) - however few. */
 static bool gbExact(const struct GbSnap* s, int tx, int ty) {
@@ -640,11 +652,19 @@ static bool gbExact(const struct GbSnap* s, int tx, int ty) {
 
 static void gbReadScreen(void) {
     gbScreenMap = 0;
+    gbScreenFont = 0;
     for (int j = 0; j < 18; j++)
         for (int i = 0; i < 20; i++) {
             gbScreen[j][i] = (uint16_t) gbScreenTile(i, j, NULL);
             gbScreenMap += gbMapKey(gbScreen[j][i]);
+            gbScreenFont += gbScreen[j][i] >= GB_MAP_TILES && gbScreen[j][i] < 0x100;
         }
+}
+
+/** A snapshot's text state as this frame shows it. Gold / Silver's flag (GB_TEXT_BIT) is set when the game loads and
+ * stays set on the plain field until a text box first closes, so there it counts only with font tiles on screen. */
+static bool gbTextNow(const struct GbSnap* m) {
+    return m->text && (!gbCfg[GB_TEXT_BIT] || gbScreenFont > 0);
 }
 
 /** Per mille of the screen's map tiles world tile (tx, ty) onwards matches, or -1 with too few map tiles. With
@@ -1521,6 +1541,7 @@ int pk_wide_gb_view(struct mCore* core, const uint32_t* frame, uint32_t* out, st
     int best = -1, bestTx = 0, bestTy = 0, bestSnap = -1;
     bool option = false;
     gbScreenMap = 0;
+    gbScreenFont = 0;
     if (gbLcdc & 0x80) {
         gbReadScreen();
         const int order[2] = { gbPrev, cur };
@@ -1641,14 +1662,14 @@ int pk_wide_gb_view(struct mCore* core, const uint32_t* frame, uint32_t* out, st
     else if (valid && bestSnap != 2 && gbScreenMap > 0) {
         const struct GbSnap* m = &gbSnaps[bestSnap];
         bool startBox = gbScreen[0][10] == GB_START_TILE_L && gbScreen[0][19] == GB_START_TILE_R;
-        gbFromStart = m->text && startBox ? true : m->text ? gbFromStart : false;
+        gbFromStart = gbTextNow(m) && startBox ? true : gbTextNow(m) ? gbFromStart : false;
     }
     // A wild battle's flashes and wipe run on the field with wIsInBattle already set: the pull-in starts with them.
     const struct GbSnap* match = !valid ? NULL : bestSnap == 2 ? &gbGood : &gbSnaps[bestSnap];
     gbLastScene = fade ? PK_WIDE_SCENE_FADE
                 : battle ? (valid ? PK_WIDE_SCENE_BATTLE_START : PK_WIDE_SCENE_OFF)
                 : !valid ? PK_WIDE_SCENE_MENU
-                : match->text ? PK_WIDE_SCENE_TEXT : PK_WIDE_SCENE_FIELD;
+                : gbTextNow(match) ? PK_WIDE_SCENE_TEXT : PK_WIDE_SCENE_FIELD;
     gbLastClose = gbLastScene != PK_WIDE_SCENE_FIELD;
 
     if (valid) {
