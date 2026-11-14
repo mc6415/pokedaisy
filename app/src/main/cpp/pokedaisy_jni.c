@@ -1436,7 +1436,14 @@ Java_com_pokedaisy_app_MgbaCore_pkRomRead(JNIEnv* env, jobject thiz, jlong off, 
         struct GB* gb = g.core->board;
         if (gb->memory.rom && (size_t) off + (size_t) len <= gb->pristineRomSize) {
             out = (*env)->NewByteArray(env, len);
-            if (out) {
+            uint8_t* buf = out ? malloc((size_t) len) : NULL;
+            if (buf) {
+                // The file's bytes: a game option's patch (REUSABLE TMS) mustn't change the Poller's hash.
+                memcpy(buf, (const uint8_t*) gb->memory.rom + off, (size_t) len);
+                pk_cheats_overlay_file((uint32_t) off, buf, len);
+                (*env)->SetByteArrayRegion(env, out, 0, len, (const jbyte*) buf);
+                free(buf);
+            } else if (out) {
                 (*env)->SetByteArrayRegion(env, out, 0, len, (const jbyte*) gb->memory.rom + off);
             }
         }

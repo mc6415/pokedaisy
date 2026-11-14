@@ -14,9 +14,9 @@ change to any of the places listed under "Where it's decided" updates its rows h
 | Red / Blue (GB) | USA/Europe | n/a | ✅ | ✅ ¹ | ✅ ⁸ | — | ✅ ¹³ | — | n/a | n/a | ✅ ¹³ | ✅ ¹³ | — | n/a | n/a | — | — |
 | Red / Blue (GB) | DE (Rote Edition / Blaue Edition) | n/a | ✅ | ✅ ¹ | ✅ ⁸ | — | ✅ ¹³ | — | n/a | n/a | ✅ ¹³ | ✅ ¹³ | — | n/a | n/a | — | — |
 | PureRed / PureBlue (GB) | 2.7.6 | n/a | ✅ | ✅ ¹ | ✅ ⁸ | — | ✅ ¹³ | — | n/a | n/a | ✅ ¹³ | ✅ ¹³ | — | n/a | n/a | — | — |
-| Gold / Silver (GBC) | USA/Europe | n/a | ✅ | ✅ ¹ | ✅ ⁸ | — | — | — | n/a | n/a | n/a | n/a | — | n/a | — | — | — |
+| Gold / Silver (GBC) | USA/Europe | n/a | ✅ | ✅ ¹ | ✅ ⁸ | — | — | — | n/a | n/a | n/a | n/a | ✅ ⁴⁰ | n/a | — | — | — |
 | Gold / Silver (GBC) | DE (Goldene Edition, Silberne Edition) | n/a | ✅ | ✅ ¹ | ✅ ⁸ | — | — | — | n/a | n/a | n/a | n/a | — | n/a | — | — | — |
-| Crystal (GBC) | USA, USA/Europe rev 1, AU | ✅ ¹² | ✅ | ✅ ¹ | ✅ ⁸ | — | ✅ ¹³ | — | n/a | n/a | ✅ ¹³ | ✅ ¹³ | — | n/a | — | — | — |
+| Crystal (GBC) | USA, USA/Europe rev 1, AU | ✅ ¹² | ✅ | ✅ ¹ | ✅ ⁸ | — | ✅ ¹³ | — | n/a | n/a | ✅ ¹³ | ✅ ¹³ | ✅ ⁴⁰ | n/a | — | — | — |
 | Crystal (GBC) | DE (Kristall) | ✅ ¹² | ✅ | ✅ ¹ | ✅ ⁸ | — | ✅ ¹³ | — | n/a | n/a | ✅ ¹³ | ✅ ¹³ | — | n/a | — | — | — |
 | Crystal Legacy (GBC) | 1.3.1 | ✅ ¹² | ✅ | ✅ ¹ | ✅ ⁸ | — | ✅ ¹³ | — | n/a | n/a | ✅ ¹³ | ✅ ¹³ | — | n/a | — | — | — |
 | Crystal Clear (GBC) | 2.5.11, 2.6.0 (4 builds) | ✅ ¹² | ✅ | ✅ ¹ | ✅ ⁸ | — | — | — | n/a | n/a | n/a | n/a | — | n/a | — | — | — |
@@ -578,6 +578,13 @@ change to any of the places listed under "Where it's decided" updates its rows h
     melonDS only (DSperate shows `N/A`). Proved headless on Platinum (a TM taught through the game's own bag: one left with
     the patch, none without); HeartGold and SoulSilver hold the same instructions at their address (their X menu isn't open
     on a new game to try it there). Black, White and their sequels keep their TMs by themselves.
+40. REUSABLE TMS on Gold / Silver / Crystal (`ReusableTms.gbSites`, 2026-11-14): pret's ConsumeTM (engine/items/tmhm.asm),
+    TeachTMHM's one call once a TM's move went in, gets a `ret` over its first byte, so wTMsHMs' count is never lowered;
+    the friendship the TM gives (ChangeHappiness, before it) stays. By the English carts' hashes, its 20 bytes checked by
+    the patch (0B:4B0C in every Crystal release, 0B:4911 in Gold / Silver; pokecrystal / pokegold's .sym). A Game Boy cart's
+    game option patches go through `pk_cheats_patch` now (addresses = places in the ROM file, mGBA's GBPatch8), and
+    `pkRomRead` shows the file's bytes under them (the Poller's hash). Taught headless through the game's own PACK in
+    Crystal rev 1, Gold and Silver (TM10 on the fixtures' saves: 3 left, 2 without the patch). The German carts aren't on it.
 
 ## What each column is
 

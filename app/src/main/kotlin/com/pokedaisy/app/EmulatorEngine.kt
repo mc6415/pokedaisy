@@ -1960,13 +1960,13 @@ class EmulatorEngine(
             return
         }
         MgbaCore.pkRomUnpatch()
-        if (!gba) return
-        val text = textPatch.takeIf { instantText }
+        // A Game Boy cart: REUSABLE TMS alone (ReusableTms.gbSites; INSTANT TEXT is GBA only).
+        val text = if (gba) textPatch.takeIf { instantText } else null
         // All or none, each: a ROM that only matched in part would still use TMs up on the other paths, and half a text
         // routine can't run. pkRomUnpatch takes everything, so text that fails puts the TMs' back.
         val sites = tmSites
         val tms = reusableTms && sites.isNotEmpty() && sites.all {
-            MgbaCore.pkRomPatch(it.at, it.expect, it.branch, com.pokedaisy.app.companion.data.ReusableTms.ALWAYS_SKIP)
+            MgbaCore.pkRomPatch(it.at, it.expect, it.branch, it.value)
         }
         if (reusableTms && sites.isNotEmpty()) {
             if (!tms) MgbaCore.pkRomUnpatch()
@@ -1975,7 +1975,7 @@ class EmulatorEngine(
         if (text != null && !text.writes.all { MgbaCore.pkRomPatch(it.addr, it.expect, it.addr, it.value) }) {
             MgbaCore.pkRomUnpatch()
             if (tms) sites.forEach {
-                MgbaCore.pkRomPatch(it.at, it.expect, it.branch, com.pokedaisy.app.companion.data.ReusableTms.ALWAYS_SKIP)
+                MgbaCore.pkRomPatch(it.at, it.expect, it.branch, it.value)
             }
             Log.i("pokedaisy", "instant text: code didn't match")
         } else if (text != null) Log.i("pokedaisy", "instant text: ${text.writes.size} piece(s) patched")

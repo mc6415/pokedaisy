@@ -96,4 +96,43 @@ class ReusableTmsTest {
         org.junit.Assert.assertFalse(ReusableTms.dsProved("IPKD", 0))
         org.junit.Assert.assertFalse(ReusableTms.dsProved("IRBO", 0))
     }
+
+    /** Gold / Silver / Crystal ([ReusableTms.gbSites]): ConsumeTM by the cart's hash, its bytes checked; `ret` over its first. */
+    @Test fun gameBoySites() {
+        fun rom(off: Int, hex: String) = ByteArray(0x200000).also { b ->
+            hex.chunked(2).forEachIndexed { i, h -> b[off + i] = h.toInt(16).toByte() }
+        }
+        val crystal = rom(0x2CB0C, "cda747fa65d23d2159d806004f097ea7c83d77c0")
+        for (sha1 in TelemetrySampler.CRYSTAL_SHA1S) {
+            val s = ReusableTms.gbSites(sha1, crystal).single()
+            assertEquals(0x2CB0CL, s.at)
+            assertEquals(0x2CB0CL, s.branch)
+            assertTrue(s.value.contentEquals(byteArrayOf(0xC9.toByte())))
+            assertEquals(20, s.expect.size)
+        }
+        val gold = rom(0x2C911, "cdb245fa51d13d217ed506004f097ea7c83d77c0")
+        for (sha1 in listOf(TelemetrySampler.GOLD_SHA1, TelemetrySampler.SILVER_SHA1)) {
+            assertEquals(0x2C911L, ReusableTms.gbSites(sha1, gold).single().at)
+        }
+        // Another cart's hash, or bytes that aren't ConsumeTM's: nothing.
+        assertTrue(ReusableTms.gbSites(TelemetrySampler.GOLD_DE_SHA1, gold).isEmpty())
+        assertTrue(ReusableTms.gbSites(TelemetrySampler.GOLD_SHA1, crystal).isEmpty())
+        assertTrue(ReusableTms.gbSites(TelemetrySampler.CRYSTAL_REV1_SHA1, ByteArray(0x1000)).isEmpty())
+    }
+
+    /** Each English cart here, its real bytes. Skips a ROM that isn't here. */
+    @Test fun gameBoySitesInTheCarts() {
+        val dir = File(System.getProperty("romDir") ?: System.getenv("POKEDAISY_ROM_DIR") ?: return).parentFile.resolve("gbc")
+        val carts = listOf(
+            "Pokemon - Crystal Version (USA, Europe) (Rev 1).gbc",
+            "Pokemon - Gold Version (USA, Europe) (SGB Enhanced) (GB Compatible).gbc",
+            "Pokemon - Silver Version (USA, Europe) (SGB Enhanced) (GB Compatible).gbc",
+        ).map { dir.resolve(it) }.filter { it.isFile }
+        assumeTrue(carts.isNotEmpty())
+        for (f in carts) {
+            val b = f.readBytes()
+            val sha1 = java.security.MessageDigest.getInstance("SHA-1").digest(b).joinToString("") { "%02x".format(it) }
+            assertEquals(f.name, 1, ReusableTms.gbSites(sha1, b).size)
+        }
+    }
 }

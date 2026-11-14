@@ -29,8 +29,7 @@ import java.nio.channels.FileChannel
 object ReusableTms {
     /** One spot: [expect] is the ROM from [at] (the compare through the RemoveBagItem call); the branch to patch sits
      * [BRANCH] bytes in. */
-    class Site(val at: Long, val expect: ByteArray) {
-        val branch get() = at + BRANCH
+    class Site(val at: Long, val expect: ByteArray, val branch: Long = at + BRANCH, val value: ByteArray = ALWAYS_SKIP) {
         /** Where its call goes: the build's RemoveBagItem. */
         val calls: Long get() = blTarget(at + 12, expect, 12)
     }
@@ -59,6 +58,33 @@ object ReusableTms {
         code.startsWith("BPR") || code.startsWith("BPG") || code.startsWith("PUV") -> 3
         code.startsWith("BPE") || code.startsWith("AXV") || code.startsWith("AXP") -> 1
         else -> 0
+    }
+
+    /**
+     * Gold / Silver / Crystal: pret's ConsumeTM (engine/items/tmhm.asm, TeachTMHM's one call after a TM's move went in:
+     * `call ConvertCurItemIntoCurTMHM; ld a, [wTempTMHM]; dec a; ld hl, wTMsHMs; ...; dec a; ld [hl], a`) starts with a
+     * `ret` (C9), so the TM's count is never lowered - everything else, the friendship it gives included, stays the game's.
+     * Its 20 bytes in the ROM file, by the English carts' hashes (every Crystal release keeps it at 0B:4B0C, Gold and
+     * Silver at 0B:4911), checked again by the patch itself. Taught in the game's own PACK headless on all three: TM10 kept
+     * at 3 (2 without the patch).
+     */
+    private class GbConsumeTm(val sha1s: Set<String>, val offset: Long, val hex: String)
+
+    private val GB_CONSUME_TM = listOf(
+        GbConsumeTm(TelemetrySampler.CRYSTAL_SHA1S, 0x2CB0C, "cda747fa65d23d2159d806004f097ea7c83d77c0"),
+        GbConsumeTm(setOf(TelemetrySampler.GOLD_SHA1, TelemetrySampler.SILVER_SHA1), 0x2C911, "cdb245fa51d13d217ed506004f097ea7c83d77c0"),
+    )
+
+    /** `ret`, over ConsumeTM's first byte. */
+    val GB_RET = byteArrayOf(0xC9.toByte())
+
+    /** A Game Boy cart's site ([GB_CONSUME_TM]) for the ROM file whose SHA-1 is [sha1], if its bytes are ConsumeTM's. */
+    fun gbSites(sha1: String, rom: ByteArray): List<Site> {
+        val c = GB_CONSUME_TM.firstOrNull { sha1 in it.sha1s } ?: return emptyList()
+        val expect = c.hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        val at = c.offset.toInt()
+        if (rom.size < at + expect.size || !rom.copyOfRange(at, at + expect.size).contentEquals(expect)) return emptyList()
+        return listOf(Site(c.offset, expect, branch = c.offset, value = GB_RET))
     }
 
     private val cache = HashMap<String, List<Site>>()
