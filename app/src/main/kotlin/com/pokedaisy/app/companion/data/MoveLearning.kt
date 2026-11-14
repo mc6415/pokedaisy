@@ -79,7 +79,7 @@ object MoveLearning {
             else -> "TM%02d".format(1 + itemId - DS_TM01)
         }
         val i = itemId - VANILLA_ITEM_TM01
-        return if (i < 50) "TM%02d".format(i + 1) else "HM%02d".format(i - 49)
+        return if (i < 50) "TM${(i + 1).pad(2)}" else "HM${(i - 49).pad(2)}"
     }
 
     /** The move TM / HM item [itemId] teaches; null = not a TM or the table isn't read. */
