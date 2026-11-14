@@ -87,4 +87,13 @@ class ReusableTmsTest {
         assertEquals(1, ReusableTms.expectedSites("AXPJ"))
         assertEquals(0, ReusableTms.expectedSites("CGB0"))
     }
+
+    @Test fun dsCartsProved() {
+        org.junit.Assert.assertTrue(ReusableTms.dsProved("CPUE", 1))
+        org.junit.Assert.assertTrue(ReusableTms.dsProved("IPKE", 0))
+        org.junit.Assert.assertTrue(ReusableTms.dsProved("IPGE", 0))
+        org.junit.Assert.assertFalse(ReusableTms.dsProved("CPUE", 0))
+        org.junit.Assert.assertFalse(ReusableTms.dsProved("IPKD", 0))
+        org.junit.Assert.assertFalse(ReusableTms.dsProved("IRBO", 0))
+    }
 }

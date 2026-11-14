@@ -532,6 +532,8 @@ int pk_ndsd_action(int, const uint32_t[4]) { return 0; }
 int pk_ndsd_action_status(int) { return -1; }
 bool pk_ndsd_action_results(int, uint32_t*) { return false; }
 
+void pk_ndsd_set_reusable_tms(bool) {}   // melonDS only (its RAM patch); DSperate shows the row N/A
+
 void pk_ndsd_set_wild_off(bool off)
 {
     if (d) d->wildOff = off;

@@ -45,6 +45,12 @@ object ReusableTms {
     /** Games whose own TMs never run out, so the row says so instead of offering it: Radical Red, Unbound and SoulGold
      * checked headless (a TM taught on their saves stayed in the bag: SoulGold v1.1.4 and v1.2's third build), Prism and
      * Polished Crystal (a bit per TM). */
+    /** The DS carts the RAM patch was proved on (nds/pk_nds.cpp's TM_PATCHES: the party menu's TeachMove keeps the TM),
+     * by game code and revision. Black, White and their sequels keep TMs by themselves ([BUILT_IN]). */
+    val DS_CARTS = setOf("CPUE" to 1, "IPKE" to 0, "IPGE" to 0)
+
+    fun dsProved(code: String, revision: Int?): Boolean = (code to revision) in DS_CARTS
+
     val BUILT_IN = setOf(GameKind.RADICAL_RED, GameKind.UNBOUND, GameKind.SOULGOLD, GameKind.PRISM, GameKind.POLISHED_CRYSTAL, GameKind.BLACK, GameKind.WHITE, GameKind.BLACK2, GameKind.WHITE2)
 
     /** How many sites the engine behind [code] (the header's game code) has: the FireRed engine (FireRed, LeafGreen,

@@ -177,6 +177,9 @@ class PokeDaisyActivity : Activity() {
 
     /** REUSABLE TMS: the ROM's spots that use a TM up ([com.pokedaisy.app.companion.data.ReusableTms]; empty = none). */
     private var tmSites: List<com.pokedaisy.app.companion.data.ReusableTms.Site> = emptyList()
+    /** REUSABLE TMS on a DS cart the patch was proved on (ReusableTms.DS_CARTS), on melonDS. */
+    @Volatile private var dsTmCart = false
+    private fun dsTms() = dsTmCart && !dsperate
     /** INSTANT TEXT: the ROM's patch ([com.pokedaisy.app.companion.data.InstantText]; null = the row shows N/A). */
     private var textPatch: com.pokedaisy.app.companion.data.InstantText.Patch? = null
     /** EXPAND's one-time offer is up on the companion ([CompanionSettings.expandOffer]). */
@@ -1755,9 +1758,9 @@ class PokeDaisyActivity : Activity() {
             if (coopRefuses()) return
             if (on) com.pokedaisy.app.companion.FeatureTips.used(TipId.REUSABLE_TMS)
             Prefs(this@PokeDaisyActivity).reusableTms = on
-            if (::engine.isInitialized) engine.setReusableTms(tmSites, on)
+            if (::engine.isInitialized) engine.setReusableTms(tmSites, on, dsTms())
         }
-        override val reusableTmsSupported get() = tmSites.isNotEmpty()
+        override val reusableTmsSupported get() = tmSites.isNotEmpty() || dsTms()
         override val instantText get() = Prefs(this@PokeDaisyActivity).instantText
         override fun setInstantText(on: Boolean) {
             Prefs(this@PokeDaisyActivity).instantText = on
@@ -2519,6 +2522,9 @@ class PokeDaisyActivity : Activity() {
         val ndsCode = if (nds) RomIdentity.ndsGameCode(r).orEmpty() else ""
         romOrigin = nds && ndsCode == com.pokedaisy.app.companion.data.OriginHeartGold.CODE &&
             com.pokedaisy.app.companion.data.OriginHeartGold.matches(r)
+        // Retail only: Renegade Platinum keeps retail's header (and this code), but wasn't tried.
+        dsTmCart = nds && com.pokedaisy.app.companion.data.ReusableTms.dsProved(ndsCode, RomIdentity.ndsRevision(r)) &&
+            !(ndsCode == com.pokedaisy.app.companion.data.RenegadePlatinum.CODE && com.pokedaisy.app.companion.data.RenegadePlatinum.matches(r))
         dsWildRates = if (!nds) null else if (romOrigin) {
             // Its tables are read in the background (NdsArt.prefetch); the core may start first, so read them here then.
             { (com.pokedaisy.app.companion.data.OriginHeartGold.data ?: com.pokedaisy.app.companion.data.NdsArt.readOrigin(r))?.wildRates ?: IntArray(0) }
@@ -2580,7 +2586,7 @@ class PokeDaisyActivity : Activity() {
                 wildFlag = flag
                 if (::engine.isInitialized) engine.wildFlag = flag
                 tmSites = tms
-                if (::engine.isInitialized) engine.setReusableTms(tms, Prefs(this).reusableTms)
+                if (::engine.isInitialized) engine.setReusableTms(tms, Prefs(this).reusableTms, dsTms())
                 textPatch = text
                 if (::engine.isInitialized) engine.setInstantText(text, Prefs(this).instantText)
             }
@@ -2913,7 +2919,7 @@ class PokeDaisyActivity : Activity() {
         e.wildEncounters = p.wildEncounters
         e.ndsScale = p.dsResolution
         e.ndsCpuBoost = p.dsCpuBoost
-        e.setReusableTms(tmSites, p.reusableTms)
+        e.setReusableTms(tmSites, p.reusableTms, dsTms())
         e.setInstantText(textPatch, p.instantText)
         e.setShinyTarget(shinyTarget)
         e.shinyOdds = shinyOddsPref()

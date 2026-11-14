@@ -2191,6 +2191,12 @@ Java_com_pokedaisy_app_MgbaCore_pkNdsAction(JNIEnv* env, jobject thiz, jint acti
     return pk_nds_active() ? pk_nds_action((int) action, args) : 0;
 }
 
+// REUSABLE TMS on a DS game (pk_nds.cpp's TM_PATCHES). Emu thread.
+JNIEXPORT void JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkNdsReusableTms(JNIEnv* env, jobject thiz, jboolean on) {
+    if (pk_nds_active()) pk_nds_set_reusable_tms(on == JNI_TRUE);
+}
+
 // The job's results once it ran (op i's into [i]), or null.
 JNIEXPORT jintArray JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkNdsActionResults(JNIEnv* env, jobject thiz, jint seq) {

@@ -319,6 +319,9 @@ object MgbaCore {
     /** How job [seq] did: 1 ran, 0 still waiting, -1 never will (the field changed under it). Emu thread. */
     external fun pkNdsActionStatus(seq: Int): Int
 
+    /** REUSABLE TMS on a DS game (nds/pk_nds.cpp's TM_PATCHES: Platinum, HeartGold / SoulSilver; melonDS only). Emu thread. */
+    external fun pkNdsReusableTms(on: Boolean)
+
     /** PC anywhere: the Pokémon Storage System's menu, as a Pokémon Center PC opens it. */
     const val NDS_ACTION_PC = 1
     /** FLY's checks: [1] = the game's FLY error (0 = may fly from here), [1 + n] = fly spot n unlocked. */

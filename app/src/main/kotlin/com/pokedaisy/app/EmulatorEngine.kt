@@ -152,11 +152,15 @@ class EmulatorEngine(
     @Volatile private var reusableTms = false
     @Volatile private var tmPatchDirty = false
 
-    fun setReusableTms(sites: List<com.pokedaisy.app.companion.data.ReusableTms.Site>, on: Boolean) {
+    fun setReusableTms(sites: List<com.pokedaisy.app.companion.data.ReusableTms.Site>, on: Boolean, ds: Boolean = false) {
         tmSites = sites
         reusableTms = on
+        dsReusableTms = ds
         tmPatchDirty = true
     }
+
+    /** A DS cart whose TM patch the native side knows ([setReusableTms]'s [ds]): it patches the RAM itself, every frame. */
+    @Volatile private var dsReusableTms = false
 
     /** INSTANT TEXT: the ROM's patch ([com.pokedaisy.app.companion.data.InstantText]; null = none known) and whether it's
      * in; with REUSABLE TMS's on the next frame boundary. */
@@ -1951,6 +1955,10 @@ class EmulatorEngine(
     /** REUSABLE TMS and INSTANT TEXT onto the ROM (emu thread): what's on patched, the rest the file's bytes. */
     private fun applyTmPatch() {
         tmPatchDirty = false
+        if (nds) {
+            MgbaCore.pkNdsReusableTms(reusableTms && dsReusableTms)
+            return
+        }
         MgbaCore.pkRomUnpatch()
         if (!gba) return
         val text = textPatch.takeIf { instantText }
