@@ -5,6 +5,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
@@ -152,14 +155,16 @@ fun GbaText(
     val style = gbaTextStyle(pixelFontFamily(), m, scaleX)
     val k = m.fontPixel.roundToInt()
     val b = if (bold) boldOffsetPx(m.fontPixel * scaleX) else 0
-    // The layout the text was given, for its copies; set before each draw (layout comes first), read only there.
-    val laid = remember { arrayOfNulls<androidx.compose.ui.text.TextLayoutResult>(1) }
+    // The layout the text was given, for its copies; set before each draw (layout comes first), read only there. It's
+    // state, so a new layout (another word: a tab chip's when the bar reorders for a battle) redraws the copies too - a
+    // plain holder let the drawBehind keep its last recording, the old word's bold copy / shadows under the new word.
+    var laid by remember { mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null) }
     Box(modifier) {
         Text(
             text, color = color, style = style, maxLines = maxLines, overflow = TextOverflow.Ellipsis,
-            onTextLayout = { laid[0] = it },
+            onTextLayout = { laid = it },
             modifier = Modifier.drawBehind {
-                val layout = laid[0] ?: return@drawBehind
+                val layout = laid ?: return@drawBehind
                 if (shadow.alpha > 0f) for ((dx, dy) in listOf(k to 0, 0 to k, k to k)) {
                     drawText(layout, color = shadow, topLeft = Offset((dx + b).toFloat(), dy.toFloat()))
                 }
