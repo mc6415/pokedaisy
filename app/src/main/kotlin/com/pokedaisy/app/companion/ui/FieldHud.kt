@@ -97,6 +97,7 @@ import com.pokedaisy.app.companion.data.PokedexState
 import com.pokedaisy.app.companion.data.SlotVerdict
 import com.pokedaisy.app.companion.data.SnapshotView
 import com.pokedaisy.app.companion.data.activeGame
+import com.pokedaisy.app.companion.data.isGameBoyGame
 import com.pokedaisy.app.companion.data.activeRegionMap
 import com.pokedaisy.app.companion.data.gameCase
 import com.pokedaisy.app.companion.data.speciesName
@@ -1011,6 +1012,10 @@ internal fun HudMonIcon(mon: MonView, size: Dp, u: Dp, tag: Boolean = true) {
             Box(Modifier.align(Alignment.TopCenter).wrapContentSize(unbounded = true).offset(y = -u * 2)) {
                 HudStatusChip(status, u, slotTextMetrics(density, max(1, (upx * 0.6f).roundToInt())))
             }
+        }
+        // Shiny (a Game Boy game's icons can't show it) or shiny once traded to Gen 2: a small sparkle top-left, gold or amber.
+        if (!mon.isEgg && (mon.tradeShiny || mon.shiny && activeGame.isGameBoyGame)) {
+            PixelIcon(PixelIcons.sparkle, if (mon.tradeShiny) ShinyAmber else ShinyGold, Modifier.align(Alignment.TopStart).size(size * 0.3f))
         }
         // NUZLOCKE: out of the run, healed or not - a small gravestone in its bottom-right corner.
         if (com.pokedaisy.app.companion.Nuzlocke.isDead(mon.personality)) {

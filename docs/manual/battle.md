@@ -103,7 +103,7 @@ To give the foe the whole page, tap the button with the corner arrows at the bot
 
 ### Shiny foes
 
-When the wild Pokémon you're facing is shiny, the BATTLE tab says so with a gold `SHINY` plate at the top right, where a trainer's Poké Balls would be. On `INFO` its name gets a gold sparkle, and its icon shows in its shiny colours inside a gold frame. This works in the original FireRed, LeafGreen, Ruby, Sapphire and Emerald, in every language, and in the hacks [SHINY ODDS](controls.md#shiny-odds) lists, and goes well with it.
+When the wild Pokémon you're facing is shiny, the BATTLE tab says so with a gold `SHINY` plate at the top right, where a trainer's Poké Balls would be. On `INFO` its name gets a gold sparkle, and its icon shows in its shiny colours inside a gold frame. This works in the original FireRed, LeafGreen, Ruby, Sapphire and Emerald, in every language, and in the hacks [SHINY ODDS](controls.md#shiny-odds) lists, and goes well with it. In Gold, Silver, Crystal and their hacks a shiny Pokémon's name gets the gold sparkle on `INFO` too. In Red, Blue and Yellow a Pokémon (yours or the foe) that would be shiny once traded to Gold, Silver or Crystal gets a gold `GS` badge after its name instead ([PARTY](party.md) has more).
 
 ### Battle focus
 

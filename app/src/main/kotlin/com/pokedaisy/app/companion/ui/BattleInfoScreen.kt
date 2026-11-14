@@ -382,6 +382,7 @@ internal fun BattlerCard(
                     GbaText(mon.name, OptionColors.label, OptionColors.labelShadow, if (compact) small else m, modifier = Modifier.weight(1f, fill = false))
                     GenderMark(mon.genderSymbol, if (compact) small else m, Modifier.padding(start = u * 2))
                     if (mon.shiny) ShinySparkle(if (compact) small else m, Modifier.padding(start = u * 3))
+                    if (mon.tradeShiny) TradeShinyBadge(if (compact) small else m, Modifier.padding(start = u * 3))
                     if (caught) PixelArt(PixelIcons.pokeBall, caughtBall, Modifier.padding(start = u * 3).size(u * 9))
                     if (compact) {
                         Spacer(Modifier.width(u * 4))
@@ -541,6 +542,27 @@ internal val VerdictGrey = Color(0xFF8C8C94)
 internal fun ShinySparkle(m: GbaTextMetrics, modifier: Modifier = Modifier) {
     val cell = with(androidx.compose.ui.platform.LocalDensity.current) { m.fontPixel.toDp() }
     ShadowedPixelIcon(PixelIcons.sparkle, ShinyGold, OptionColors.labelShadow, m, modifier = modifier, cell = cell)
+}
+
+/** A Red / Blue / Yellow Pokémon that will be shiny once traded to Gold / Silver / Crystal ([MonView.tradeShiny]): the
+ * sparkle and "GS" in amber on a pale gold pill with a gold rim, so it never reads as a shiny of its own game. */
+@Composable
+internal fun TradeShinyBadge(m: GbaTextMetrics, modifier: Modifier = Modifier) {
+    val u = m.u
+    val cell = with(androidx.compose.ui.platform.LocalDensity.current) { m.fontPixel.toDp() }
+    Row(
+        modifier
+            .semantics { contentDescription = tr("Shiny in Gold, Silver and Crystal") }
+            .background(ShinyGold, PixelRoundedShape(u * 2))
+            .padding(u)
+            .background(ShinyPale, PixelRoundedShape(u))
+            .padding(horizontal = u * 2, vertical = u * 0.5f),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ShadowedPixelIcon(PixelIcons.sparkle, ShinyGold, ShinyAmber.copy(alpha = 0.35f), m, cell = cell)
+        Spacer(Modifier.width(u * 2))
+        GbaText(tr("GS|shiny"), ShinyAmber, ShinyGold.copy(alpha = 0.45f), m)
+    }
 }
 
 /** A Pokémon icon's [size] square box: [fill], or for a [shiny] one a gold frame on pale gold (INFO's cards, the summary). */

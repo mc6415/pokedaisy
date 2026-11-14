@@ -1271,6 +1271,14 @@ open class CompanionScreenshotTest {
     @Test fun pureBlueMap() = pure("pureblue", "MAP", blue = true)
     @Test fun pureBlueDexEntry() = pure("pureblue", "DEX", blue = true, dexEntry = 100)
     @Test fun yellowParty() = yellow("yellow", "PARTY")
+    /** The GS badge: the lead shiny once traded to Gen 2 (party slot, summary, battle INFO). */
+    @Test fun yellowPartyTradeShiny() = yellow("yellow", "PARTY", tweak = ::gsLead)
+    @Test fun yellowSummaryTradeShiny() = yellow("yellow", "PARTY", monIndex = 0, tweak = ::gsLead)
+    @Test fun yellowBattleTradeShiny() = yellow("yellow_battle", "BATTLE", tweak = { v ->
+        gsLead(v).copy(battlePlayer = v.battlePlayer.map { it.copy(tradeShiny = true) }, battleOpponent = v.battleOpponent.map { it.copy(tradeShiny = true) })
+    })
+    private fun gsLead(v: com.pokedaisy.app.companion.data.SnapshotView) =
+        v.copy(party = v.party.mapIndexed { i, m -> if (i == 0) m.copy(tradeShiny = true) else m })
     // The GUIDE (a player's request): HERE in VERMILION CITY (its people and items), on ROUTE 1 and in VIRIDIAN FOREST
     // (the wild Pokémon, caught ones marked), NEXT BOSS, the generated WHERE IS; Red's HERE on ROUTE 1 too.
     @Test fun yellowGuide() = yellow("yellow", "GUIDE", guidePage = "HERE")
@@ -1403,6 +1411,8 @@ open class CompanionScreenshotTest {
         guidePage: String? = null,
         /** The save as if it stood on this map (wCurMap): the fixtures are all in a Pokémon Center. */
         onMap: Int? = null,
+        /** Changes to the read snapshot (marks no fixture has, like a GS shiny). */
+        tweak: (com.pokedaisy.app.companion.data.SnapshotView) -> com.pokedaisy.app.companion.data.SnapshotView = { it },
     ) {
         activeGame = game
         romLanguage = cfg.language   // another test's ROM may have left Japanese names on
@@ -1412,7 +1422,7 @@ open class CompanionScreenshotTest {
         com.pokedaisy.app.companion.data.Gen1Dex.rom = if (rom.isFile) rom.readBytes() else null
         val t = com.pokedaisy.app.companion.data.readGen1Telemetry(FixtureMemoryReader.load(fixture), cfg)
             .let { if (onMap == null) it else it.copy(mapNum = onMap, regionMapSectionId = onMap) }
-        val v = buildSnapshotView(t).copy(game = game)
+        val v = tweak(buildSnapshotView(t).copy(game = game))
         // The icon sheets load asynchronously in the app; decode them before the snapshot.
         (v.party + v.battlePlayer + v.battleOpponent).forEach { m -> m.iconAsset?.let { GameArt.get(paparazzi.context, it) } }
         // The touch controls (FIGHT / moves) show with a battle input to drive.

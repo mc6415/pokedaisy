@@ -266,6 +266,7 @@ fun decodeGen1PartyMon(raw: ByteArray, off: Int, cfg: Gen1Config): Mon? {
         genderSymbol = GENDER_SYMBOL_NONE,
         exp = exp,
         personality = gen1MonKey(raw, off),   // no personality in Gen 1: the switch's key (GbPartySwitch)
+        gen2Shiny = gen2ShinyDvs(u8(raw, off + 27), u8(raw, off + 28)),
     )
 }
 
@@ -283,6 +284,7 @@ fun decodeGen1BattleMon(raw: ByteArray, cfg: Gen1Config): BattleMon? {
         status1 = u8(raw, 4).toLong(),
         moves = IntArray(4) { u8(raw, 8 + it) },
         pp = IntArray(4) { u8(raw, 25 + it) and 0x3F },
+        gen2Shiny = gen2ShinyDvs(u8(raw, 12), u8(raw, 13)),
     )
 }
 

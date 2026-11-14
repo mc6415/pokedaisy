@@ -43,6 +43,7 @@ import com.pokedaisy.app.companion.data.GameKind
 import com.pokedaisy.app.companion.data.MonView
 import com.pokedaisy.app.companion.data.RomArt
 import com.pokedaisy.app.companion.data.activeGame
+import com.pokedaisy.app.companion.data.isGameBoyGame
 import com.pokedaisy.app.companion.data.gameText
 import com.pokedaisy.app.companion.data.localText
 import com.pokedaisy.app.companion.data.romGameCode
@@ -59,6 +60,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInParent
 import androidx.compose.ui.input.pointer.pointerInput
@@ -75,14 +77,31 @@ fun PartyScreen(party: List<MonView>, onMonClick: (MonView) -> Unit, onSwap: ((I
     PartyGrid(party, selected = 0, onSlotClick = onMonClick, onDragSwap = onSwap) { mon ->
         // NUZLOCKE: a Pokémon that fainted once carries a gravestone beside what it holds.
         val dead = com.pokedaisy.app.companion.Nuzlocke.isDead(mon.personality)
-        if (mon.heldItemId != 0 || dead) Row(
+        // A Game Boy game's icons have no shiny colours, so its shinies carry the sparkle here; Red / Blue / Yellow's
+        // that turn shiny in Gold / Silver / Crystal their GS badge.
+        val gbShiny = mon.shiny && activeGame.isGameBoyGame
+        if (mon.heldItemId != 0 || dead || gbShiny || mon.tradeShiny) Row(
             Modifier.align(Alignment.TopEnd).padding(top = 4.dp, end = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically,
         ) {
+            if (mon.tradeShiny) TradeShinyBadge(rememberGbaTextMetrics(0.75f))
+            if (gbShiny) ShinyTag()
             if (dead) NuzlockeDeadTag()
             if (mon.heldItemId != 0) HeldItemTag(mon.heldItemId)
         }
     }
+}
+
+/** A shiny's sparkle on the party slot's tag, for games whose icons can't show it. */
+@Composable
+private fun ShinyTag() {
+    val m = rememberGbaTextMetrics(0.75f)
+    val u = m.u
+    Box(
+        Modifier
+            .drawBehind { drawLayeredBox(OptionColors.titleLayers.inPx(u.toPx()), OptionColors.titleFill, radius = 2 * u.toPx()) }
+            .padding(horizontal = u * 3, vertical = u * 2),
+    ) { ShinySparkle(m) }
 }
 
 /**

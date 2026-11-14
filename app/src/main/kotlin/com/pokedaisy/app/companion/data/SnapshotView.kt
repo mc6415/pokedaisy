@@ -51,6 +51,9 @@ data class MonView(
     val nickname: String? = null,
     /** Shiny (the battle screen's and INFO's SHINY marks). */
     val shiny: Boolean = false,
+    /** Red / Blue / Yellow: shiny once traded to Gold / Silver / Crystal (its DVs pass Gen 2's check, [gen2ShinyDvs]) - the
+     * party slot's, summary's and INFO's GS badge. */
+    val tradeShiny: Boolean = false,
 ) {
     /** What the game's party menu prints: the nickname where it was read, else the species ([name]). */
     val shownName: String get() = nickname ?: name
@@ -364,7 +367,8 @@ fun partyMonView(m: Mon): MonView {
         status = statusLabel(m.status),
         types = monTypes(type1, type2),
         // A DS game's eggs keep their species: the egg's own icon is NdsArt's 494.
-        iconAsset = if (m.shiny && !isEgg) shinyIconAsset(m.species) else spriteAsset("pokemon", if (isEgg && activeGame.isGen5) NdsArt.BLACK_EGG else if (isEgg && originHeartGold) NdsArt.ORIGIN_EGG else if (isEgg && activeGame.isDsGame) 494 else m.species),
+        // (A Game Boy game's party icons have no shiny colours: a Gen 2 shiny keeps its icon, marked on its slot instead.)
+        iconAsset = if (m.shiny && !isEgg && !activeGame.isGameBoyGame) shinyIconAsset(m.species) else spriteAsset("pokemon", if (isEgg && activeGame.isGen5) NdsArt.BLACK_EGG else if (isEgg && originHeartGold) NdsArt.ORIGIN_EGG else if (isEgg && activeGame.isDsGame) 494 else m.species),
         genderSymbol = m.genderSymbol,
         moves = moves,
         exp = if (isEgg) null else expProgress(m.species, m.level, m.exp),
@@ -373,6 +377,7 @@ fun partyMonView(m: Mon): MonView {
         heldItemId = m.heldItem,
         nickname = if (isEgg) null else m.nickname,
         shiny = m.shiny && !isEgg,
+        tradeShiny = m.gen2Shiny && !isEgg && activeGame.tradesToGen2,
         weaknesses = matchups.weaknesses,
         resistances = matchups.resistances,
         immunities = matchups.immunities,
@@ -466,9 +471,11 @@ fun buildSnapshotView(t: Telemetry): SnapshotView {
                 species = b.species, name = speciesName(b.species), level = b.level,
                 hp = b.hp, maxHp = b.maxHp, status = statusLabel(b.status1),
                 types = monTypes(b.type1, b.type2),
-                iconAsset = if (b.shiny) shinyIconAsset(b.species) else spriteAsset("pokemon", b.species),
+                iconAsset = if (b.shiny && !activeGame.isGameBoyGame) shinyIconAsset(b.species) else spriteAsset("pokemon", b.species),
                 moves = moves,
                 stats = statsFor(b, t.party, usedParty),
+                shiny = b.shiny,
+                tradeShiny = b.gen2Shiny && activeGame.tradesToGen2,
             )
         }
 
@@ -493,7 +500,7 @@ fun buildSnapshotView(t: Telemetry): SnapshotView {
                 species = b.species, name = speciesName(b.species), level = b.level,
                 hp = b.hp, maxHp = b.maxHp, status = statusLabel(b.status1),
                 types = monTypes(b.type1, b.type2),
-                iconAsset = if (b.shiny) shinyIconAsset(b.species) else spriteAsset("pokemon", b.species),
+                iconAsset = if (b.shiny && !activeGame.isGameBoyGame) shinyIconAsset(b.species) else spriteAsset("pokemon", b.species),
                 // The foe's moveset (battle INFO's FOE MOVES); verdicts against
                 // the player's battlers are worked out where they're shown.
                 moves = moveViews(b.moves, b.pp),
@@ -506,6 +513,7 @@ fun buildSnapshotView(t: Telemetry): SnapshotView {
                 immunities = matchups.immunities,
                 stats = statsFor(b, t.battleFoes, usedFoes, prefer),
                 shiny = b.shiny,
+                tradeShiny = b.gen2Shiny && activeGame.tradesToGen2,
             )
         }
 

@@ -523,9 +523,13 @@ internal fun InfoSection(mon: MonView, m: GbaTextMetrics, small: GbaTextMetrics,
                         }
                         if (mon.status.isNotEmpty()) StatusBadge(mon.status)
                         if (typesBesideIcon) Types(mon)
+                        // Shiny once traded up: the GS badge, under the level (by the name it cut the name short).
+                        if (mon.tradeShiny) TradeShinyBadge(small)
                     }
                 }
             }
+            // What the GS badge means, the block's whole width.
+            if (mon.tradeShiny) GbaText(tr("Shiny in Gold, Silver and Crystal"), ShinyAmber, optionLook.labelShadow, small, maxLines = 3)
             // Own row, side by side: the block keeps one height for single and dual types.
             if (!typesBesideIcon) Types(mon)
             if (!mon.isEgg) {

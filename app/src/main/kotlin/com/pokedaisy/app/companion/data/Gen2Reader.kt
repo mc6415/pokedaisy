@@ -355,6 +355,7 @@ fun decodePolishedPartyMon(raw: ByteArray, off: Int, cfg: Gen2Config): Mon? {
         isEgg = egg,
         heldItem = u8(raw, off + 1),
         personality = gbMonKey(id, be16(raw, off + 6), be16(raw, off + 17)),
+        shiny = !egg && polishedShiny(u8(raw, off + 20)),
     )
 }
 
@@ -377,6 +378,8 @@ fun decodePolishedBattleMon(raw: ByteArray): BattleMon? {
         pp = IntArray(4) { u8(raw, 11 + it) and 0x3F },
         item = u8(raw, 1),
         stats = IntArray(5) { be16(raw, 23 + 2 * it) },
+        // Its personality (+9): the nature's low bits, shiny bit 7.
+        shiny = polishedShiny(u8(raw, 9)),
     )
 }
 const val POLISHED_BATTLE_MON_SIZE = 35
@@ -431,6 +434,7 @@ fun decodeGen2PartyMon(raw: ByteArray, off: Int, cfg: Gen2Config, egg: Boolean =
         isEgg = egg,
         heldItem = u8(raw, off + 1),
         personality = gen2MonKey(raw, off),   // no personality in Gen 2: the switch's key (GbPartySwitch)
+        shiny = !egg && gen2ShinyDvs(u8(raw, off + 21), u8(raw, off + 22)),
     )
 }
 
@@ -467,6 +471,7 @@ fun decodeGen2BattleMon(raw: ByteArray, speciesCount: Int = 251): BattleMon? {
         item = u8(raw, 1),
         // Attack, Defense, Speed, Sp. Atk, Sp. Def - BattleMon's order is Gen 3's.
         stats = IntArray(5) { be16(raw, 20 + 2 * it) },
+        shiny = gen2ShinyDvs(u8(raw, 6), u8(raw, 7)),
     )
 }
 

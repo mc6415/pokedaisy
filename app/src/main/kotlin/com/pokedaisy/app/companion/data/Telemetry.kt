@@ -65,6 +65,8 @@ data class Mon(
     val nickname: String? = null,
     // Shiny, where the game's party menu shows it ([PartyMonLayout.shinyBelow]: SoulGold's own icon palettes).
     val shiny: Boolean = false,
+    // A Gen 1 Pokémon whose DVs pass Gen 2's shiny check: shiny once traded to Gold / Silver / Crystal ([gen2ShinyDvs]).
+    val gen2Shiny: Boolean = false,
 )
 
 // What FireRed's party menu shows next to the level. UNKNOWN = a source that can't tell.
@@ -92,6 +94,8 @@ data class BattleMon(
     val statStages: IntArray? = null,
     /** Shiny, where the game's shiny check is known ([NativeConfig.shinyBelow]). */
     val shiny: Boolean = false,
+    /** A Gen 1 battler whose DVs pass Gen 2's shiny check ([Mon.gen2Shiny]). */
+    val gen2Shiny: Boolean = false,
 )
 
 data class Item(val itemId: Int, val quantity: Int, val pocket: Int = POCKET_ITEMS)
