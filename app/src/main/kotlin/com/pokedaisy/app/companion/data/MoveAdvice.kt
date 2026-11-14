@@ -51,7 +51,7 @@ fun moveKind(mv: MoveView): MoveKind? = when {
 
 /** [id]'s [MoveStats]; null where the running game's moves aren't the original games'. A randomized retail ROM's
  * ([runningRandomized]) are its own, read from it. */
-fun moveStats(id: Int): MoveStats? = if (!movesAreVanilla) null
+fun moveStats(id: Int): MoveStats? = if (activeGame.isDsGame) DsMoveStats.stats(id) else if (!movesAreVanilla) null
     else runningRandomized?.moveStats?.let { it.getOrNull(id)?.takeIf { id > 0 } }
     // Emerald Legacy rebalanced ~130 moves (accuracy, PP, a few effects): its own table, read from its ROM.
     ?: (if (emeraldLegacy) moveStatsEmeraldLegacy else vanillaMoveStats).getOrNull(id)?.takeIf { id > 0 }
@@ -77,6 +77,8 @@ enum class Verdict {
     SKIP,
     /** It knows it already. */
     KNOWN,
+    /** No verdict: a DS game's status move whose effect the advice doesn't know ([MoveAdvisor.unsure]). */
+    UNSURE,
 }
 
 /** Why: an English id the UI translates (see [MoveAdvisor]), [args] filled in, [good] for the Pokémon or not. */
@@ -110,13 +112,17 @@ object MoveAdvisor {
     fun advise(mon: AdviceMon, move: Int, unforgettable: Set<Int> = VANILLA_HM_MOVES): MoveAdvice {
         if (move in mon.moves) return MoveAdvice(move, Verdict.KNOWN, 0, emptyList(), 0f)
         val current = mon.moves.filter { it != 0 }
+        // A status move it can't value: a free slot is still the game's to fill, but no verdict past that.
+        if (unsure(move)) return MoveAdvice(move, if (current.size < 4) Verdict.LEARN else Verdict.UNSURE, 0,
+            if (current.size < 4) listOf(AdviceReason("FREE SLOT", good = true)) else emptyList(), 0f)
         val ref = attackScore(mon, current).takeIf { it > 0f } ?: BASELINE
         val now = score(mon, current, ref)
         if (current.size < 4) {
             val gain = (score(mon, current + move, ref) - now) / ref
             return MoveAdvice(move, Verdict.LEARN, 0, listOf(AdviceReason("FREE SLOT", good = true)) + whyNew(mon, move, null, current, ref), gain)
         }
-        val options = current.filter { it !in unforgettable }.map { out ->
+        // ... nor is one it knows ever the one to forget: it would score nothing.
+        val options = current.filter { it !in unforgettable && !unsure(it) }.map { out ->
             out to score(mon, current.map { if (it == out) move else it }, ref)
         }
         val top = options.maxOfOrNull { it.second }
@@ -183,19 +189,27 @@ object MoveAdvisor {
         val acc = if (st.accuracy == 0) 1f else st.accuracy / 100f
         if (!ownType) return p * acc
         val stab = if (info.type in mon.types) 1.5f else 1f
-        return p * acc * stab * statShare(mon, info.type) * (if (st.priority > 0) 1.1f else 1f)
+        return p * acc * stab * statShare(mon, id, info.type) * (if (st.priority > 0) 1.1f else 1f)
     }
 
     /** The stat [type]'s moves run on, against the Pokémon's better one (1 = its best). */
-    private fun statShare(mon: AdviceMon, type: Int): Float {
+    private fun statShare(mon: AdviceMon, id: Int, type: Int): Float {
         val atk = mon.attack ?: return 1f
         val spa = mon.spAttack ?: return 1f
         val best = maxOf(atk, spa).takeIf { it > 0 } ?: return 1f
-        return ((if (isPhysical(type)) atk else spa).toFloat() / best).coerceAtLeast(0.4f)
+        return ((if (physical(id, type)) atk else spa).toFloat() / best).coerceAtLeast(0.4f)
     }
 
     /** Gen 3: Normal ... Steel are physical, Fire ... Dark special. */
     fun isPhysical(type: Int): Boolean = type < TYPE_MYSTERY
+
+    /** [id]'s stat: the DS games keep a category on each move, the originals went by its [type]. */
+    private fun physical(id: Int, type: Int): Boolean = if (activeGame.isDsGame) DsMoveStats.physical(id) else isPhysical(type)
+
+    /** A DS game's move the advice can't value: past the original games' (no effect it knows) and a status move, or one
+     * whose power the battle works out (its record says 1: HEAT CRASH, GYRO BALL). */
+    fun unsure(id: Int): Boolean = activeGame.isDsGame && moveStats(id)?.effect.isNullOrEmpty() &&
+        lookupMove(id).power.let { it == 0 || it == 1 }
 
     // ---- status moves -----------------------------------------------------------
 
@@ -297,7 +311,7 @@ object MoveAdvisor {
             if (out != null && !isStatus(out) && lookupMove(out).type == info.type && info.power > lookupMove(out).power) {
                 r += AdviceReason("SAME TYPE, {0} vs {1} POWER", listOf("${info.power}", "${lookupMove(out).power}"), good = true)
             }
-            if (statShare(mon, info.type) < 0.8f) r += AdviceReason(if (isPhysical(info.type)) "RUNS ON ATTACK, ITS WEAKER STAT" else "RUNS ON SP. ATK, ITS WEAKER STAT", good = false)
+            if (statShare(mon, move, info.type) < 0.8f) r += AdviceReason(if (physical(move, info.type)) "RUNS ON ATTACK, ITS WEAKER STAT" else "RUNS ON SP. ATK, ITS WEAKER STAT", good = false)
             if (st != null && st.accuracy in 1..84) r += AdviceReason("ACCURACY {0}%", listOf("${st.accuracy}"), good = false)
         } else if (st != null && tierFor(mon, st.effect).second >= 2f) {
             r += AdviceReason("STRONG EFFECT", good = true)
@@ -322,7 +336,7 @@ object MoveAdvisor {
             current.filter { !isStatus(it) && lookupMove(it).type == info.type && (attackValue(mon, it) ?: 0f) >= mine }
                 .maxByOrNull { attackValue(mon, it) ?: 0f }
                 ?.let { r += AdviceReason("{0} IS BETTER", listOf(lookupMove(it).name), good = false) }
-            if (statShare(mon, info.type) < 0.8f) r += AdviceReason(if (isPhysical(info.type)) "RUNS ON ATTACK, ITS WEAKER STAT" else "RUNS ON SP. ATK, ITS WEAKER STAT", good = false)
+            if (statShare(mon, move, info.type) < 0.8f) r += AdviceReason(if (physical(move, info.type)) "RUNS ON ATTACK, ITS WEAKER STAT" else "RUNS ON SP. ATK, ITS WEAKER STAT", good = false)
             if (st != null && st.accuracy in 1..84) r += AdviceReason("ACCURACY {0}%", listOf("${st.accuracy}"), good = false)
         } else if (st != null && tierFor(mon, st.effect).second <= 1f) {
             r += AdviceReason("WEAK EFFECT", good = false)

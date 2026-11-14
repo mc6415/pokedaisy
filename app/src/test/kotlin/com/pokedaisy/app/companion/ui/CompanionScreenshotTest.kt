@@ -465,6 +465,38 @@ open class CompanionScreenshotTest {
         }
     }
 
+    /** The bag's TM row in Black 2: who can learn the TM, from the cart's machines and move records. */
+    @Test
+    fun black2TmRow() {
+        activeGame = GameKind.BLACK2
+        romLanguage = 'E'
+        romGameCode = ""
+        val rom = java.io.File(java.io.File(java.io.File(RETAIL_ROM_DIR).parentFile, "nds"), "Pokemon - Black Version 2 (USA, Europe) (NDSi Enhanced).nds")
+        val dir = kotlin.io.path.createTempDirectory("nds-art").toFile()
+        try {
+            if (!rom.isFile || !com.pokedaisy.app.companion.data.NdsArt.extractTo(rom, dir)) return
+            com.pokedaisy.app.companion.data.NdsArt.dir = dir
+            val t = com.pokedaisy.app.companion.data.readGen5Telemetry(FixtureMemoryReader.load("black2"), com.pokedaisy.app.companion.data.GEN5_BLACK2)
+            val v = buildSnapshotView(t).copy(game = GameKind.BLACK2)
+            v.party.forEach { m -> m.iconAsset?.let { GameArt.get(paparazzi.context, it) } }
+            val tables = v.pokedex?.tables ?: return
+            val ctx = LearnContext(tables, v.guideTables, v.items, showHints = true)
+            val tms = v.items.filter { com.pokedaisy.app.companion.data.MoveLearning.isTm(it.itemId) }
+            // worked out first, as the app's IO would
+            tms.forEach { com.pokedaisy.app.companion.data.MoveLearning.learners(tables, v.guideTables, v.party, it.itemId) }
+            val names = com.pokedaisy.app.companion.data.MoveLearning.tmMoveNames(tables)
+            snapshot {
+                AppTheme {
+                    ItemsScreen(tms, androidx.compose.ui.Modifier.fillMaxSize(), initialItemId = tms.firstOrNull()?.itemId, tmMoves = names,
+                        itemExtra = { item, text, shadow -> TmLearnersRow(ctx, v.party, item, text, shadow, rememberGbaTextMetrics()) })
+                }
+            }
+        } finally {
+            com.pokedaisy.app.companion.data.NdsArt.dir = null
+            dir.deleteRecursively()
+        }
+    }
+
     /** LEARN in Black 2: the next level-up moves and the bag's TMs from the cart, no verdicts (the advice is Gen 3's). */
     @Test
     fun partyDetailLearnBlack2() {
@@ -480,6 +512,8 @@ open class CompanionScreenshotTest {
             v.party.forEach { m -> m.iconAsset?.let { GameArt.get(paparazzi.context, it) } }
             val tables = v.pokedex?.tables ?: return
             val ctx = LearnContext(tables, v.guideTables, v.items, showHints = com.pokedaisy.app.companion.data.MoveLearning.advises)
+            // the options load in the background in the app: here before the snapshot (its cache answers the screen)
+            com.pokedaisy.app.companion.data.MoveLearning.options(tables, v.guideTables, v.party[0], v.items)
             snapshot { AppTheme { MonDetailScreen(v.party, 0, {}, {}, learn = ctx, initialLearnPick = 0) } }
         } finally {
             com.pokedaisy.app.companion.data.NdsArt.dir = null

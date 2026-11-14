@@ -52,7 +52,7 @@ Under the icons, a line names the best fit and, if its moves are full, which mov
 `BEST` and the forget suggestion follow `BATTLE HINTS` in SETTINGS: with hints off you still see who's `ABLE`, without the recommendation.
 
 > [!NOTE]
-> The TM party row works in FireRed, LeafGreen, Ruby, Sapphire and Emerald (the original games) so far.
+> The TM party row works in FireRed, LeafGreen, Ruby, Sapphire and Emerald (the original games), and on the DS in Platinum, HeartGold, SoulSilver, Black, White, Black 2 and White 2 (not the hacks on them).
 
 ## Teaching a TM or HM
 

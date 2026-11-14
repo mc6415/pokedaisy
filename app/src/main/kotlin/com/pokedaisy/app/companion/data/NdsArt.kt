@@ -78,7 +78,7 @@ object NdsArt {
     /** The Town Map's player marker and cursor frames for a Gen 5 [game] (Black's, or the sequels'). */
     fun gen5Player(game: GameKind?) = if (game.isBw2) BLACK2_PLAYER else BLACK_PLAYER
     fun gen5Cursor(game: GameKind?, frame: Int) = if (game.isBw2) black2Cursor(frame) else blackCursor(frame)
-    private const val VERSION = 11
+    private const val VERSION = 12   // 12: each retail cart's move stats (DsMoveStats)
     /** The Town Map's art under rom-art/regionmap: the map, each fly location's block sprite and the player's head. */
     const val PLATINUM_MAP = "platinum_sinnoh"
     fun platinumBlock(shape: Int, variant: Int) = "pt_block_${shape}_$variant"
@@ -203,6 +203,7 @@ object NdsArt {
                 // Japanese Black / White: one bank fewer before the moves, so the categories are 257 (the rest as the US carts').
                 .let { if (!black2 && code[3] == 'J') it.copy(category = 257) else it }
             if (!extractGen5(f, header, dir, files)) return false
+            if (!redux) moveStats(f, header, dir, "/a/0/2/1", gen5 = true, if (black2) DsMoveStats.BLACK2 else DsMoveStats.BLACK)
             marker.parentFile?.mkdirs()
             marker.writeText(stamp)
             return true
@@ -241,9 +242,28 @@ object NdsArt {
                 else -> if (soulSilver) DEX_SOULSILVER else DEX_HEARTGOLD
             })
         }
+        if (!renegade) moveStats(f, header, dir, if (platinum) "/poketool/waza/pl_waza_tbl.narc" else "/a/0/1/1", gen5 = false,
+            if (platinum) DsMoveStats.PLATINUM else DsMoveStats.HEARTGOLD)
         marker.parentFile?.mkdirs()
         marker.writeText(stamp)
         true
+    }
+
+    /**
+     * Each move's accuracy, PP and priority from the cart's move records ([DsMoveStats]: 4 bytes a move id), for the move
+     * advice. Gen 4's records (16 bytes): accuracy at 5, PP 6, priority 10; Gen 5's (36 bytes): accuracy 4, PP 5, priority 6.
+     */
+    private fun moveStats(f: RandomAccessFile, header: ByteArray, dir: File, path: String, gen5: Boolean, out: String) {
+        val records = Narc(file(f, header, path) ?: return)
+        val bytes = ByteArray(records.size * 4)
+        for (id in 1 until records.size) {
+            val m = records.member(id) ?: continue
+            if (m.size < (if (gen5) 7 else 11)) continue
+            bytes[id * 4] = m[if (gen5) 4 else 5]
+            bytes[id * 4 + 1] = m[if (gen5) 5 else 6]
+            bytes[id * 4 + 2] = m[if (gen5) 6 else 10]
+        }
+        write(dir, out, bytes)
     }
 
     /**

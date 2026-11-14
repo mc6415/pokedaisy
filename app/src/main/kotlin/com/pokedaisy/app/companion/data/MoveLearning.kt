@@ -30,11 +30,33 @@ object MoveLearning {
     fun available(t: PokedexTables?, g: GuideTables?): Boolean =
         t != null && (t.gen4 != null || movesAreVanilla && (hasLearnsets(t, g) || DexDetails.hasTeachable(t)))
 
-    /** Whether its options carry a verdict: the advisor knows only the original games' moves ([moveStats]). */
-    val advises: Boolean get() = movesAreVanilla
+    /** Whether its options carry a verdict: the original games' moves ([moveStats]), or a retail DS cart's from its own
+     * move records ([DsMoveStats]; a hack's are its own). */
+    val advises: Boolean get() = movesAreVanilla || DsMoveStats.known()
 
-    /** No verdict: a DS game's options ([advises] false), never drawn. */
-    private fun noAdvice(move: Int) = MoveAdvice(move, Verdict.LEARN, 0, emptyList(), 0f)
+    /** No verdict (a DS game whose move stats didn't load): nothing drawn. */
+    private fun noAdvice(move: Int) = MoveAdvice(move, Verdict.UNSURE, 0, emptyList(), 0f)
+
+    // The DS games' machine items: TM01-TM92 328-419, then the HMs from 420; Black / White and their sequels' TM93-95 at
+    // 618-620 (their records list TM01..TM95, then HM01..HM06).
+    private const val DS_TM01 = 328
+    private const val DS_HM01 = 420
+    private const val DS_TM93 = 618
+
+    /** The DS machine item [itemId]'s place in [t]'s list (TMs, then HMs); null = not one. */
+    private fun dsMachine(t: Gen4DexTables, itemId: Int): Int? = when {
+        itemId in DS_TM01 until DS_HM01 -> itemId - DS_TM01
+        t.gen5 && itemId in DS_TM93 until DS_TM93 + (t.tmCount - 92) -> 92 + itemId - DS_TM93
+        itemId in DS_HM01 until DS_HM01 + (t.moves.size - t.tmCount) -> t.tmCount + itemId - DS_HM01
+        else -> null
+    }
+
+    /** The item id of [t]'s machine number [i] (the reverse of [dsMachine]). */
+    private fun dsMachineItem(t: Gen4DexTables, i: Int): Int = when {
+        i < 92 -> DS_TM01 + i
+        i < t.tmCount -> DS_TM93 + i - 92
+        else -> DS_HM01 + i - t.tmCount
+    }
 
     /** A DS bag's TMs / HMs ("TM06", "HM01": the item's own name, as the cart spells it) it can learn, in machine order. */
     private fun dsMachines(t: PokedexTables, g: GuideTables?, mon: MonView, bag: List<ItemView>, known: Collection<Int>): List<LearnOption> {
@@ -45,20 +67,32 @@ object MoveLearning {
     }
     private val MACHINE = Regex("^(TM|HM)\\d{2}$")
 
-    fun isTm(itemId: Int): Boolean = movesAreVanilla && itemId in VANILLA_ITEM_TM01..VANILLA_ITEM_HM08
+    fun isTm(itemId: Int): Boolean = if (activeGame.isDsGame) DsMoveStats.known() &&
+        (itemId in DS_TM01 until DS_HM01 + 8 || activeGame.isGen5 && itemId in DS_TM93 until DS_TM93 + 3)
+        else movesAreVanilla && itemId in VANILLA_ITEM_TM01..VANILLA_ITEM_HM08
 
     /** "TM06" / "HM01" for a TM item. */
     fun tmLabel(itemId: Int): String {
+        if (activeGame.isDsGame) return when {
+            itemId >= DS_TM93 -> "TM%02d".format(93 + itemId - DS_TM93)
+            itemId >= DS_HM01 -> "HM%02d".format(1 + itemId - DS_HM01)
+            else -> "TM%02d".format(1 + itemId - DS_TM01)
+        }
         val i = itemId - VANILLA_ITEM_TM01
         return if (i < 50) "TM%02d".format(i + 1) else "HM%02d".format(i - 49)
     }
 
     /** The move TM / HM item [itemId] teaches; null = not a TM or the table isn't read. */
-    fun tmMove(t: PokedexTables, itemId: Int): Int? =
-        if (!isTm(itemId)) null else DexDetails.tmhmMoves(t)?.getOrNull(itemId - VANILLA_ITEM_TM01)?.takeIf { it > 0 }
+    fun tmMove(t: PokedexTables, itemId: Int): Int? = if (!isTm(itemId)) null
+        else t.gen4?.let { d -> dsMachine(d, itemId)?.let { d.moves.getOrNull(it) }?.takeIf { it > 0 } }
+            ?: DexDetails.tmhmMoves(t)?.getOrNull(itemId - VANILLA_ITEM_TM01)?.takeIf { it > 0 && t.gen4 == null }
 
     /** Every TM / HM item's move name ("TOXIC" for TM06), for the bag's rows; empty where the TMs aren't read. */
     fun tmMoveNames(t: PokedexTables): Map<Int, String> {
+        t.gen4?.let { d ->
+            if (!DsMoveStats.known()) return emptyMap()
+            return d.moves.withIndex().filter { it.value > 0 }.associate { (i, move) -> dsMachineItem(d, i) to lookupMove(move).name }
+        }
         if (!movesAreVanilla) return emptyMap()
         val moves = DexDetails.tmhmMoves(t) ?: return emptyMap()
         return moves.withIndex().filter { it.value > 0 }.associate { (i, move) -> VANILLA_ITEM_TM01 + i to lookupMove(move).name }
@@ -72,7 +106,8 @@ object MoveLearning {
         moves = mon.moves.map { it.id }.filter { it > 0 },
     )
 
-    private fun hmMoves(t: PokedexTables): Set<Int> = DexDetails.tmhmMoves(t)?.drop(50)?.toSet() ?: VANILLA_HM_MOVES
+    private fun hmMoves(t: PokedexTables): Set<Int> = t.gen4?.let { it.moves.drop(it.tmCount).toSet() }
+        ?: DexDetails.tmhmMoves(t)?.drop(50)?.toSet() ?: VANILLA_HM_MOVES
 
     private fun optionsKey(t: PokedexTables, g: GuideTables?, mon: MonView, bag: List<ItemView>): List<Any?> =
         listOf(t, g, activeGame, mon.species, mon.level, mon.moves.map { it.id }, mon.stats?.stats, bag.map { it.itemId }.filter(::isTm).sorted(), if (advises) null else bag.map { it.name }.sorted())
@@ -89,7 +124,8 @@ object MoveLearning {
         val key = optionsKey(t, g, mon, bag)
         optionsCache[key]?.let { return it }
         if (mon.isEgg || mon.species <= 0 || !available(t, g)) return emptyList()
-        if (!advises) {
+        // A DS cart's move stats from its extracted records (IO, here): without them, the list alone.
+        if (!movesAreVanilla && !DsMoveStats.load()) {
             val known = mon.moves.map { it.id }.filter { it > 0 }
             val levelUps = upcoming(DexDetails.levelUp(t, g, mon.species).orEmpty(), mon.level, known)
                 .map { LearnOption(it.move, it.level, "", noAdvice(it.move)) }
@@ -122,6 +158,7 @@ object MoveLearning {
     fun learners(t: PokedexTables, g: GuideTables?, party: List<MonView>, itemId: Int): List<TmLearner>? {
         val key = learnersKey(t, g, party, itemId)
         learnersCache[key]?.let { return it }
+        if (t.gen4 != null && !DsMoveStats.load()) return null
         val move = tmMove(t, itemId) ?: return null
         val hms = hmMoves(t)
         return party.mapIndexed { i, mon ->
@@ -137,6 +174,6 @@ object MoveLearning {
 
     /** The party member a TM suits best: the biggest gain among those it's worth teaching. */
     fun best(learners: List<TmLearner>): Int? = learners
-        .filter { it.advice != null && it.advice.verdict != Verdict.SKIP }
+        .filter { it.advice != null && it.advice.verdict != Verdict.SKIP && it.advice.verdict != Verdict.UNSURE }
         .maxByOrNull { it.advice!!.gain }?.index
 }

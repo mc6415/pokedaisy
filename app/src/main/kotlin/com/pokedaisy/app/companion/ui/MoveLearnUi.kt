@@ -157,6 +157,7 @@ private fun VerdictBadge(a: MoveAdvice) {
         Verdict.REPLACE -> VerdictPill(tr("FORGET {0}", lookupMove(a.forget).name), LearnGreen)
         Verdict.SKIP -> VerdictPill(tr("SKIP"), VerdictGrey)
         Verdict.KNOWN -> VerdictPill(tr("LEARNED"), LearnedBlue)
+        Verdict.UNSURE -> {}   // a status move the advice can't value: the facts alone
     }
 }
 
