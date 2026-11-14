@@ -2522,9 +2522,6 @@ class PokeDaisyActivity : Activity() {
         val ndsCode = if (nds) RomIdentity.ndsGameCode(r).orEmpty() else ""
         romOrigin = nds && ndsCode == com.pokedaisy.app.companion.data.OriginHeartGold.CODE &&
             com.pokedaisy.app.companion.data.OriginHeartGold.matches(r)
-        // Retail only: Renegade Platinum keeps retail's header (and this code), but wasn't tried.
-        dsTmCart = nds && com.pokedaisy.app.companion.data.ReusableTms.dsProved(ndsCode, RomIdentity.ndsRevision(r)) &&
-            !(ndsCode == com.pokedaisy.app.companion.data.RenegadePlatinum.CODE && com.pokedaisy.app.companion.data.RenegadePlatinum.matches(r))
         dsWildRates = if (!nds) null else if (romOrigin) {
             // Its tables are read in the background (NdsArt.prefetch); the core may start first, so read them here then.
             { (com.pokedaisy.app.companion.data.OriginHeartGold.data ?: com.pokedaisy.app.companion.data.NdsArt.readOrigin(r))?.wildRates ?: IntArray(0) }
@@ -2566,6 +2563,9 @@ class PokeDaisyActivity : Activity() {
         fieldGame = if (!gba || romBlocked != null) WideScreen.OFF else WideScreen.fieldGameFor(tablesCrc)
         wildFlag = 0L
         tmSites = emptyList()
+        // REUSABLE TMS on a DS cart (retail only: Renegade Platinum keeps retail's header and this code, but wasn't tried)
+        dsTmCart = nds && com.pokedaisy.app.companion.data.ReusableTms.dsProved(ndsCode, RomIdentity.ndsRevision(r)) &&
+            !(ndsCode == com.pokedaisy.app.companion.data.RenegadePlatinum.CODE && com.pokedaisy.app.companion.data.RenegadePlatinum.matches(r))
         if (::engine.isInitialized) engine.setReusableTms(tmSites, false)
         textPatch = null
         if (::engine.isInitialized) engine.setInstantText(null, false)

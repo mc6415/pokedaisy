@@ -262,6 +262,9 @@ object MgbaCore {
     /** DS CPU BOOST: the emulated ARM9 at twice the DS's clock - a game's own slow frames (HeartGold walking) go. Emu thread. */
     external fun pkNdsCpuBoost(on: Boolean)
 
+    /** REUSABLE TMS on a DS game (nds/pk_nds.cpp's TM_PATCHES: Platinum, HeartGold / SoulSilver; melonDS only). Emu thread. */
+    external fun pkNdsReusableTms(on: Boolean)
+
     /** DS CORE (companion.DsCore): the DS core the next [pkInit] of a DS cart starts, NDS_CORE_*. Emu thread. */
     external fun pkNdsSetCore(core: Int)
     /** The DS core that's up (NDS_CORE_*), -1 with no DS game. */
@@ -318,9 +321,6 @@ object MgbaCore {
 
     /** How job [seq] did: 1 ran, 0 still waiting, -1 never will (the field changed under it). Emu thread. */
     external fun pkNdsActionStatus(seq: Int): Int
-
-    /** REUSABLE TMS on a DS game (nds/pk_nds.cpp's TM_PATCHES: Platinum, HeartGold / SoulSilver; melonDS only). Emu thread. */
-    external fun pkNdsReusableTms(on: Boolean)
 
     /** PC anywhere: the Pokémon Storage System's menu, as a Pokémon Center PC opens it. */
     const val NDS_ACTION_PC = 1
