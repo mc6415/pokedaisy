@@ -3086,6 +3086,16 @@ States carry the save memory's CRC32 in a header of ours, so a resume checks `pk
 `pkStateMatchesSave` (save files are sacred). The DS's bottom screen goes on the bottom display (`NdsBottomScreen.kt`)
 where the companion goes for a GBA game; one GAME SCREEN / COMPANION toggle swaps them.
 
+TRADE EVOLUTIONS on Gold / Silver / Crystal (`GbTradeEvo.kt`, English carts): EvolvePokemon, as the link trade and the
+evolution stones run it, with wLinkMode = LINK_TRADECENTER for its EVOLVE_TRADE check. A map script queued from the free
+field (RunMemScript, as GbField's PC / FLY) sits in wUnusedMapBuffer (24 bytes the game only zeroes on a map load):
+`callasm` a 16-byte routine after it (link mode on, farcall EvolvePokemon, link mode off), `reloadmap` (the map, palettes
+and its music back: EvolveAfterBattle returns early in a link and skips RestartMapMusic), `end`; wCurPartyMon is written as
+it's queued. Who evolves comes from the cart's EvosAttacks, the held item and an Everstone counted as EvolvePokemon counts
+them. Checked headless in Crystal rev 1, Gold and Silver (KADABRA, ONIX + Metal Coat, an Everstone refused, walking after).
+Red / Blue / Yellow would need their own way (no script queue; their in-game trade's `.tradeEvo` sets wLinkState and calls
+TryEvolvingMon, then restores a screen it saved first): not done.
+
 **Reads and tables.** Everything comes from pret's decomps, which build the retail ROMs byte for byte
 (`$DECOMPS/pokeplatinum`, `$DECOMPS/pokeheartgold`, built in Docker): addresses from their `.xMAP`, struct offsets from
 their headers, each checked on headless captures. `Gen4Reader.kt` reads the game's SaveData in RAM (party, the eight

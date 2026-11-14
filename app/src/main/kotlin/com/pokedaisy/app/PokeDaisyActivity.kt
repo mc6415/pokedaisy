@@ -544,6 +544,22 @@ class PokeDaisyActivity : Activity() {
         return v
     }
 
+    /** TRADE EVOLUTIONS on Gold / Silver / Crystal ([com.pokedaisy.app.companion.data.GbTradeEvo]): the English carts, by
+     * the config their hash picked, their code checked in the cart once. */
+    @Volatile private var gbTradeEvoCache: Pair<Any, com.pokedaisy.app.companion.data.GbTradeEvo?>? = null
+
+    private fun gbTradeEvo(): com.pokedaisy.app.companion.data.GbTradeEvo? {
+        if (!romIsGameBoy || !telemetry.snapshot.value.game.isGen2) return null
+        val evo = com.pokedaisy.app.companion.data.GbTradeEvo.forConfig(com.pokedaisy.app.companion.data.activeGen2) ?: return null
+        gbTradeEvoCache?.let { (k, v) -> if (k === evo) return v }
+        if (!::engine.isInitialized || !engine.running) return null
+        val ok = runCatching { evo.codeMatches { off, len -> MgbaCore.pkRomRead(off, len) } }.getOrElse { return null }
+        Log.i("pokedaisy", "Game Boy trade evolutions: ${if (ok) "code found" else "code not found"}")
+        val v = evo.takeIf { ok }
+        gbTradeEvoCache = evo to v
+        return v
+    }
+
     /** Runs a Game Boy field action ([start], emu thread: true = the game has it, or has it queued) and, [GbField.TAKE_FRAMES]
      * later, [done] (main thread) with whether the game took it - a queued one it didn't take is withdrawn. */
     private fun gbFieldAction(
@@ -788,7 +804,7 @@ class PokeDaisyActivity : Activity() {
             com.pokedaisy.app.companion.data.withdrawFromBox(fields, fns, box, slot, boxPersonality, busy, calls)
         }
 
-        override fun canTradeEvolve() = Prefs(this@PokeDaisyActivity).tradeEvolutions && (tradeEvoFns() != null || dsTradeEvo())
+        override fun canTradeEvolve() = Prefs(this@PokeDaisyActivity).tradeEvolutions && (tradeEvoFns() != null || dsTradeEvo() || gbTradeEvo() != null)
 
         /** The DS games' TRADE EVOLUTIONS ([com.pokedaisy.app.companion.data.DsTradeEvo]): a job, the game's own rules. */
         private fun dsTradeEvo() = dsTradeEvoKnown() && dsCalls()
@@ -803,6 +819,14 @@ class PokeDaisyActivity : Activity() {
                     out = res?.let { com.pokedaisy.app.companion.data.DsTradeEvo.targets(it, party) } ?: emptyMap()
                     com.pokedaisy.app.companion.data.ItemUseResult.USED
                 }) { done(out) }
+            }
+            gbTradeEvo()?.let { gb ->
+                if (!Prefs(this@PokeDaisyActivity).tradeEvolutions) return done(emptyMap())
+                // Read from the cart's own evolution table (no call): any frame will do, a battle too.
+                return engine.requestFieldItemJob(false) { calls, _ ->
+                    val out = runCatching { gb.targets(calls) }.getOrElse { Log.e("pokedaisy", "Game Boy trade evolutions failed", it); emptyMap() }
+                    runOnUiThread { done(out) }
+                }
             }
             val evo = tradeEvoFns()
             if (evo == null || !Prefs(this@PokeDaisyActivity).tradeEvolutions) return done(emptyMap())
@@ -823,6 +847,25 @@ class PokeDaisyActivity : Activity() {
                     if (o.result == com.pokedaisy.app.companion.data.ItemUseResult.FAILED) r = com.pokedaisy.app.companion.data.TradeEvoResult.FAILED
                     if (r == com.pokedaisy.app.companion.data.TradeEvoResult.EVOLVING) closeCompanionWindow()
                     done(r)
+                }
+            }
+            gbTradeEvo()?.let { gb ->
+                if (!Prefs(this@PokeDaisyActivity).tradeEvolutions) return done(com.pokedaisy.app.companion.data.TradeEvoResult.FAILED)
+                // A map script queued from the free field (GbTradeEvo), then confirmed taken a step later, like PC / FLY.
+                return engine.requestFieldItemJob(telemetry.snapshot.value.inBattle) { calls, busy ->
+                    val r = if (busy) com.pokedaisy.app.companion.data.TradeEvoResult.NOT_NOW
+                    else runCatching { gb.start(calls, slot, personality) }.getOrElse {
+                        Log.e("pokedaisy", "Game Boy trade evolution failed", it); com.pokedaisy.app.companion.data.TradeEvoResult.FAILED
+                    }
+                    if (r != com.pokedaisy.app.companion.data.TradeEvoResult.EVOLVING) { runOnUiThread { done(r) }; return@requestFieldItemJob }
+                    engine.requestFieldItemJob(false, com.pokedaisy.app.companion.data.GbField.TAKE_FRAMES) { c, _ ->
+                        val took = runCatching { gb.taken(c) }.getOrDefault(false)
+                        Log.i("pokedaisy", "Game Boy trade evolution: ${if (took) "taken" else "not taken, withdrawn"}")
+                        runOnUiThread {
+                            if (took) closeCompanionWindow()
+                            done(if (took) com.pokedaisy.app.companion.data.TradeEvoResult.EVOLVING else com.pokedaisy.app.companion.data.TradeEvoResult.NOT_NOW)
+                        }
+                    }
                 }
             }
             val evo = tradeEvoFns()
@@ -1816,7 +1859,7 @@ class PokeDaisyActivity : Activity() {
             romIsNds && ::engine.isInitialized && engine.fieldState and MgbaCore.FIELD_KNOWN != 0
         override val tradeEvolutions get() = Prefs(this@PokeDaisyActivity).tradeEvolutions
         override fun setTradeEvolutions(on: Boolean) { Prefs(this@PokeDaisyActivity).tradeEvolutions = on }
-        override val tradeEvolutionsSupported get() = tradeEvoFns() != null || dsTradeEvoKnown()
+        override val tradeEvolutionsSupported get() = tradeEvoFns() != null || dsTradeEvoKnown() || gbTradeEvo() != null
         override val flightArea get() = Prefs(this@PokeDaisyActivity).flightArea
         override fun setFlightArea(mode: com.pokedaisy.app.companion.FlightAreaMode) {
             Prefs(this@PokeDaisyActivity).flightAreaId = mode.id
@@ -2658,6 +2701,7 @@ class PokeDaisyActivity : Activity() {
         if (::engine.isInitialized) engine.setShinyTarget(null)
         syncShinyAchievements()
         gbFieldCache = null
+        gbTradeEvoCache = null
         if (::engine.isInitialized) engine.gbField = null
         if (gba && romBlocked == null) Thread({
             val flag = com.pokedaisy.app.companion.data.WildEncounters.find(r)
