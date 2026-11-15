@@ -74,7 +74,8 @@ class DsRandomizerTest {
     @Test
     fun `hashes are the cart's`() = each { g, f ->
         val (retail, made) = DsRandomizer.hashes(f.toOkioPath())!!
-        System.getenv("DS_HASHES")?.let { File(it).appendText("${g.code}${g.rev} $retail $made\n") }
+        // DS_HASHES=<file>: each cart's hashes written there (for a change to the files the tool writes), not checked.
+        System.getenv("DS_HASHES")?.let { File(it).appendText("${g.code}${g.rev} ${g.retailFilesSha1} ${g.madeSha1} $retail $made\n"); return@each }
         assertEquals(g.title, g.retailFilesSha1, retail)
         assertEquals(g.title, g.madeSha1, made)
     }
@@ -144,6 +145,44 @@ class DsRandomizerTest {
         assertEquals(3, starters.toSet().size)
         fun targets(s: Int) = evo.member(s).let { m -> (0 until m.size / 6).filter { u16(m, it * 6) != 0 }.map { u16(m, it * 6 + 4) } }
         for (s in starters) assertTrue("starter $s", targets(s).any { targets(it).isNotEmpty() })
+    }
+
+    @Test
+    fun `base stats, learnsets and held items are what was asked`() = each { g, f ->
+        val a = tmp.root.resolve("${g.code}-extra.nds").toOkioPath()
+        val o = RomRandomizer.Options(RomRandomizer.Starters.OFF, RomRandomizer.Wild.OFF, false,
+            trainerItems = true, baseStats = true, learnsets = true)
+        assertTrue(DsRandomizer.randomize(f.toOkioPath(), a, o, 3L))
+        fun read(p: okio.Path) = FileSystem.SYSTEM.openReadOnly(p).use { h ->
+            val c = DsRandomizer.Cart(h)
+            Triple(DsRandomizer.Narc(c.file(c.fileId(g.personal))), DsRandomizer.Narc(c.file(c.fileId(g.learnsets))),
+                DsRandomizer.Narc(c.file(c.fileId(g.moves))))
+        }
+        val (p0, l0, moves) = read(f.toOkioPath())
+        val (p1, l1, _) = read(a)
+        // The moves' archive is the right one: POUND (1) has 40 power.
+        assertEquals(g.title, 40, moves.member(1)[3].toInt() and 0xFF)
+        var moved = 0
+        val step = if (g.gen == 5) 4 else 2
+        for (sp in 1..g.speciesCount) {
+            val was = (0 until 6).map { p0.member(sp)[it].toInt() and 0xFF }
+            val now = (0 until 6).map { p1.member(sp)[it].toInt() and 0xFF }
+            assertEquals("${g.title} $sp", was.sorted(), now.sorted())
+            if (was != now) moved++
+            val m0 = l0.member(sp); val m1 = l1.member(sp)
+            val list = ArrayList<Int>()
+            var i = 0
+            while (i + step <= m1.size && u16(m1, i) != 0xFFFF) {
+                val level = { m: ByteArray -> if (g.gen == 5) u16(m, i + 2) else u16(m, i) shr 9 }
+                assertEquals("${g.title} $sp", level(m0), level(m1))
+                list += if (g.gen == 5) u16(m1, i) else u16(m1, i) and 0x1FF
+                i += step
+            }
+            assertEquals("${g.title} $sp", list.size, list.toSet().size)
+            if (list.isNotEmpty()) assertTrue("${g.title} $sp", moves.member(list[0])[3].toInt() and 0xFF > 0)
+        }
+        assertTrue(g.title, moved > 400)
+        assertEquals(g.madeSha1, DsRandomizer.hashes(a)!!.second)
     }
 
     @Test

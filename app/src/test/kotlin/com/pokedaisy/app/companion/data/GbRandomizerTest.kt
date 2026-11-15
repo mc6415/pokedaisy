@@ -41,7 +41,8 @@ class GbRandomizerTest {
     fun `hashes are the cart's`() {
         val found = ArrayList<Triple<GbRandomizer.Game, String, String?>>()
         each { g, rom -> found += Triple(g, GbRandomizer.sha1(rom), GbRandomizer.madeHash(rom, g)) }
-        System.getenv("GB_HASHES")?.let { out -> File(out).writeText(found.joinToString("") { "${it.first.title} ${it.third}\n" }) }
+        // GB_HASHES=<file>: each cart's made hash written there (for a change to the sites), not checked.
+        System.getenv("GB_HASHES")?.let { out -> File(out).writeText(found.joinToString("") { "${it.first.madeSha1} ${it.third}\n" }); return }
         for ((g, sha, made) in found) {
             assertEquals(g.title, g.retailSha1, sha)
             assertEquals(g.title, g.madeSha1, made)
@@ -90,6 +91,37 @@ class GbRandomizerTest {
             assertTrue("${g.title}: ${wrote.size}", wrote.size > 100)
         } finally {
             okio.FileSystem.SYSTEM.deleteRecursively(dir)
+        }
+    }
+
+    @Test
+    fun `base stats, learnsets and held items are what was asked`() = each { g, rom ->
+        val o = RomRandomizer.Options(RomRandomizer.Starters.OFF, RomRandomizer.Wild.OFF, false,
+            trainerItems = true, baseStats = true, learnsets = true)
+        val a = GbRandomizer.randomize(rom, o, 5L)!!
+        assertSame(g, GbRandomizer.recognise(a))
+        // The move table is the right one: POUND (1) has 40 power.
+        assertEquals(g.title, 40, rom[g.moves + 2].toInt() and 0xFF)
+        val stride = if (g.gen == 1) 6 else 7
+        // Base stats: the same five / six, in another order.
+        val count = if (g.gen == 1) 5 else 6
+        val firsts = if (g.gen == 1) (1..151).map { n -> if (n == 151 && g.mewStats != 0) g.mewStats else g.baseStats + (n - 1) * 28 }
+            else (1..251).map { g.baseStats + (it - 1) * 0x20 }
+        var moved = 0
+        for (at in firsts) {
+            val was = (1..count).map { rom[at + it].toInt() and 0xFF }
+            val now = (1..count).map { a[at + it].toInt() and 0xFF }
+            assertEquals(g.title, was.sorted(), now.sorted())
+            if (was != now) moved++
+        }
+        assertTrue(g.title, moved > 100)
+        // Every byte that changed is a site (levels, the rest of the records, untouched).
+        val sites = GbRandomizer.sites(rom, g).toSet() + setOf(0x14E, 0x14F)
+        assertTrue(g.title, rom.indices.all { rom[it] == a[it] || it in sites })
+        // Gen 1's level-1 moves: the first one does damage.
+        if (g.gen == 1) for (at in firsts) {
+            val first = a[at + 15].toInt() and 0xFF
+            if (first != 0) assertTrue("${g.title} ${Integer.toHexString(at)}", a[g.moves + (first - 1) * stride + 2].toInt() and 0xFF > 0)
         }
     }
 

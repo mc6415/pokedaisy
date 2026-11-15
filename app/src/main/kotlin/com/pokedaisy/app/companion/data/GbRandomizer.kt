@@ -36,6 +36,8 @@ object GbRandomizer {
         val starters: List<Pair<Int, Int>> = emptyList(),
         /** Where the last trainer class's parties end (Gen 1: TrainerAI); 0 = where they stop reading as parties. */
         val trainersEnd: Int = 0,
+        /** Moves: move 1's record first, power the third byte (Gen 1's 6-byte records, Gen 2's 7). */
+        val moves: Int = 0,
     ) {
         /** The untouched cart's CRC32 (EXPAND's tables go by it). */
         val retailCrc: Int get() = CRCS.getValue(title)
@@ -63,21 +65,21 @@ object GbRandomizer {
     }
 
     val GAMES = listOf(
-        Game("Red", "ea9bcae617fdf159b045185467ae58b2e4a48b9a", "36f010812473c5b5352c01c3367b3e222cb60081", 1, listOf(0xCEEB), 0x39D3B, 47, 0x383DE, 0x3B05C,
-            dexOrder = 0x41024, mewStats = 0x425B, starters = red(blue = false), trainersEnd = 0x3A52E),
-        Game("Blue", "d7037c83e1ae5b39bde3c30787637ba1d4c48ce2", "c024abaa75463e7f36cc4864f57f6d25be64341b", 1, listOf(0xCEEB), 0x39D3B, 47, 0x383DE, 0x3B05C,
-            dexOrder = 0x41024, mewStats = 0x425B, starters = red(blue = true), trainersEnd = 0x3A52E),
-        Game("Yellow", "cc7d03262ebfaf2f06772c1a480c7d9d5f4a38e1", "a6ce9188e634dfb869547013f2cc1df60b3a1f26", 1, listOf(0xCB95), 0x39DD1, 47, 0x383DE, 0x3B1E5,
-            dexOrder = 0x410B1, trainersEnd = 0x3A5B2),
-        Game("Gold", "d8b8a3600a465308c9953dfa04f0081c05bdcb94", "d47e52d7114b49967c6b7848314115f9f86bed7c", 2,
+        Game("Red", "ea9bcae617fdf159b045185467ae58b2e4a48b9a", "e3762b26a29f677b111d5b4a332729a94b26f117", 1, listOf(0xCEEB), 0x39D3B, 47, 0x383DE, 0x3B05C,
+            dexOrder = 0x41024, mewStats = 0x425B, starters = red(blue = false), trainersEnd = 0x3A52E, moves = 0x38000),
+        Game("Blue", "d7037c83e1ae5b39bde3c30787637ba1d4c48ce2", "2cdaefbc7d31dc1e09af409249ce95961b437492", 1, listOf(0xCEEB), 0x39D3B, 47, 0x383DE, 0x3B05C,
+            dexOrder = 0x41024, mewStats = 0x425B, starters = red(blue = true), trainersEnd = 0x3A52E, moves = 0x38000),
+        Game("Yellow", "cc7d03262ebfaf2f06772c1a480c7d9d5f4a38e1", "1dd0d9c7bdab87534e4d06a711644bae3b7508e5", 1, listOf(0xCB95), 0x39DD1, 47, 0x383DE, 0x3B1E5,
+            dexOrder = 0x410B1, trainersEnd = 0x3A5B2, moves = 0x38000),
+        Game("Gold", "d8b8a3600a465308c9953dfa04f0081c05bdcb94", "f2891100d618224fc93c094302dfaf3af246ae09", 2,
             listOf(0x2AB35, 0x2B7C0, 0x2BE1C, -0x2B669, -0x2BD43, -0x2BED9), 0x3993E, 66, 0x51B0B, 0x427BD,
-            starters = elm(0x1800D2, 0x180114, 0x180150)),
-        Game("Silver", "49b163f7e57702bc939d642a18f591de55d92dae", "a07ad54feeb4745f0308f273d52075cf073870f0", 2,
+            starters = elm(0x1800D2, 0x180114, 0x180150), moves = 0x41AFE),
+        Game("Silver", "49b163f7e57702bc939d642a18f591de55d92dae", "84813da96adc96f1b4cee4398d82c3caff6defae", 2,
             listOf(0x2AB35, 0x2B7C0, 0x2BE1C, -0x2B669, -0x2BD43, -0x2BED9), 0x3993E, 66, 0x51B0B, 0x427BD,
-            starters = elm(0x1800D2, 0x180114, 0x180150)),
-        Game("Crystal", "f2f52230b536214ef7c9924f483392993e226cfb", "66d28fedea1fef92dd83cb76148445295710f9cc", 2,
+            starters = elm(0x1800D2, 0x180114, 0x180150), moves = 0x41AFE),
+        Game("Crystal", "f2f52230b536214ef7c9924f483392993e226cfb", "f5be8c4b9dc0c51a06eb95bea18e4e02ebd35df6", 2,
             listOf(0x2A5E9, 0x2B274, 0x2B8D0, -0x2B11D, -0x2B7F7, -0x2B92F), 0x39999, 67, 0x51424, 0x425B1,
-            starters = elm(0x78C7F, 0x78CC1, 0x78CFD)),
+            starters = elm(0x78C7F, 0x78CC1, 0x78CFD), moves = 0x41AFB),
     )
 
     /** Pokédex numbers of the legendaries and mythicals up to Gen 2. */
@@ -121,6 +123,9 @@ object GbRandomizer {
         for ((_, at) in g.starters) out += at
         r.wildSlots { out += it }
         r.trainerMons { species, moves -> out += species; if (moves >= 0) for (k in 0 until 4) out += moves + k }
+        r.trainerItems { out += it }
+        r.statSites { at, n -> for (k in 0 until n) out += at + k }
+        r.learnMoves { out += it }
         require(out.all { it in rom.indices }) { "not this game's tables" }
         return out
     }
@@ -169,6 +174,50 @@ object GbRandomizer {
             }
         }
 
+        /** Each species' base stats: where they start and how many (Gen 1: HP, ATTACK, DEFENSE, SPEED, SPECIAL; Gen 2: six). */
+        fun statSites(each: (at: Int, count: Int) -> Unit) {
+            if (g.gen == 2) { for (id in 1..251) each(g.baseStats + (id - 1) * 0x20 + 1, 6); return }
+            for (n in 1..151) {
+                val at = if (n == 151 && g.mewStats != 0) g.mewStats else g.baseStats + (n - 1) * 28
+                each(at + 1, 5)
+            }
+        }
+
+        /** Every move byte [id] learns, in order: Gen 1's level-1 moves first (its base stats' four, the ones it has), then
+         * each level-up entry's (after the evolutions: level, move pairs to a 0). */
+        fun movePlaces(id: Int): List<Int> {
+            val out = ArrayList<Int>()
+            if (g.gen == 1) {
+                val n = dex[id]
+                val at = if (n == 151 && g.mewStats != 0) g.mewStats else g.baseStats + (n - 1) * 28
+                for (k in 15..18) if (u8(at + k) != 0) out += at + k
+            }
+            var a = evolutions(id).second
+            while (u8(a) != 0) { out += a + 1; a += 2 }
+            return out
+        }
+
+        /** Every move byte any species learns, once. */
+        fun learnMoves(each: (at: Int) -> Unit) {
+            val seen = HashSet<Int>()
+            for (id in 1 until dex.size) if (species(id)) for (at in movePlaces(id)) if (seen.add(at)) each(at)
+        }
+
+        /** Gen 2: each trainer Pokémon's held item byte, where its party's type has one. */
+        fun trainerItems(each: (at: Int) -> Unit) {
+            if (g.gen != 2) return
+            val starts = (0 until g.trainerClasses).map { ptr(g.trainers + it * 2) }
+            val order = starts.distinct().sorted()
+            for ((i, start) in order.withIndex()) {
+                val end = order.getOrNull(i + 1) ?: Int.MAX_VALUE
+                var a = start
+                while (a < end && a < b.size) {
+                    val next = gen2Party(a, items = each) ?: break
+                    a = next.second
+                }
+            }
+        }
+
         /** Each trainer Pokémon's species byte, and (Gen 2, a party with its own moves) where its four moves are, else -1.
          * A class's parties run to the next class's; one that doesn't read as a party ends its class. */
         fun trainerMons(each: (species: Int, moves: Int) -> Unit) {
@@ -207,8 +256,8 @@ object GbRandomizer {
             return if (out.isEmpty() || out.size > 6) null else out to q + 1
         }
 
-        /** A Gen 2 party at [a]: a name (to 0x50), a type, then its Pokémon to 0xFF. */
-        private fun gen2Party(a: Int): Pair<List<Pair<Int, Int>>, Int>? {
+        /** A Gen 2 party at [a]: a name (to 0x50), a type, then its Pokémon to 0xFF; [items] hears each held item's place. */
+        private fun gen2Party(a: Int, items: ((Int) -> Unit)? = null): Pair<List<Pair<Int, Int>>, Int>? {
             var q = a
             while (q - a <= 12 && u8(q) != 0x50) q++
             if (u8(q) != 0x50) return null
@@ -220,6 +269,7 @@ object GbRandomizer {
                 if (u8(q) !in 1..100 || !species(u8(q + 1))) return null
                 val moves = if (type and 1 != 0) q + 2 + (if (type and 2 != 0) 1 else 0) else -1
                 out += (q + 1) to moves
+                if (type and 2 != 0) items?.invoke(q + 2)
                 q += 2 + (if (type and 2 != 0) 1 else 0) + (if (type and 1 != 0) 4 else 0)
                 if (out.size > 6) return null
             }
@@ -286,9 +336,46 @@ object GbRandomizer {
         }
 
         fun all() {
+            // Stats and learnsets first: the strength match keeps working (the totals stay) and trainers' moves follow.
+            if (o.baseStats) baseStats()
+            if (o.learnsets) learnsets()
             starters()
             wild()
             if (o.trainers) trainers()
+            if (o.trainerItems) trainerItems()
+        }
+
+        /** Each species' base stats in another order. */
+        fun baseStats() {
+            statSites { at, n ->
+                val v = (0 until n).map { b[at + it] }.shuffled(rnd)
+                v.forEachIndexed { k, x -> b[at + k] = x }
+            }
+        }
+
+        fun power(move: Int) = u8(g.moves + (move - 1) * (if (g.gen == 1) 6 else 7) + 2)
+
+        /** Random moves at each species' own levels: none twice in a list, the first one with power. */
+        fun learnsets() {
+            val moves = (1..(if (g.gen == 1) 164 else 251)).filter { it != 165 }
+            val damaging = moves.filter { power(it) > 0 }
+            val seen = HashSet<Int>()
+            for (id in all) {
+                val places = movePlaces(id).filter { seen.add(it) }
+                val used = HashSet<Int>()
+                places.forEachIndexed { k, at ->
+                    var move: Int
+                    do { move = (if (k == 0) damaging else moves).random(rnd) } while (!used.add(move))
+                    b[at] = move.toByte()
+                }
+            }
+        }
+
+        /** Gen 2: every held item a trainer has, one of the items trainers hold anywhere in the game. */
+        fun trainerItems() {
+            val held = ArrayList<Int>().also { l -> trainerItems { if (u8(it) != 0) l += u8(it) } }.distinct()
+            if (held.isEmpty()) return
+            trainerItems { b[it] = held.random(rnd).toByte() }
         }
 
         fun starters() {

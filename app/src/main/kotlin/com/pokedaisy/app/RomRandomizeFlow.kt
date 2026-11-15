@@ -139,9 +139,8 @@ class RomRandomizeFlow(
         }, "pokedaisy-randomize-look").apply { isDaemon = true; start() }
     }
 
-    /** The options as [b]'s game takes them: field items, held items, base stats and learnsets are the GBA games' only. */
-    fun optionsFor(b: Base) = if (b.ds || b.gb) options.copy(fieldItems = false, trainerItems = false, baseStats = false, learnsets = false)
-        else options
+    /** The options as [b]'s game takes them ([takesFieldItems], [takesHeldItems]). */
+    fun optionsFor(b: Base) = options.copy(fieldItems = options.fieldItems && takesFieldItems(b), trainerItems = options.trainerItems && takesHeldItems(b))
 
     /** RANDOMIZE. */
     fun make() {
@@ -269,6 +268,12 @@ class RomRandomizeFlow(
 
         /** "Pokemon FireRed Randomized (seed 123456).gba". */
         fun outputName(b: Base, seed: Long) = RomUris.sanitizeFileName("Pokemon ${b.game} Randomized (seed $seed).gba")
+
+        /** FIELD ITEMS: the GBA games so far. */
+        fun takesFieldItems(b: Base) = !b.ds && !b.gb
+
+        /** HELD ITEMS: not Red / Blue / Yellow, whose trainers hold nothing. */
+        fun takesHeldItems(b: Base) = !(b.gb && b.game in setOf("Red", "Blue", "Yellow"))
 
         fun startersLabel(s: RomRandomizer.Starters) = when (s) {
             RomRandomizer.Starters.OFF -> tk("AS THEY ARE")
@@ -410,15 +415,17 @@ private fun ReadyRows(
     OptionLine(tr("LEGENDARIES"), tr(if (o.noLegendaries) "NONE" else "ALLOWED"), false, m, divider = true) {
         flow.options = o.copy(noLegendaries = !o.noLegendaries)
     }
-    // The GBA games' own (RomRandomizer): the DS and Game Boy ones don't shuffle these yet.
-    if (!base.ds && !base.gb) {
-        fun shuffled(b: Boolean) = tr(if (b) "SHUFFLED" else "AS THEY ARE")
+    fun shuffled(b: Boolean) = tr(if (b) "SHUFFLED" else "AS THEY ARE")
+    // Only where the picked game takes them (RomRandomizeFlow.takesFieldItems / takesHeldItems).
+    if (RomRandomizeFlow.takesFieldItems(base)) {
         OptionLine(tr("FIELD ITEMS"), shuffled(o.fieldItems), false, m, divider = true) { flow.options = o.copy(fieldItems = !o.fieldItems) }
+    }
+    if (RomRandomizeFlow.takesHeldItems(base)) {
         OptionLine(tr("HELD ITEMS"), onOff(o.trainerItems), false, m, divider = true) { flow.options = o.copy(trainerItems = !o.trainerItems) }
-        OptionLine(tr("BASE STATS"), shuffled(o.baseStats), false, m, divider = true) { flow.options = o.copy(baseStats = !o.baseStats) }
-        OptionLine(tr("LEARNSETS"), tr(if (o.learnsets) "RANDOM" else "AS THEY ARE"), false, m, divider = true) {
-            flow.options = o.copy(learnsets = !o.learnsets)
-        }
+    }
+    OptionLine(tr("BASE STATS"), shuffled(o.baseStats), false, m, divider = true) { flow.options = o.copy(baseStats = !o.baseStats) }
+    OptionLine(tr("LEARNSETS"), tr(if (o.learnsets) "RANDOM" else "AS THEY ARE"), false, m, divider = true) {
+        flow.options = o.copy(learnsets = !o.learnsets)
     }
     OptionLine(tr("SEED"), flow.seed.toString(), false, m) { flow.newSeed() }
     Spacer(Modifier.height(m.u * 4))
