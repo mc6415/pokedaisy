@@ -168,6 +168,15 @@ class RomRandomizerTest {
             assertEquals(g.title, before.size, after.size)
             assertTrue("${g.title} ${before.size}", before.indices.count { before[it].id != after[it].id } > before.size / 2)
             assertEquals(g.title, before.map { it.id }.sorted().size, after.size)
+            // GIFTS: the gift Pokémon HERE names are the cart's new ones.
+            fun gifts() = allAreaThings(id).values.flatten().filter { it.kind == AreaKind.MON }.map { it.id }
+            ownRandomizedGuide = null
+            val giftsBefore = gifts()
+            val made = RomRandomizer.randomize(rom, RomRandomizer.Options(RomRandomizer.Starters.OFF, RomRandomizer.Wild.OFF, false, gifts = true), 9L)!!
+            ownRandomizedGuide = id to RomRandomizer.guide(made, g)
+            val giftsAfter = gifts()
+            assertEquals(g.title, giftsBefore.size, giftsAfter.size)
+            if (giftsBefore.isNotEmpty()) assertTrue("${g.title} $giftsBefore", giftsBefore != giftsAfter)
         } finally {
             ownRandomizedGuide = null
         }
@@ -182,5 +191,14 @@ class RomRandomizerTest {
         val spread = RomRandomizer.randomize(rom, RunModesCheck.SPREAD, 22L)!!
         val without = RomRandomizer.randomize(rom, RunModesCheck.SPREAD.copy(allCatchable = false), 22L)!!
         RunModesCheck.spread(g.title, retail, RomRandomizer.view(spread, g), RomRandomizer.view(without, g))
+    }
+
+    @Test
+    fun `GIFTS swaps the gift and static Pokemon`() = each { g, rom ->
+        val o = RomRandomizer.Options(RomRandomizer.Starters.OFF, RomRandomizer.Wild.OFF, false, gifts = true)
+        val a = RomRandomizer.randomize(rom, o, 31L)!!
+        assertEquals(g.title, g, RomRandomizer.recognise(a))
+        fun read(b: ByteArray) = RomRandomizer.statics(g).map { one -> one.map { (b[it].toInt() and 0xFF) or ((b[it + 1].toInt() and 0xFF) shl 8) } }
+        checkGifts(g.title, read(rom), read(a))
     }
 }

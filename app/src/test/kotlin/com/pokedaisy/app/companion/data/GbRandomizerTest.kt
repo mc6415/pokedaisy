@@ -213,6 +213,16 @@ class GbRandomizerTest {
         RunModesCheck.spread(g.title, retail, GbRandomizer.view(spread, g), GbRandomizer.view(without, g))
     }
 
+
+    @Test
+    fun `GIFTS swaps the gift and static Pokemon`() = each { g, rom ->
+        val o = RomRandomizer.Options(RomRandomizer.Starters.OFF, RomRandomizer.Wild.OFF, false, gifts = true)
+        val a = GbRandomizer.randomize(rom, o, 31L)!!
+        assertSame(g, GbRandomizer.recognise(a))
+        fun read(b: ByteArray) = GbRandomizer.statics(g).map { one -> one.map { b[it].toInt() and 0xFF } }
+        checkGifts(g.title, read(rom), read(a))
+    }
+
     @Test
     fun `anything else is refused`() = each { g, rom ->
         val other = rom.copyOf().also { it[0x2000] = (it[0x2000] + 1).toByte() }

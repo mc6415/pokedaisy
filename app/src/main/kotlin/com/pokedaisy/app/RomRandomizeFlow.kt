@@ -362,18 +362,19 @@ class RomRandomizeFlow(
 
         /** A ready-made [Style]'s options (LAST TIME and CUSTOM aren't). */
         fun optionsOf(s: Style): RomRandomizer.Options = when (s) {
-            Style.WILD_ONLY -> RomRandomizer.Options(trainers = false)
+            Style.WILD_ONLY -> RomRandomizer.Options(trainers = false, gifts = true)
             Style.CHAOS -> RomRandomizer.Options(
                 starters = RomRandomizer.Starters.RANDOM, wild = RomRandomizer.Wild.RANDOM, trainers = true,
                 similarStrength = false, noLegendaries = false, fieldItems = true, trainerItems = true, baseStats = true, learnsets = true,
+                gifts = true,
             )
-            else -> RomRandomizer.Options()
+            else -> RomRandomizer.Options(gifts = true)
         }
 
         /** [o] as [Prefs.randomizeLast] keeps it: its settings in order, `,`-separated. */
         fun encode(o: RomRandomizer.Options): String = listOf(
             o.starters.name, o.wild.name, o.trainers, o.similarStrength, o.noLegendaries, o.fieldItems, o.trainerItems, o.baseStats, o.learnsets,
-            o.levelScale, o.noDuplicates, o.allCatchable, o.trainersKeepType, o.monotype?.name ?: "",
+            o.levelScale, o.noDuplicates, o.allCatchable, o.trainersKeepType, o.monotype?.name ?: "", o.gifts,
         ).joinToString(",")
 
         fun decode(s: String?): RomRandomizer.Options? = runCatching {
@@ -386,6 +387,7 @@ class RomRandomizeFlow(
                 levelScale = f.getOrNull(9)?.toInt() ?: 0, noDuplicates = f.getOrNull(10)?.toBooleanStrict() ?: false,
                 allCatchable = f.getOrNull(11)?.toBooleanStrict() ?: false, trainersKeepType = f.getOrNull(12)?.toBooleanStrict() ?: false,
                 monotype = f.getOrNull(13)?.takeIf { it.isNotEmpty() }?.let { com.pokedaisy.app.companion.data.PokeType.valueOf(it) },
+                gifts = f.getOrNull(14)?.toBooleanStrict() ?: false,
             )
         }.getOrNull()
 
@@ -402,8 +404,9 @@ class RomRandomizeFlow(
                 RomRandomizer.Wild.GLOBAL -> add(tr("Each wild Pokémon swapped for another everywhere"))
                 RomRandomizer.Wild.OFF -> Unit
             }
+            if (o.gifts) add(tr("Gift and static Pokémon swapped"))
             if (o.trainers) add(tr("Trainers' teams shuffled"))
-            val swaps = o.starters != RomRandomizer.Starters.OFF || o.wild != RomRandomizer.Wild.OFF || o.trainers
+            val swaps = o.starters != RomRandomizer.Starters.OFF || o.wild != RomRandomizer.Wild.OFF || o.trainers || o.gifts
             o.monotype?.takeIf { swaps }?.let { add(tr("Only {0} Pokémon", typeName(it))) }
             if (o.trainers && o.trainersKeepType && o.monotype == null) add(tr("Trainers keep their types"))
             if (o.levelScale > 0) add(tr("Trainers' levels up {0}%", o.levelScale))
@@ -608,18 +611,22 @@ private fun WizardPage(
             heading(tr("POKéMON"))
             row(tr("STARTERS"), tr(RomRandomizeFlow.startersLabel(o.starters)), RomRandomizeFlow.startersInfo(o.starters)) { choose("STARTERS") }
             row(tr("WILD POKéMON"), tr(RomRandomizeFlow.wildLabel(o.wild)), RomRandomizeFlow.wildInfo(o.wild)) { choose("WILD") }
-            row(tr("SIMILAR STRENGTH"), onOff(o.similarStrength),
-                if (o.similarStrength) tk("Swaps stay close in strength.") else tk("A swap can be much stronger or weaker.")) {
-                flow.options = o.copy(similarStrength = !o.similarStrength)
+            row(tr("GIFTS"), shuffled(o.gifts),
+                if (o.gifts) tk("Gifts, prizes and Pokémon waiting on the map swapped.") else tk("The game's own gifts and waiting Pokémon.")) {
+                flow.options = o.copy(gifts = !o.gifts)
             }
-            row(tr("LEGENDARIES"), tr(if (o.noLegendaries) "NONE" else "ALLOWED"),
-                if (o.noLegendaries) tk("Kept out of the grass and trainers' teams.") else tk("Can turn up in the grass and in teams."), last = true) {
-                flow.options = o.copy(noLegendaries = !o.noLegendaries)
+            row(tr("SIMILAR STRENGTH"), onOff(o.similarStrength),
+                if (o.similarStrength) tk("Swaps stay close in strength.") else tk("A swap can be much stronger or weaker."), last = true) {
+                flow.options = o.copy(similarStrength = !o.similarStrength)
             }
         }
         // The run modes.
         RomRandomizeFlow.Page.RULES -> {
             heading(tr("RULES"))
+            row(tr("LEGENDARIES"), tr(if (o.noLegendaries) "NONE" else "ALLOWED"),
+                if (o.noLegendaries) tk("Kept out of the grass and trainers' teams.") else tk("Can turn up in the grass and in teams.")) {
+                flow.options = o.copy(noLegendaries = !o.noLegendaries)
+            }
             row(tr("NO DUPLICATES"), onOff(o.noDuplicates),
                 if (o.noDuplicates) tk("No Pokémon twice in one area.") else tk("An area can have a Pokémon twice.")) {
                 flow.options = o.copy(noDuplicates = !o.noDuplicates)

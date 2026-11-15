@@ -24,9 +24,9 @@ class RomRandomizeFlowTest {
         assertEquals(null, RomRandomizeFlow.decode("NOT,A,SETTING"))
         // The run modes too, and a setup saved before them (nine fields) reads with them off.
         val modes = o.copy(levelScale = 25, noDuplicates = true, allCatchable = true, trainersKeepType = true,
-            monotype = com.pokedaisy.app.companion.data.PokeType.DRAGON)
+            monotype = com.pokedaisy.app.companion.data.PokeType.DRAGON, gifts = true)
         assertEquals(modes, RomRandomizeFlow.decode(RomRandomizeFlow.encode(modes)))
-        assertEquals(o.copy(levelScale = 0), RomRandomizeFlow.decode(RomRandomizeFlow.encode(o).split(',').take(9).joinToString(",")))
+        assertEquals(o.copy(levelScale = 0, gifts = false), RomRandomizeFlow.decode(RomRandomizeFlow.encode(o).split(',').take(9).joinToString(",")))
     }
 
     @Test
@@ -39,7 +39,7 @@ class RomRandomizeFlowTest {
         }
         assertEquals(false, RomRandomizeFlow.optionsOf(RomRandomizeFlow.Style.WILD_ONLY).trainers)
         // Red's trainers hold nothing: CHAOS's held items aren't promised there.
-        assertEquals(7, RomRandomizeFlow.summary(RomRandomizeFlow.optionsOf(RomRandomizeFlow.Style.CHAOS), red).size)
+        assertEquals(8, RomRandomizeFlow.summary(RomRandomizeFlow.optionsOf(RomRandomizeFlow.Style.CHAOS), red).size)
         val nothing = com.pokedaisy.app.companion.data.RomRandomizer.Options(
             com.pokedaisy.app.companion.data.RomRandomizer.Starters.OFF, com.pokedaisy.app.companion.data.RomRandomizer.Wild.OFF, false,
         )

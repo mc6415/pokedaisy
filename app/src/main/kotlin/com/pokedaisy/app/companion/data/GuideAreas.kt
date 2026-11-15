@@ -156,7 +156,7 @@ internal fun randomizedAreas(areas: Map<Int, List<AreaThing>>, r: RandomizedGuid
             when (t.kind) {
                 AreaKind.ITEM, AreaKind.HIDDEN -> r.items[t.flag]?.let { t.copy(id = it) } ?: t.takeIf { r.keepUnknown }
                 AreaKind.TRADE -> if (r.trades == null) t else r.trades["${t.id}/${t.wants}"]?.let { (given, wanted) -> t.copy(id = given, wants = wanted) }
-                AreaKind.MON, AreaKind.EGG -> if (r.statics == null) t else r.statics[t.id]?.let { t.copy(id = it) }
+                AreaKind.MON, AreaKind.EGG -> if (r.statics == null) t else r.statics[t.id]?.let { t.copy(id = it) } ?: t.takeIf { r.keepUnknown }
                 AreaKind.GIFT, AreaKind.KEY -> t
             }
         }

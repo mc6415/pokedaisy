@@ -46,9 +46,11 @@ object RomRandomizer {
         val trainersKeepType: Boolean = false,
         /** Only this type's Pokémon in the grass, the starters and trainers' teams (null: any). */
         val monotype: PokeType? = null,
+        /** Gift and static Pokémon (handed over, sitting on the map, prizes) swapped too ([RANDOMIZER_STATICS]). */
+        val gifts: Boolean = false,
     ) {
         val changesSomething get() = starters != Starters.OFF || wild != Wild.OFF || trainers || fieldItems || trainerItems ||
-            baseStats || learnsets || levelScale > 0
+            baseStats || learnsets || levelScale > 0 || gifts
     }
 
     /** Where one retail game keeps what the tool changes (ROM offsets). */
@@ -87,31 +89,31 @@ object RomRandomizer {
 
     val GAMES = listOf(
         Game(
-            "BPRE", 1, "FireRed", "dd5945db9b930750cb39d00c84da8571feebf417", "ef09327e6b6f4c820a3b941a247a2f776b48cb22",
+            "BPRE", 1, "FireRed", "dd5945db9b930750cb39d00c84da8571feebf417", "c7c13834d4f1089cdfc2f77d2ee77d84d86789c6",
             trainers = 0x23EB38, trainerCount = 743, learnsets = 0x25D824, evolutions = 0x2597C4, baseStats = 0x2547F4,
             wildHeaders = 0x3C9D28, starterSites = oaksLab(0x169C2D), starterLines = listOf(0x18E2F1, 0x18E210, 0x18E283),
             speciesNames = 0x245F50, items = 0x3DB098, battleMoves = 0x250C74, mapGroups = 0x352718, keyPocket = 2,
         ),
         Game(
-            "BPGE", 1, "LeafGreen", "7862c67bdecbe21d1d69ce082ce34327e1c6ed5e", "750d127f3578c8e82c7963488c5757b42231ecd2",
+            "BPGE", 1, "LeafGreen", "7862c67bdecbe21d1d69ce082ce34327e1c6ed5e", "bca1a3293b20a99069fc6ef98d61cdf164b7a6eb",
             trainers = 0x23EB14, trainerCount = 743, learnsets = 0x25D804, evolutions = 0x2597A4, baseStats = 0x2547D0,
             wildHeaders = 0x3C9B64, starterSites = oaksLab(0x169C09), starterLines = listOf(0x18E2CD, 0x18E1EC, 0x18E25F),
             speciesNames = 0x245F2C, items = 0x3DAED4, battleMoves = 0x250C50, mapGroups = 0x3526F8, keyPocket = 2,
         ),
         Game(
-            "AXVE", 2, "Ruby", "5b64eacf892920518db4ec664e62a086dd5f5bc8", "799496077bcc7fa01e9333f190cdd2c4e285aa9b",
+            "AXVE", 2, "Ruby", "5b64eacf892920518db4ec664e62a086dd5f5bc8", "e138691fda22da481cb7b1215cea8f6bdbedc7d7",
             trainers = 0x1F0514, trainerCount = 694, learnsets = 0x207BE0, evolutions = 0x203B80, baseStats = 0x1FEC30,
             wildHeaders = 0x39D46C, starterSites = starterMon(0x3F76E0),
             items = 0x3C5580, battleMoves = 0x1FB144, mapGroups = 0x3085A0, keyPocket = 5,
         ),
         Game(
-            "AXPE", 2, "Sapphire", "89b45fb172e6b55d51fc0e61989775187f6fe63c", "b1fb79727a7e5a333f14c3f39b6fd1f1169efa98",
+            "AXPE", 2, "Sapphire", "89b45fb172e6b55d51fc0e61989775187f6fe63c", "2d0c6b5f6d9da77e520ed85dee6864f71cf70b24",
             trainers = 0x1F04A4, trainerCount = 694, learnsets = 0x207B70, evolutions = 0x203B10, baseStats = 0x1FEBC0,
             wildHeaders = 0x39D2B4, starterSites = starterMon(0x3F773C),
             items = 0x3C55DC, battleMoves = 0x1FB0D4, mapGroups = 0x308530, keyPocket = 5,
         ),
         Game(
-            "BPEE", 0, "Emerald", "f3ae088181bf583e55daf962a92bb46f4f1d07b7", "1e7179c3e165712ddd5dbaca1396a2278b06da62",
+            "BPEE", 0, "Emerald", "f3ae088181bf583e55daf962a92bb46f4f1d07b7", "f32126c0d46bbe5c71252a9cde7721a2091c85a3",
             trainers = 0x310030, trainerCount = 855, learnsets = 0x32937C, evolutions = 0x32531C, baseStats = 0x3203CC,
             wildHeaders = 0x552D48, starterSites = starterMon(0x5B1DF8),
             items = 0x5839A0, battleMoves = 0x31C898, mapGroups = 0x486578, keyPocket = 5,
@@ -185,7 +187,15 @@ object RomRandomizer {
             }
             group++
         }
-        return RandomizedGuide(items, trades = null, statics = null, keepUnknown = true)
+        return RandomizedGuide(items, trades = null, statics = giftsNow(rom, g), keepUnknown = true)
+    }
+
+    /** Each gift / static Pokémon's species in [rom] by its retail species (when only one has that species). */
+    private fun giftsNow(rom: ByteArray, g: Game): Map<Int, Int> {
+        val was = staticSpecies(g)
+        val places = statics(g)
+        return was.indices.filter { i -> was.count { it == was[i] } == 1 }
+            .associate { i -> was[i] to ((rom[places[i][0]].toInt() and 0xFF) or ((rom[places[i][0] + 1].toInt() and 0xFF) shl 8)) }
     }
 
     /** [rom] is one this tool made (not the untouched cart): its game, else null. For the Poller and the library. */
@@ -230,6 +240,12 @@ object RomRandomizer {
         return CartView(wild.values.toList(), trainers) { s -> setOf(r.u8(g.baseStats + s * BASE_STRIDE + 6), r.u8(g.baseStats + s * BASE_STRIDE + 7)) }
     }
 
+    /** [g]'s gift and static Pokémon: each one's species places ([RANDOMIZER_STATICS]). */
+    internal fun statics(g: Game): List<IntArray> = RANDOMIZER_STATICS["${g.code}${g.rev}"].orEmpty().map { it.copyOfRange(1, it.size) }
+
+    /** [g]'s gift and static Pokémon's retail species, in [statics]' order. */
+    internal fun staticSpecies(g: Game): List<Int> = RANDOMIZER_STATICS["${g.code}${g.rev}"].orEmpty().map { it[0] }
+
     internal fun sites(rom: ByteArray, g: Game): List<IntRange> {
         val r = Reader(rom)
         val out = ArrayList<IntRange>()
@@ -251,6 +267,7 @@ object RomRandomizer {
         for (s in ALL) out += g.baseStats + s * BASE_STRIDE until g.baseStats + s * BASE_STRIDE + 6
         r.learnsetEntries(g) { at -> out += at..at + 1 }
         r.fieldItems(g) { at -> out += at..at + 1 }
+        for (one in statics(g)) for (at in one) out += at..at + 1
         require(out.all { it.first >= 0 && it.last < rom.size && it.last - it.first < 0x200 }) { "not this game's tables" }
         return out
     }
@@ -389,6 +406,7 @@ object RomRandomizer {
             if (o.learnsets) learnsets()
             starters()
             wild()
+            if (o.gifts) gifts()
             if (o.levelScale > 0) levels()
             if (o.trainers) trainers()
             if (o.trainerItems) trainerItems()
@@ -515,6 +533,18 @@ object RomRandomizer {
                     val list = movesAt(now, u8(m + 2))
                     for (k in 0 until 4) put16(moves + k * 2, list.getOrElse(k) { 0 })
                 }
+            }
+        }
+
+        /** GIFTS: each gift / static Pokémon swapped (every place its species is written), none twice. */
+        fun gifts() {
+            val used = HashSet<Int>()
+            for (one in statics(g)) {
+                val was = u16(one[0])
+                if (was !in 1..SPECIES) continue
+                val now = picker.pick(was, used)
+                used += now
+                for (at in one) put16(at, now)
             }
         }
 

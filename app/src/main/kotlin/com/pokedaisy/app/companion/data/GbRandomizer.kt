@@ -88,22 +88,22 @@ object GbRandomizer {
     }
 
     val GAMES = listOf(
-        Game("Red", "ea9bcae617fdf159b045185467ae58b2e4a48b9a", "ee32b16b6e17c98589deef94e1a71fa0fda57237", 1, listOf(0xCEEB), 0x39D3B, 47, 0x383DE, 0x3B05C,
+        Game("Red", "ea9bcae617fdf159b045185467ae58b2e4a48b9a", "15a977e1c1e44a780a466ca580336a792f6f0e42", 1, listOf(0xCEEB), 0x39D3B, 47, 0x383DE, 0x3B05C,
             dexOrder = 0x41024, mewStats = 0x425B, starters = red(blue = false), trainersEnd = 0x3A52E, moves = 0x38000,
             field = redField(0x76688)),
-        Game("Blue", "d7037c83e1ae5b39bde3c30787637ba1d4c48ce2", "5f7118b6a0f4751e9c2b68dbec5287cfb51a05b8", 1, listOf(0xCEEB), 0x39D3B, 47, 0x383DE, 0x3B05C,
+        Game("Blue", "d7037c83e1ae5b39bde3c30787637ba1d4c48ce2", "2f3689906adb354cf30909919b9284db28548032", 1, listOf(0xCEEB), 0x39D3B, 47, 0x383DE, 0x3B05C,
             dexOrder = 0x41024, mewStats = 0x425B, starters = red(blue = true), trainersEnd = 0x3A52E, moves = 0x38000,
             field = redField(0x76689)),
-        Game("Yellow", "cc7d03262ebfaf2f06772c1a480c7d9d5f4a38e1", "3fd69baf4436268d489ce45afec76bed25a62b47", 1, listOf(0xCB95), 0x39DD1, 47, 0x383DE, 0x3B1E5,
+        Game("Yellow", "cc7d03262ebfaf2f06772c1a480c7d9d5f4a38e1", "1faef8f63c3a0a03b2a8269acc46ada6ba092362", 1, listOf(0xCB95), 0x39DD1, 47, 0x383DE, 0x3B1E5,
             dexOrder = 0x410B1, trainersEnd = 0x3A5B2, moves = 0x38000,
             field = Field(0xFC1F2, 0xE6DD, 0xFC3E4, 0xF268D, 0, 0x75F74, 0xC892, 0x75FAA)),
-        Game("Gold", "d8b8a3600a465308c9953dfa04f0081c05bdcb94", "f57c6a3a47d5ad9ee14a73ec2826739039c37066", 2,
+        Game("Gold", "d8b8a3600a465308c9953dfa04f0081c05bdcb94", "3238128bec1b637fa88e609680aa4b5e24e9ac9a", 2,
             listOf(0x2AB35, 0x2B7C0, 0x2BE1C, -0x2B669, -0x2BD43, -0x2BED9), 0x3993E, 66, 0x51B0B, 0x427BD,
             starters = elm(0x1800D2, 0x180114, 0x180150), moves = 0x41AFE, field = Field(0x940ED, 0x68A0)),
-        Game("Silver", "49b163f7e57702bc939d642a18f591de55d92dae", "9edfc30494a714e1bc0d7f0be42280463d024393", 2,
+        Game("Silver", "49b163f7e57702bc939d642a18f591de55d92dae", "cfede4443d19f7d0b605e66e5a61692105061aa1", 2,
             listOf(0x2AB35, 0x2B7C0, 0x2BE1C, -0x2B669, -0x2BD43, -0x2BED9), 0x3993E, 66, 0x51B0B, 0x427BD,
             starters = elm(0x1800D2, 0x180114, 0x180150), moves = 0x41AFE, field = Field(0x940ED, 0x68A0)),
-        Game("Crystal", "f2f52230b536214ef7c9924f483392993e226cfb", "f34b9529aea35a5d2f2665123b911df7e6856bbf", 2,
+        Game("Crystal", "f2f52230b536214ef7c9924f483392993e226cfb", "36b732226e982f9d26246f6079558d476a4c4492", 2,
             listOf(0x2A5E9, 0x2B274, 0x2B8D0, -0x2B11D, -0x2B7F7, -0x2B92F), 0x39999, 67, 0x51424, 0x425B1,
             starters = elm(0x78C7F, 0x78CC1, 0x78CFD), moves = 0x41AFB, field = Field(0x94000, 0x67C1)),
     )
@@ -170,6 +170,7 @@ object GbRandomizer {
         r.wildSlots { out += it }
         r.trainerMons { species, moves -> out += species; if (moves >= 0) for (k in 0 until 4) out += moves + k }
         r.trainerLevels { out += it }
+        for (one in statics(g)) for (at in one) out += at
         r.trainerItems { out += it }
         r.statSites { at, n -> for (k in 0 until n) out += at + k }
         r.learnMoves { out += it }
@@ -214,7 +215,14 @@ object GbRandomizer {
         }
 
         /** HERE's item balls and hidden items as this cart has them: by their flags, trades and gifts as the game's. */
-        val guide: RandomizedGuide by lazy { RandomizedGuide(r.itemsByFlag(), trades = null, statics = null, keepUnknown = true) }
+        val guide: RandomizedGuide by lazy {
+            // Gifts by Pokédex number (the area data's), when only one gift has that species.
+            val was = RANDOMIZER_STATICS[game.title].orEmpty().map { it[0] }
+            val places = statics(game)
+            val gifts = was.indices.filter { i -> was.count { it == was[i] } == 1 && r.species(was[i]) && r.species(r.u8(places[i][0])) }
+                .associate { i -> r.dex[was[i]] to r.dex[r.u8(places[i][0])] }
+            RandomizedGuide(r.itemsByFlag(), trades = null, statics = gifts, keepUnknown = true)
+        }
 
         /** Trainer class [cls]'s [no]th party (both from 1), or null when it doesn't read as one. */
         fun party(cls: Int, no: Int): List<TrainerMon>? = runCatching { r.party(cls, no) }.getOrNull()
@@ -227,6 +235,9 @@ object GbRandomizer {
 
     /** [rom]'s [Shuffle] when it's a cart this tool made, else null. */
     fun readShuffle(rom: ByteArray): Shuffle? = recognise(rom)?.let { Shuffle(it, rom) }
+
+    /** [g]'s gift and static Pokémon: each one's species places ([RANDOMIZER_STATICS], its retail species dropped). */
+    internal fun statics(g: Game): List<IntArray> = RANDOMIZER_STATICS[g.title].orEmpty().map { it.copyOfRange(1, it.size) }
 
     /** The item balls' and hidden items' item bytes, but the kept ones. */
     internal fun fieldSites(rom: ByteArray, g: Game): List<Int> = ArrayList<Int>().also { l -> Reader(rom, g).fieldItems { l += it } }
@@ -639,6 +650,7 @@ object GbRandomizer {
             if (o.learnsets) learnsets()
             starters()
             wild()
+            if (o.gifts) gifts()
             if (o.levelScale > 0) levels()
             if (o.trainers) trainers()
             if (o.trainerItems) trainerItems()
@@ -723,6 +735,18 @@ object GbRandomizer {
                 }
                 used += now
                 b[at] = now.toByte()
+            }
+        }
+
+        /** GIFTS: each gift / static Pokémon swapped (every place its species is written), none twice. */
+        fun gifts() {
+            val used = HashSet<Int>()
+            for (one in statics(g)) {
+                val was = u8(one[0])
+                if (!species(was)) continue
+                val now = picker.pick(was, used)
+                used += now
+                for (at in one) b[at] = now.toByte()
             }
         }
 

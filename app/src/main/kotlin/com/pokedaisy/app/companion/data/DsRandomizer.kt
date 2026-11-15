@@ -126,7 +126,7 @@ object DsRandomizer {
 
     val GAMES = listOf(
         Game(
-            "CPUE", 1, "Platinum", "55ac97b09ff4333d5a4aad24fb26ac1133f7dfc9", "e49e0e0cac331493d39c1e59a1ca9a1c335d727f",
+            "CPUE", 1, "Platinum", "55ac97b09ff4333d5a4aad24fb26ac1133f7dfc9", "44e7ab9d704d6572bf9ac010fd3ad1e9b0c16d63",
             starterOverlay = 78, starterOffsets = listOf(0x1BC0, 0x1BC4, 0x1BC8),
             encounters = "/fielddata/encountdata/pl_enc_data.narc",
             trainers = "/poketool/trainer/trdata.narc", trainerParties = "/poketool/trainer/trpoke.narc",
@@ -139,8 +139,8 @@ object DsRandomizer {
             balls = Balls("/fielddata/script/scr_seq.narc", 404, events = "/fielddata/eventdata/zone_event.narc"),
         ),
     ) + listOf(
-        Triple("IPKE", "HeartGold", "900df66d390866f97f82e1ff2c2edc98870209ad" to "ebcf06e071c3d1d19aaad70476d288ef644a2b38"),
-        Triple("IPGE", "SoulSilver", "4562c3ef0374f1e08591342f43075b0d3d44195b" to "12b28c2ff99d7dc4bdd078a25a2b72c0e59a0555"),
+        Triple("IPKE", "HeartGold", "900df66d390866f97f82e1ff2c2edc98870209ad" to "d405617566c164b7af51e022af8da0edf5999d45"),
+        Triple("IPGE", "SoulSilver", "4562c3ef0374f1e08591342f43075b0d3d44195b" to "86480488f3054eb9ad3b199f87be782fbb54601c"),
     ).map { (code, title, hashes) ->
         // pret/pokeheartgold: choose_starter.c's species (ARM9), choose_starter_app.c's sSpecies (overlay 61), msg_0190.
         Game(
@@ -151,8 +151,8 @@ object DsRandomizer {
             balls = Balls("/a/0/1/2", 141, events = "/a/0/3/2"),
         )
     } + listOf(
-        Triple("IRBO", "Black", "0a92d35ef541f9c915fc9cb70d7b171267402ca0" to "7c0927e50101fb202476fe1addd59c1ec9614036"),
-        Triple("IRAO", "White", "09e827becf04aa7577e617bb9906ef1fcbe1e65a" to "b4caa2a084d6477a134cf6e51769ef0e71763645"),
+        Triple("IRBO", "Black", "0a92d35ef541f9c915fc9cb70d7b171267402ca0" to "c0a583e2f633c1e612066704a9f52bef25b7b2d0"),
+        Triple("IRAO", "White", "09e827becf04aa7577e617bb9906ef1fcbe1e65a" to "5685566fb6dc6e3b51dd6fbe4a0efd994226dfea"),
     ).map { (code, title, hashes) ->
         // No decomp: the archives from the cart (scripts/gen_gen5_guide.py's FILES_BW), the choice screen overlay 223's list.
         Game(
@@ -163,8 +163,8 @@ object DsRandomizer {
             balls = Balls("/a/0/5/7", 864, at = 2, events = "/a/1/2/5"),
         )
     } + listOf(
-        Triple("IREO", "Black 2", "74ea944a90b5c067579a318c05b2e3385ad3f7c5" to "d4d9f718bc40a751067c2b5dbac06c729a170c34"),
-        Triple("IRDO", "White 2", "d831b4f7e464b2acc51a6abfcb85c3132376cc66" to "baed0d5289644766fd96c090527c1878d3373422"),
+        Triple("IREO", "Black 2", "74ea944a90b5c067579a318c05b2e3385ad3f7c5" to "5296dca7a0a02b41defea41975fe47be55c4c15d"),
+        Triple("IRDO", "White 2", "d831b4f7e464b2acc51a6abfcb85c3132376cc66" to "795654ba1b2826ed7a3073e3274ebadd376360e3"),
     ).map { (code, title, hashes) ->
         // pret has no decomp of these: the archives from the cart (scripts/gen_gen5_guide.py reads the same ones).
         Game(
@@ -421,12 +421,23 @@ object DsRandomizer {
                 }
                 if (scripts != null) for ((at, _) in scriptSites(sc)) { sc[at] = 0; sc[at + 1] = 0 }
                 if (balls != null) ballSites(bl) { at -> bl[at] = 0; bl[at + 1] = 0 }
+                if (balls != null) staticSites(bl) { at -> bl[at] = 0; bl[at + 1] = 0 }
             }
             return (o + e + p + m + sc + a9 + po + pe + le + (if (ballsShared) ByteArray(0) else bl)).toByteString().sha1().hex()
         }
 
         /** An item an item ball keeps: HMs and key items (Gen 4: 420 on; Gen 5: 420-536 and 615-638, but its TM93-95). */
         fun keepsItem(item: Int) = item == 0 || if (g.gen == 4) item >= 420 else item in 420..536 || item in 615..638 && item !in 618..620
+
+        /** Each gift / static Pokémon's species words in [d] (the script archive [Balls] names: the statics' too), by
+         * static ([RANDOMIZER_STATICS]'s (member, offset) pairs). */
+        fun statics(d: ByteArray): List<List<Int>> {
+            val n = Narc(d)
+            // Its retail species first, then (member, offset) pairs.
+            return RANDOMIZER_STATICS[g.code].orEmpty().map { one -> (1 until one.size step 2).map { k -> n.start(one[k]) + one[k + 1] } }
+        }
+
+        fun staticSites(d: ByteArray, each: (at: Int) -> Unit) = statics(d).forEach { it.forEach(each) }
 
         /** Each item ball's item word in [d] (the script archive [Balls] names), but the ones [keepsItem] keeps. */
         fun ballSites(d: ByteArray, each: (at: Int) -> Unit) {
@@ -524,9 +535,11 @@ object DsRandomizer {
         private val sets: List<ByteArray>,
         private val teams: Map<Int, List<TrainerMon>>,
         items: Map<Int, Int> = emptyMap(),
+        /** Each gift / static Pokémon's species now, by its retail species. */
+        gifts: Map<Int, Int> = emptyMap(),
     ) {
-        /** HERE's item balls as this cart has them, by their flags ([ballItems]); hidden items stay the game's. */
-        val guide = RandomizedGuide(items, trades = null, statics = null, keepUnknown = true)
+        /** HERE's item balls and gifts as this cart has them ([ballItems]); hidden items stay the game's. */
+        val guide = RandomizedGuide(items, trades = null, statics = gifts, keepUnknown = true)
 
         /** Encounter set [set]'s species at byte [offset] of its record, or null when it has none there. */
         fun speciesAt(set: Int, offset: Int): Int? = sets.getOrNull(set)?.let { m ->
@@ -571,7 +584,11 @@ object DsRandomizer {
                     TrainerMon(u16(m, at + 4) and speciesMask(g.gen), m[at + 2].toInt() and 0xFF, item, moves)
                 }
             }
-            Shuffle(g, (0 until enc.size).map { enc.member(it) }, teams, ballItems(cart, g, f))
+            // Gifts by retail species, when only one has that species.
+            val was = RANDOMIZER_STATICS[g.code].orEmpty().map { it[0] }
+            val now = f.balls?.let { d -> f.statics(d).map { u16(d, it[0]) } }.orEmpty()
+            val gifts = was.indices.filter { i -> i < now.size && was.count { it == was[i] } == 1 }.associate { i -> was[i] to now[i] }
+            Shuffle(g, (0 until enc.size).map { enc.member(it) }, teams, ballItems(cart, g, f), gifts)
         }
     }.getOrNull()
 
@@ -622,6 +639,15 @@ object DsRandomizer {
         CartView(wild.values.toList(), trainers) { s ->
             if (s !in 1..g.speciesCount) emptySet() else personal.member(s).let { m -> setOf(m[6].toInt() and 0xFF, m[7].toInt() and 0xFF) }
         }
+    }
+
+    /** [path]'s gift / static Pokémon: the species at each of each one's places (tests). */
+    internal fun giftSpecies(path: Path): List<List<Int>>? = FileSystem.SYSTEM.openReadOnly(path).use { h ->
+        val cart = Cart(h)
+        val g = gameOfHeader(cart) ?: return@use null
+        val f = Files(cart, g)
+        val d = f.balls ?: return@use emptyList()
+        f.statics(d).map { one -> one.map { u16(d, it) } }
     }
 
     /** [path]'s item balls by flag ([ballItems]), any cart of a known game (the tests check retail's against the GUIDE). */
@@ -732,10 +758,24 @@ object DsRandomizer {
             if (o.learnsets) learnsets()
             starters()
             wild()
+            if (o.gifts) gifts()
             if (o.levelScale > 0) levels()
             if (o.trainers) trainers()
             if (o.trainerItems) trainerItems()
             if (o.fieldItems) fieldItems()
+        }
+
+        /** GIFTS: each gift / static Pokémon swapped (every script word naming it), none twice. */
+        fun gifts() {
+            val d = f.balls ?: return
+            val used = HashSet<Int>()
+            for (one in f.statics(d)) {
+                val was = u16(d, one[0])
+                if (was !in 1..g.speciesCount) continue
+                val now = picker.pick(was, used)
+                used += now
+                for (at in one) put16(d, at, now)
+            }
         }
 
         /** LEVELS: every trainer Pokémon's level (the byte at +2 of its record) raised. */

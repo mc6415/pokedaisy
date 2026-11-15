@@ -255,6 +255,17 @@ class DsRandomizerTest {
         RunModesCheck.spread(g.title, retail, made(RunModesCheck.SPREAD, 22L, "spread"), made(RunModesCheck.SPREAD.copy(allCatchable = false), 22L, "without"))
     }
 
+
+    @Test
+    fun `GIFTS swaps the gift and static Pokemon`() = each { g, f ->
+        val a = tmp.root.resolve("${g.code}-gifts.nds").toOkioPath()
+        val o = RomRandomizer.Options(RomRandomizer.Starters.OFF, RomRandomizer.Wild.OFF, false, gifts = true)
+        assertTrue(DsRandomizer.randomize(f.toOkioPath(), a, o, 31L))
+        assertSame(g, DsRandomizer.recognise(a))
+        checkGifts(g.title, DsRandomizer.giftSpecies(f.toOkioPath())!!, DsRandomizer.giftSpecies(a)!!)
+        java.io.File(a.toString()).delete()
+    }
+
     @Test
     fun `the GUIDE reads a shuffled Black 2`() = each { g, f ->
         if (g.code != "IREO") return@each

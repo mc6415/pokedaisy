@@ -37,3 +37,14 @@ internal object RunModesCheck {
         assertTrue("$title: EVERY POKéMON placed $on kinds, $off without it", on > off)
     }
 }
+
+/** GIFTS, read back: each gift / static's places agree, most are new, and none twice. */
+internal fun checkGifts(title: String, retail: List<List<Int>>, made: List<List<Int>>) {
+    assertEquals(title, retail.size, made.size)
+    assertTrue("$title has no gifts", retail.isNotEmpty())
+    for ((i, one) in made.withIndex()) assertEquals("$title gift $i's places disagree: $one", 1, one.toSet().size)
+    val now = made.map { it[0] }
+    assertTrue("$title: ${now.indices.count { now[it] != retail[it][0] }} of ${now.size} gifts changed",
+        now.indices.count { now[it] != retail[it][0] } > now.size / 2)
+    assertEquals("$title: a gift twice", now.size, now.toSet().size)
+}

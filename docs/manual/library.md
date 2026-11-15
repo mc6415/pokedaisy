@@ -121,9 +121,9 @@ RANDOMIZE asks three things, a page each. `BACK` (or the arrow at the top) goes 
 
 | Style | What it shuffles |
 | --- | --- |
-| `CLASSIC` | New starters that evolve twice, wild Pokémon area by area and trainers' teams, each swap close in strength, no legendaries. |
-| `WILD ONLY` | The same starters and wild Pokémon, but trainers keep their teams. |
-| `CHAOS` | Everything: any Pokémon as a starter, a random one in every encounter, trainers' teams and held items, the items lying around, base stats and the moves Pokémon learn, legendaries allowed. |
+| `CLASSIC` | New starters that evolve twice, wild Pokémon area by area, gift Pokémon and trainers' teams, each swap close in strength, no legendaries. |
+| `WILD ONLY` | The same starters, wild and gift Pokémon, but trainers keep their teams. |
+| `CHAOS` | Everything: any Pokémon as a starter, a random one in every encounter, gift Pokémon, trainers' teams and held items, the items lying around, base stats and the moves Pokémon learn, legendaries allowed. |
 | `LAST TIME` | The settings you used the last time you made a game. It shows once you've made one. |
 | `CUSTOM` | Pick every setting yourself, on four short pages: `POKéMON`, `RULES`, `TRAINERS` and `EXTRAS` (below). |
 
@@ -135,13 +135,14 @@ RANDOMIZE asks three things, a page each. `BACK` (or the arrow at the top) goes 
 | --- | --- |
 | `STARTERS` | The three Pokémon you choose your partner from. `EVOLVE TWICE` (the default) picks Pokémon that evolve two times, like the real ones; `ANY POKéMON` can be anything but a legendary; `AS THEY ARE` keeps them. In FireRed and LeafGreen the professor names the new ones when you choose; in Platinum the briefcase and in HeartGold and SoulSilver Professor Elm's machine show them, each with its name, and in Red, Blue, Black, White, Black 2 and White 2 every scene that names your starter (your rival's pick too) names the new ones. In Black and White the screen you choose on shows the new three as outlines and names each one, but the picture when you pick a ball, and its type, are still the original partner's. In Yellow your partner and your rival's stay as they are, since the story is built around them. |
 | `WILD POKéMON` | What you meet in the grass, caves, water and with a rod. `PER AREA` (the default) swaps each kind of Pokémon for another on each route, so a route still has its common and rare ones. `EVERY ENCOUNTER` picks anew for every slot, `SWAPPED EVERYWHERE` swaps each kind for one other kind across the whole game, and `AS THEY ARE` keeps them. |
+| `GIFTS` | `SHUFFLED` swaps the Pokémon the game gives you or leaves waiting for you: gifts, Game Corner prizes, fossils and the ones that sit on the map until you battle them. Every place the game names one (its cry, its picture, the battle) follows. Pokémon that roam aren't swapped. On by default in `CLASSIC`, `WILD ONLY` and `CHAOS`. |
 | `SIMILAR STRENGTH` | Keeps each swap close in strength to what it replaces (their base stats added up), so an early route doesn't fill with fully evolved Pokémon. |
-| `LEGENDARIES` | `NONE` keeps legendary Pokémon out of the grass and out of trainers' teams. |
 
 The `RULES` page, for run rules like a Nuzlocke's:
 
 | Row | What it does |
 | --- | --- |
+| `LEGENDARIES` | `NONE` keeps legendary Pokémon out of the grass and out of trainers' teams. |
 | `NO DUPLICATES` | `ON` never puts the same Pokémon twice in one area's wild list (as long as there are others to pick), so every catch on a route is a different one. |
 | `EVERY POKéMON` | `ON` spreads the wild swaps over Pokémon that haven't turned up yet first, so as many kinds as possible can be caught somewhere. |
 | `ONE TYPE` | Picks one type, and only Pokémon of that type turn up: in the grass, as starters and in trainers' teams. Red, Blue and Yellow have no `DARK` or `STEEL` Pokémon to pick. |
@@ -163,7 +164,7 @@ The `EXTRAS` page:
 | `BASE STATS` | `SHUFFLED` gives each Pokémon its own six base stats in another order: the same total, spread another way, so a slow one might be fast now. The `DEX` and the stats on the summary show the new ones. |
 | `LEARNSETS` | `RANDOM` gives each Pokémon new moves at the levels it learned its own, never the same move twice, and its first move always does damage. In Red, Blue and Yellow the moves a Pokémon knows from the start change too. Trainers who had moves picked for them get moves from the new lists. |
 
-Your own game is never changed: the randomized one is a new file, named with its seed (`Pokemon FireRed Randomized (seed 123456).gba`), saved where a [patched game](#patch-a-rom-hack) would go. A DS game is the size of the whole cart (128 MB for Platinum, HeartGold and SoulSilver, 256 MB for Black and White, 512 MB for Black 2 and White 2), so it takes a few seconds, and it needs that much free space. It has its own save, so start a new game in it. When you're done with a run, its menu's `DELETE` removes it, even from a linked folder. The companion treats it as the game it came from, with every feature that game has, and reads the shuffled Pokémon from it: the [guide](guide.md)'s wild Pokémon and leaders' teams follow the shuffle on every game, and so does the list of items lying around in each area.
+Your own game is never changed: the randomized one is a new file, named with its seed (`Pokemon FireRed Randomized (seed 123456).gba`), saved where a [patched game](#patch-a-rom-hack) would go. A DS game is the size of the whole cart (128 MB for Platinum, HeartGold and SoulSilver, 256 MB for Black and White, 512 MB for Black 2 and White 2), so it takes a few seconds, and it needs that much free space. It has its own save, so start a new game in it. When you're done with a run, its menu's `DELETE` removes it, even from a linked folder. The companion treats it as the game it came from, with every feature that game has, and reads the shuffled Pokémon from it: the [guide](guide.md)'s wild Pokémon and leaders' teams follow the shuffle on every game, and so do the items lying around and the gift Pokémon it lists for each area.
 
 If you see `NO GAME TO RANDOMIZE`, none of your games is one it works on. A game that was already patched or randomized, another language or another release (such as FireRed's first, Rev 0) won't do.
 
