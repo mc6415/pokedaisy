@@ -78,7 +78,7 @@ class DsMoveLearningTest {
         val pl = File(File(RETAIL_ROM_DIR).parentFile, "nds/Pokemon - Platinum Version (USA) (Rev 1).nds")
         assumeTrue("no Platinum ROM at $pl", pl.isFile)
         activeGame = GameKind.PLATINUM
-        dir = kotlin.io.path.createTempDirectory("nds-art").toFile().also { assertTrue(NdsArt.extractTo(pl, it)); NdsArt.dir = it }
+        dir = kotlin.io.path.createTempDirectory("nds-art").toFile().also { assertTrue(NdsArt.extractTo(pl.toOkioPath(), it.toOkioPath())); NdsArt.dir = it.toOkioPath() }
         assertTrue(DsMoveStats.load())
         assertEquals(100, DsMoveStats.stats(57)!!.accuracy)   // SURF
         assertEquals(15, DsMoveStats.stats(57)!!.pp)
