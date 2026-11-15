@@ -65,15 +65,20 @@ object ReusableTms {
      * Its 20 bytes in the ROM file, by the English carts' hashes (every Crystal release keeps it at 0B:4B0C, Gold and
      * Silver at 0B:4911), checked again by the patch itself. Taught in the game's own PACK headless on all three: TM10 kept
      * at 3 (2 without the patch).
+     * Red / Blue / Yellow: pret's pokered / pokeyellow ItemUseTMHM ends `call IsItemHM; ret c; jp RemoveUsedItem` (an HM
+     * returns before the bag loses it); its `ret c` (D8) made `ret` (C9) returns for every TM. The 7 bytes found once in each
+     * English cart by those two routines' addresses (Red / Blue 03:654B, Yellow 03:647F), the patch on the `ret c` alone.
      */
-    private class GbConsumeTm(val sha1s: Set<String>, val offset: Long, val hex: String)
+    private class GbConsumeTm(val sha1s: Set<String>, val offset: Long, val hex: String, val patchAt: Long = offset)
 
     private val GB_CONSUME_TM = listOf(
         GbConsumeTm(TelemetrySampler.CRYSTAL_SHA1S, 0x2CB0C, "cda747fa65d23d2159d806004f097ea7c83d77c0"),
         GbConsumeTm(setOf(TelemetrySampler.GOLD_SHA1, TelemetrySampler.SILVER_SHA1), 0x2C911, "cdb245fa51d13d217ed506004f097ea7c83d77c0"),
+        GbConsumeTm(setOf(TelemetrySampler.RED_SHA1, TelemetrySampler.BLUE_SHA1), 0xE548, "cd4030d8c37165", patchAt = 0xE54B),
+        GbConsumeTm(setOf(TelemetrySampler.YELLOW_SHA1), 0xE47C, "cd352fd8c3a564", patchAt = 0xE47F),
     )
 
-    /** `ret`, over ConsumeTM's first byte. */
+    /** `ret`, over ConsumeTM's first byte (Gold / Silver / Crystal) or ItemUseTMHM's `ret c` (Red / Blue / Yellow). */
     val GB_RET = byteArrayOf(0xC9.toByte())
 
     /** A Game Boy cart's site ([GB_CONSUME_TM]) for the ROM file whose SHA-1 is [sha1], if its bytes are ConsumeTM's. */
@@ -82,7 +87,7 @@ object ReusableTms {
         val expect = c.hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
         val at = c.offset.toInt()
         if (rom.size < at + expect.size || !rom.copyOfRange(at, at + expect.size).contentEquals(expect)) return emptyList()
-        return listOf(Site(c.offset, expect, branch = c.offset, value = GB_RET))
+        return listOf(Site(c.offset, expect, branch = c.patchAt, value = GB_RET))
     }
 
     private val cache = HashMap<String, List<Site>>()

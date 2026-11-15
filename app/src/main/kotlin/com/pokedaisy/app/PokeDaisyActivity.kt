@@ -2852,7 +2852,7 @@ class PokeDaisyActivity : Activity() {
         // STEADY FF music: a Gen 1 cart's (and Crystal's) songs come from its own sound engine (Gen1MusicRenderer).
         val gbSha1 = gbRom?.let { java.security.MessageDigest.getInstance("SHA-1").digest(it).joinToString("") { b -> "%02x".format(b) } }
         gen1Music = gbSha1?.let { com.pokedaisy.app.companion.data.Gen1Music.forSha1(it) }
-        // REUSABLE TMS on Gold / Silver / Crystal: ConsumeTM's first byte, by the cart's hash (ReusableTms.gbSites).
+        // REUSABLE TMS on the Game Boy: Gold / Silver / Crystal's ConsumeTM, Red / Blue / Yellow's ItemUseTMHM, by the cart's hash (ReusableTms.gbSites).
         if (gbRom != null && gbSha1 != null && romBlocked == null) {
             tmSites = com.pokedaisy.app.companion.data.ReusableTms.gbSites(gbSha1, gbRom)
             if (tmSites.isNotEmpty()) Log.i("pokedaisy", "reusable TMs: Game Boy ConsumeTM found")

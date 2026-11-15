@@ -8,10 +8,10 @@ change to any of the places listed under "Where it's decided" updates its rows h
 
 | Game | Version | EXPAND | Battle buttons | One-press picks | POKéMON switch | Field items | FLY | Trainer card | Field reads | Bike / surf | Wild encounters | PC anywhere | Reusable TMs | Player look | Shiny odds | TMs from the bag | FLASH | Area map |
 | ---- | ------- | :----: | :------------: | :-------------: | :------------: | :---------: | :-: | :----------: | :---------: | :---------: | :-------------: | :---------: | :----------: | :---------: | :--------: | :--------------: | :---: | :------: |
-| Yellow (GB) | USA/Europe | ✅ ¹² | ✅ | ✅ ¹ | ✅ ⁸ | — | ✅ ¹³ | — | n/a | n/a | ✅ ¹³ | ✅ ¹³ | — | n/a | n/a | — | — | — ³⁶ |
+| Yellow (GB) | USA/Europe | ✅ ¹² | ✅ | ✅ ¹ | ✅ ⁸ | — | ✅ ¹³ | — | n/a | n/a | ✅ ¹³ | ✅ ¹³ | ✅ ⁴¹ | n/a | n/a | — | — | — ³⁶ |
 | Yellow (GB) | DE / FR / IT / ES | n/a | ✅ | ✅ ¹ | ✅ ⁸ | — | ✅ ¹³ | — | n/a | n/a | ✅ ¹³ | ✅ ¹³ | — | n/a | n/a | — | — | — ³⁶ |
 | Yellow Legacy (GB) | 1.0.10 | ✅ ¹² | ✅ | ✅ ¹ | ✅ ⁸ | — | ✅ ¹³ | — | n/a | n/a | ✅ ¹³ | ✅ ¹³ | — | n/a | n/a | — | — | — ³⁶ |
-| Red / Blue (GB) | USA/Europe | n/a | ✅ | ✅ ¹ | ✅ ⁸ | — | ✅ ¹³ | — | n/a | n/a | ✅ ¹³ | ✅ ¹³ | — | n/a | n/a | — | — | — ³⁶ |
+| Red / Blue (GB) | USA/Europe | n/a | ✅ | ✅ ¹ | ✅ ⁸ | — | ✅ ¹³ | — | n/a | n/a | ✅ ¹³ | ✅ ¹³ | ✅ ⁴¹ | n/a | n/a | — | — | — ³⁶ |
 | Red / Blue (GB) | DE (Rote Edition / Blaue Edition) | n/a | ✅ | ✅ ¹ | ✅ ⁸ | — | ✅ ¹³ | — | n/a | n/a | ✅ ¹³ | ✅ ¹³ | — | n/a | n/a | — | — | — ³⁶ |
 | PureRed / PureBlue (GB) | 2.7.6 | n/a | ✅ | ✅ ¹ | ✅ ⁸ | — | ✅ ¹³ | — | n/a | n/a | ✅ ¹³ | ✅ ¹³ | — | n/a | n/a | — | — | — ³⁶ |
 | Gold / Silver (GBC) | USA/Europe | n/a | ✅ | ✅ ¹ | ✅ ⁸ | — | — | — | n/a | n/a | n/a | n/a | ✅ ⁴¹ | n/a | — | — | — | — ³⁶ |
@@ -606,13 +606,16 @@ change to any of the places listed under "Where it's decided" updates its rows h
     the patch, none without); HeartGold and SoulSilver hold the same instructions at their address (their X menu isn't open
     on a new game to try it there). Black, White and their sequels keep their TMs by themselves.
 
-41. REUSABLE TMS on Gold / Silver / Crystal (`ReusableTms.gbSites`, 2026-11-14): pret's ConsumeTM (engine/items/tmhm.asm),
+41. REUSABLE TMS on Gold / Silver / Crystal and Red / Blue / Yellow (`ReusableTms.gbSites`, 2026-11-14 / 15): pret's ConsumeTM (engine/items/tmhm.asm),
     TeachTMHM's one call once a TM's move went in, gets a `ret` over its first byte, so wTMsHMs' count is never lowered;
     the friendship the TM gives (ChangeHappiness, before it) stays. By the English carts' hashes, its 20 bytes checked by
     the patch (0B:4B0C in every Crystal release, 0B:4911 in Gold / Silver; pokecrystal / pokegold's .sym). A Game Boy cart's
     game option patches go through `pk_cheats_patch` now (addresses = places in the ROM file, mGBA's GBPatch8), and
     `pkRomRead` shows the file's bytes under them (the Poller's hash). Taught headless through the game's own PACK in
-    Crystal rev 1, Gold and Silver (TM10 on the fixtures' saves: 3 left, 2 without the patch). The German carts aren't on it.
+    Crystal rev 1, Gold and Silver (TM10 on the fixtures' saves: 3 left, 2 without the patch). Red / Blue / Yellow: pokered /
+    pokeyellow's ItemUseTMHM ends `call IsItemHM; ret c; jp RemoveUsedItem`, its `ret c` -> `ret` (03:654B in Red / Blue,
+    03:647F in Yellow, the 7 bytes checked); taught through the game's own ITEM menu in Red, Blue and a new Yellow game
+    (TM01 / TM06: 3 left, 2 without the patch, the move learned either way). The German / European carts aren't on it.
 
 ## What each column is
 

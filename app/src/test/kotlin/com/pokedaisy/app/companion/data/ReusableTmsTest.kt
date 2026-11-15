@@ -115,20 +115,34 @@ class ReusableTmsTest {
         for (sha1 in listOf(TelemetrySampler.GOLD_SHA1, TelemetrySampler.SILVER_SHA1)) {
             assertEquals(0x2C911L, ReusableTms.gbSites(sha1, gold).single().at)
         }
+        // Red / Blue / Yellow: ItemUseTMHM's `call IsItemHM; ret c; jp RemoveUsedItem` checked, `ret` over the `ret c` alone.
+        val red = rom(0xE548, "cd4030d8c37165")
+        for (sha1 in listOf(TelemetrySampler.RED_SHA1, TelemetrySampler.BLUE_SHA1)) {
+            val s = ReusableTms.gbSites(sha1, red).single()
+            assertEquals(0xE548L, s.at)
+            assertEquals(0xE54BL, s.branch)
+            assertEquals(7, s.expect.size)
+        }
+        val yellow = rom(0xE47C, "cd352fd8c3a564")
+        assertEquals(0xE47FL, ReusableTms.gbSites(TelemetrySampler.YELLOW_SHA1, yellow).single().branch)
+        assertTrue(ReusableTms.gbSites(TelemetrySampler.YELLOW_SHA1, red).isEmpty())
         // Another cart's hash, or bytes that aren't ConsumeTM's: nothing.
         assertTrue(ReusableTms.gbSites(TelemetrySampler.GOLD_DE_SHA1, gold).isEmpty())
         assertTrue(ReusableTms.gbSites(TelemetrySampler.GOLD_SHA1, crystal).isEmpty())
         assertTrue(ReusableTms.gbSites(TelemetrySampler.CRYSTAL_REV1_SHA1, ByteArray(0x1000)).isEmpty())
     }
 
-    /** Each English cart here, its real bytes. Skips a ROM that isn't here. */
+    /** Each English cart here (in `gb/` or `gbc/`), its real bytes. Skips a ROM that isn't here. */
     @Test fun gameBoySitesInTheCarts() {
-        val dir = File(System.getProperty("romDir") ?: System.getenv("POKEDAISY_ROM_DIR") ?: return).parentFile.resolve("gbc")
+        val root = File(System.getProperty("romDir") ?: System.getenv("POKEDAISY_ROM_DIR") ?: return).parentFile
         val carts = listOf(
+            "Pokemon - Red Version (USA, Europe) (SGB Enhanced).gb",
+            "Pokemon - Blue Version (USA, Europe) (SGB Enhanced).gb",
+            "Pokemon - Yellow Version - Special Pikachu Edition (USA, Europe) (CGB+SGB Enhanced).gb",
             "Pokemon - Crystal Version (USA, Europe) (Rev 1).gbc",
             "Pokemon - Gold Version (USA, Europe) (SGB Enhanced) (GB Compatible).gbc",
             "Pokemon - Silver Version (USA, Europe) (SGB Enhanced) (GB Compatible).gbc",
-        ).map { dir.resolve(it) }.filter { it.isFile }
+        ).mapNotNull { n -> listOf("gb", "gbc").map { root.resolve("$it/$n") }.firstOrNull { it.isFile } }
         assumeTrue(carts.isNotEmpty())
         for (f in carts) {
             val b = f.readBytes()
