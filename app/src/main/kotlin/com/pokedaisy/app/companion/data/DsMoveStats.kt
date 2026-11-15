@@ -1,6 +1,5 @@
 package com.pokedaisy.app.companion.data
 
-import java.io.File
 
 /**
  * The DS games' move stats for the move advice ([MoveAdvisor]): each move's accuracy, PP and priority from the player's
@@ -45,7 +44,7 @@ object DsMoveStats {
         val p = path() ?: return false
         if (loaded?.first == p) return true
         val dir = NdsArt.dir ?: return false
-        val b = File(dir, p).takeIf { it.isFile }?.let { runCatching { it.readBytes() }.getOrNull() } ?: return false
+        val b = runCatching { (dir / p).readBytes() }.getOrNull() ?: return false
         loaded = p to b
         return true
     }
