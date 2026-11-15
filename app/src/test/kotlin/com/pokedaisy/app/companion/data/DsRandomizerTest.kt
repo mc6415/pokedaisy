@@ -24,6 +24,8 @@ class DsRandomizerTest {
 
     private val carts = mapOf(
         "CPUE" to "Pokemon - Platinum Version (USA) (Rev 1).nds",
+        "IPKE" to "Pokemon - HeartGold Version (USA).nds",
+        "IPGE" to "Pokemon - SoulSilver Version (USA, Australia).nds",
         "IREO" to "Pokemon - Black Version 2 (USA, Europe) (NDSi Enhanced).nds",
         "IRDO" to "Pokemon - White Version 2 (USA, Europe) (NDSi Enhanced).nds",
     )
@@ -98,6 +100,8 @@ class DsRandomizerTest {
             listOfNotNull(
                 g.starterOverlay?.let { cart.span(cart.overlayFile(it)) }, cart.span(cart.fileId(g.encounters)), cart.span(cart.fileId(g.trainerParties)),
                 g.text?.let { cart.span(cart.fileId(it.path)) }, g.starterScripts?.let { cart.span(cart.fileId(it.path)) },
+                g.packedStarters?.let { cart.arm9Place() until cart.arm9Place() + cart.arm9().size },
+                g.packedStarters?.let { cart.span(cart.overlayFile(it.overlay, allowCompressed = true)) },
             )
         }
         var changed = 0
@@ -110,7 +114,15 @@ class DsRandomizerTest {
         val (starters, evo) = FileSystem.SYSTEM.openReadOnly(a).use { h ->
             val cart = DsRandomizer.Cart(h)
             val evo = DsRandomizer.Narc(cart.file(cart.fileId(g.evolutions)))
-            val three = if (g.starterOverlay != null) {
+            val three = if (g.packedStarters != null) {
+                // What you're given (ARM9) and the starter app's copy (overlay 61) agree.
+                val ps = g.packedStarters!!
+                val a9 = Blz.decompress(cart.arm9())
+                val ov = Blz.decompress(cart.file(cart.overlayFile(ps.overlay, allowCompressed = true)))
+                val given = (0 until 3).map { u32(a9, ps.arm9Offset + it * 4) }
+                assertEquals(given, (0 until 3).map { u32(ov, ps.overlayOffset + it * 4) })
+                given
+            } else if (g.starterOverlay != null) {
                 val ov = cart.file(cart.overlayFile(g.starterOverlay!!))
                 g.starterOffsets.map { u32(ov, it) }
             } else {
@@ -172,6 +184,30 @@ class DsRandomizerTest {
             DsRandomizer.shuffle = null
         }
         assertEquals(before, PLATINUM_WORLD.encounters(0, 342, null).grass.map { it.species }.toSet())
+    }
+
+    @Test
+    fun `the GUIDE reads a shuffled HeartGold`() = each { g, f ->
+        if (g.code != "IPKE") return@each
+        val a = tmp.root.resolve("hg-a.nds").toOkioPath()
+        assertTrue(DsRandomizer.randomize(f.toOkioPath(), a, RomRandomizer.Options(), 7L))
+        val shuffle = DsRandomizer.readShuffle(a)!!
+        fun all(m: MapEncounters) = (m.grass + m.water + m.rockSmash + m.oldRod + m.goodRod + m.superRod).map { it.species }.toSet()
+        // Every map the GUIDE knows: some of them change, none read the cart for SoulSilver.
+        val maps = (0 until 600)
+        val before = maps.associateWith { all(HEARTGOLD_WORLD.encounters(0, it, null)) }
+        val ssBefore = maps.associateWith { all(SOULSILVER_WORLD.encounters(0, it, null)) }
+        val falkner = HEARTGOLD_WORLD.party(20, null)
+        try {
+            DsRandomizer.shuffle = shuffle
+            val changed = maps.count { all(HEARTGOLD_WORLD.encounters(0, it, null)) != before[it] }
+            assertTrue("maps changed: $changed", changed > 20)
+            assertEquals(ssBefore, maps.associateWith { all(SOULSILVER_WORLD.encounters(0, it, null)) })
+            assertEquals(shuffle.team(20), HEARTGOLD_WORLD.party(20, null))
+            assertFalse(HEARTGOLD_WORLD.party(20, null).map { it.species } == falkner.map { it.species })
+        } finally {
+            DsRandomizer.shuffle = null
+        }
     }
 
     @Test

@@ -28,8 +28,12 @@ object DsRandomizer {
         val retailFilesSha1: String,
         /** The same with every site zeroed: what every cart made from it hashes to. */
         val madeSha1: String,
-        /** 4: Platinum's layouts; 5: Black / White's. */
+        /** 4: Platinum's and HeartGold's layouts; 5: Black / White's. */
         val gen: Int = 4,
+        /** HeartGold / SoulSilver's encounter records (EncounterData, u16 species) rather than Platinum's. */
+        val hgss: Boolean = false,
+        /** The starters' words in compressed code ([Blz]): HeartGold / SoulSilver's ARM9 binary and starter app. */
+        val packedStarters: PackedStarters? = null,
         /** The overlay with the starters' words (Platinum), or null. */
         val starterOverlay: Int? = null,
         /** The starters' words in [starterOverlay], in the order the game shows them (grass, fire, water). */
@@ -56,8 +60,20 @@ object DsRandomizer {
      */
     class SpritePatch(val at: Int, val len: Int, val getSpecies: Int, val makeSprite: Int)
 
-    /** The message [bank] in [path] whose [lines] ask about each starter; species names are bank [names]. */
-    class StarterText(val path: String, val bank: Int, val lines: List<Int>, val names: Int)
+    /**
+     * The message [bank] in [path] whose [lines] ask about each starter, by starter; species names are bank [names].
+     * Platinum's ("<category> Pokémon TURTWIG! Will you take this Pokémon?") keep what follows the "!"; HeartGold's
+     * [inBall] lines ("CHIKORITA, the Grass-type Pokémon, is in this Poké Ball!") become "<NAME> is in this Poké Ball!", its
+     * [lines] ("Professor Elm: So, you like CHIKORITA, the Grass-type Pokémon?") "Professor Elm: So, you like <NAME>?".
+     */
+    class StarterText(val path: String, val bank: Int, val lines: List<Int>, val names: Int, val inBall: List<Int> = emptyList(), val hgss: Boolean = false)
+
+    /**
+     * Starters held in compressed code: three u32s at [arm9Offset] of the decompressed ARM9 binary (choose_starter.c's
+     * `species`: what you're given) and at [overlayOffset] of overlay [overlay] (choose_starter_app.c's `sSpecies`: the cries).
+     * Both are recompressed to their own size ([Blz.compressTo]), so the cart's header, secure area and tables stay as they are.
+     */
+    class PackedStarters(val arm9Offset: Int, val overlay: Int, val overlayOffset: Int)
 
     /** A starter's species word (u16) in script [member] at [offset]: [which] starter it is (0, 1, 2 = grass, fire, water). */
     class StarterSite(val member: Int, val offset: Int, val which: Int)
@@ -92,6 +108,17 @@ object DsRandomizer {
             text = StarterText("/msgdata/pl_msg.narc", bank = 360, lines = listOf(1, 2, 3), names = 412),
         ),
     ) + listOf(
+        Triple("IPKE", "HeartGold", "559459f6d2b2153f93fa79a1d55b6f16f602191e" to "e96b3fe533f1e2be0cea5feeb744ff4a09731adf"),
+        Triple("IPGE", "SoulSilver", "426e6773ae23e101544cd9e3e7b59b97a0825f06" to "fb61df1a357b9a34570138d341db9601affab581"),
+    ).map { (code, title, hashes) ->
+        // pret/pokeheartgold: choose_starter.c's species (ARM9), choose_starter_app.c's sSpecies (overlay 61), msg_0190.
+        Game(
+            code, 0, title, hashes.first, hashes.second, hgss = true, packedStarters = PackedStarters(0x108514, 61, 0x1A98),
+            encounters = "/a/0/3/7", trainers = "/a/0/5/5", trainerParties = "/a/0/5/6",
+            personal = "/a/0/0/2", evolutions = "/a/0/3/4", learnsets = "/a/0/3/3", speciesCount = 493,
+            text = StarterText("/a/0/2/7", bank = 190, lines = listOf(1, 2, 3), names = 237, inBall = listOf(4, 5, 6), hgss = true),
+        )
+    } + listOf(
         Triple("IREO", "Black 2", "16e96e0e57675205a8c900f34e2103159204b30f" to "b6ad711f472164ab7f2167100e7198c04c217d9a"),
         Triple("IRDO", "White 2", "ab919dfae9392a39e312258cea525be4248f84ce" to "6f7728967faaa93544d690220528c51cf55945da"),
     ).map { (code, title, hashes) ->
@@ -116,6 +143,20 @@ object DsRandomizer {
     private val SUPER_ROD = water(380)
     private val ENCOUNTER_SPECIES = GRASS + TIMED + SURF + OLD_ROD + GOOD_ROD + SUPER_ROD
 
+    // HeartGold / SoulSilver's EncounterData (include/wild_encounter.h), 0xC4 bytes: every u16 species word.
+    private val HG_MORNING = (0 until 12).map { 0x14 + it * 2 }
+    private val HG_DAY = (0 until 12).map { 0x2C + it * 2 }
+    private val HG_NIGHT = (0 until 12).map { 0x44 + it * 2 }
+    private fun hgSlots(base: Int, count: Int) = (0 until count).map { base + it * 4 + 2 }
+    private val HG_SURF = hgSlots(0x64, 5)
+    private val HG_ROCK = hgSlots(0x78, 2)
+    private val HG_OLD_ROD = hgSlots(0x80, 5)
+    private val HG_GOOD_ROD = hgSlots(0x94, 5)
+    private val HG_SUPER_ROD = hgSlots(0xA8, 5)
+    private const val HG_NIGHT_FISH = 0xC0
+    private val HGSS_SPECIES = HG_MORNING + HG_DAY + HG_NIGHT + listOf(0x5C, 0x5E, 0x60, 0x62) + HG_SURF + HG_ROCK +
+        HG_OLD_ROD + HG_GOOD_ROD + HG_SUPER_ROD + listOf(0xBC, 0xBE, HG_NIGHT_FISH, 0xC2)
+
     /** Gen 5's encounter block (0xE8 bytes): 56 slots of species (11 bits) + form, min level, max level, from +8. */
     private const val GEN5_BLOCK = 0xE8
     private const val GEN5_SLOTS = 56
@@ -129,11 +170,13 @@ object DsRandomizer {
     private fun speciesMask(gen: Int) = if (gen == 5) 0x7FF else 0x3FF
 
     /** Every species word in encounter archive [narc]: its place and width (Platinum's are u32, Gen 5's u16). */
-    private fun encounterSites(gen: Int, narc: Narc, each: (member: Int, at: Int, width: Int) -> Unit) {
+    private fun encounterSites(gen: Int, narc: Narc, each: (member: Int, at: Int, width: Int) -> Unit, hgss: Boolean = false) {
         for (m in 0 until narc.size) {
             val start = narc.start(m)
             val size = narc.end(m) - start
-            if (gen == 5) {
+            if (hgss) {
+                for (s in HGSS_SPECIES) if (s + 2 <= size) each(m, start + s, 2)
+            } else if (gen == 5) {
                 for (b in 0 until size / GEN5_BLOCK) for (i in 0 until GEN5_SLOTS) each(m, start + b * GEN5_BLOCK + 8 + i * 4, 2)
             } else {
                 for (s in ENCOUNTER_SPECIES) if (s + 4 <= size) each(m, start + s, 4)
@@ -173,14 +216,25 @@ object DsRandomizer {
             error("no overlay $overlay")
         }
 
-        fun overlayFile(overlay: Int): Int {
+        fun overlayFile(overlay: Int, allowCompressed: Boolean = false): Int {
             val table = read(u32(header, 0x50).toLong(), u32(header, 0x54))
             for (i in 0 until table.size / 32) if (u32(table, i * 32) == overlay) {
-                require(table[i * 32 + 31].toInt() and 1 == 0) { "overlay $overlay is compressed" }
+                require(allowCompressed || table[i * 32 + 31].toInt() and 1 == 0) { "overlay $overlay is compressed" }
                 return u32(table, i * 32 + 24)
             }
             error("no overlay $overlay")
         }
+
+        /** Overlay [overlay] is compressed ([Blz]). */
+        fun overlayCompressed(overlay: Int): Boolean {
+            val table = read(u32(header, 0x50).toLong(), u32(header, 0x54))
+            for (i in 0 until table.size / 32) if (u32(table, i * 32) == overlay) return table[i * 32 + 31].toInt() and 1 != 0
+            error("no overlay $overlay")
+        }
+
+        /** The ARM9 binary: where it is in the cart and its bytes (compressed or not, as the cart has it). */
+        fun arm9Place(): Long = u32(header, 0x20).toLong()
+        fun arm9(): ByteArray = read(u32(header, 0x20).toLong(), u32(header, 0x2C))
 
         /** The file id at [path] ("/a/b/c.narc"). */
         fun fileId(path: String): Int {
@@ -251,11 +305,22 @@ object DsRandomizer {
         val msg = msgId?.let { cart.file(it) }
         val scripts = scriptsId?.let { cart.file(it) }
         val trdata = Narc(cart.file(cart.fileId(g.trainers)))
+        // HeartGold / SoulSilver: the ARM9 binary and the starter app's overlay, as stored and decompressed.
+        val arm9Blob = g.packedStarters?.let { cart.arm9() }
+        val arm9 = arm9Blob?.let { Blz.decompress(it) }
+        val packedOverlayId = g.packedStarters?.let { cart.overlayFile(it.overlay, allowCompressed = true) }
+        val packedOverlayBlob = packedOverlayId?.let { cart.file(it) }
+        val packedOverlay = packedOverlayBlob?.let { b -> if (cart.overlayCompressed(g.packedStarters!!.overlay)) Blz.decompress(b) else b }
 
-        /** Each file written, at its place in the cart. */
+        /** Each file written, at its place in the cart (compressed code re-packed to its own size). */
         fun written(): List<Pair<Long, ByteArray>> = listOfNotNull(
             overlayId?.let { cart.span(it).first to overlay }, cart.span(encId).first to enc, cart.span(partiesId).first to parties,
             msgId?.let { cart.span(it).first to msg!! }, scriptsId?.let { cart.span(it).first to scripts!! },
+            arm9?.let { cart.arm9Place() to (Blz.compressTo(it, arm9Blob!!.size) ?: error("ARM9 doesn't fit")) },
+            packedOverlay?.let { ov ->
+                cart.span(packedOverlayId!!).first to
+                    (if (cart.overlayCompressed(g.packedStarters!!.overlay)) Blz.compressTo(ov, packedOverlayBlob!!.size) ?: error("overlay doesn't fit") else ov)
+            },
         )
 
         /** The starter sites' absolute places in [scripts]. */
@@ -267,10 +332,15 @@ object DsRandomizer {
         fun hash(zeroed: Boolean): String {
             val o = overlay.copyOf(); val e = enc.copyOf(); val p = parties.copyOf(); val m = msg?.copyOf() ?: ByteArray(0)
             val sc = scripts?.copyOf() ?: ByteArray(0)
+            val a9 = arm9?.copyOf() ?: ByteArray(0)
+            val po = packedOverlay?.copyOf() ?: ByteArray(0)
             if (zeroed) {
+                g.packedStarters?.let { ps ->
+                    for (k in 0 until 12) { a9[ps.arm9Offset + k] = 0; po[ps.overlayOffset + k] = 0 }
+                }
                 for (at in g.starterOffsets) for (i in 0 until 4) o[at + i] = 0
                 g.sprites?.let { sp -> for (i in 0 until sp.len) o[sp.at + i] = 0 }
-                encounterSites(g.gen, Narc(e)) { _, at, width -> for (i in 0 until width) e[at + i] = 0 }
+                encounterSites(g.gen, Narc(e), { _, at, width -> for (i in 0 until width) e[at + i] = 0 }, g.hgss)
                 trainerMons(Narc(p)) { at, moves ->
                     p[at + 4] = 0; p[at + 5] = 0
                     // Gen 5's form word goes with the species.
@@ -281,14 +351,14 @@ object DsRandomizer {
                     val mn = Narc(m)
                     val bank = mn.start(t.bank)
                     val file = mn.member(t.bank)
-                    for (line in t.lines) {
+                    for (line in t.lines + t.inBall) {
                         val (off, len) = Gen4Text.span(file, line)
                         for (i in 0 until len * 2) m[bank + off + i] = 0
                     }
                 }
                 if (scripts != null) for ((at, _) in scriptSites(sc)) { sc[at] = 0; sc[at + 1] = 0 }
             }
-            return (o + e + p + m + sc).toByteString().sha1().hex()
+            return (o + e + p + m + sc + a9 + po).toByteString().sha1().hex()
         }
 
         /** Each trainer Pokémon in [narc] (trpoke): its record and its moves' place (-1 none), as absolute places in it. */
@@ -338,6 +408,7 @@ object DsRandomizer {
         /** Encounter set [set]'s species at byte [offset] of its record, or null when it has none there. */
         fun speciesAt(set: Int, offset: Int): Int? = sets.getOrNull(set)?.let { m ->
             if (game.gen == 5) m.takeIf { offset + 2 <= it.size }?.let { u16(it, offset) and 0x7FF }
+            else if (game.hgss) m.takeIf { offset + 2 <= it.size }?.let { u16(it, offset) and 0x3FF }
             else m.takeIf { offset + 4 <= it.size }?.let { u32(it, offset) }
         }
 
@@ -387,6 +458,13 @@ object DsRandomizer {
     internal fun nightOffset(i: Int) = TIMED[4 + i]
     internal fun surfOffset(slot: Int) = SURF[slot]
     internal fun rodOffset(rod: Int, slot: Int) = listOf(OLD_ROD, GOOD_ROD, SUPER_ROD)[rod][slot]
+
+    /** HeartGold / SoulSilver's places in an EncounterData record, for [Gen4World]. */
+    internal fun hgGrassOffset(time: Int, slot: Int) = listOf(HG_MORNING, HG_DAY, HG_NIGHT)[time][slot]
+    internal fun hgSurfOffset(slot: Int) = HG_SURF[slot]
+    internal fun hgRockOffset(slot: Int) = HG_ROCK[slot]
+    internal fun hgRodOffset(rod: Int, slot: Int) = listOf(HG_OLD_ROD, HG_GOOD_ROD, HG_SUPER_ROD)[rod][slot]
+    internal const val HG_NIGHT_FISH_OFFSET = HG_NIGHT_FISH
 
     /** The two hashes of [path]'s files, for filling in a new [Game]: retail, made. */
     internal fun hashes(path: Path): Pair<String, String>? = FileSystem.SYSTEM.openReadOnly(path).use { h ->
@@ -483,6 +561,9 @@ object DsRandomizer {
             val three = List(3) { from.random(rnd).also { from.remove(it) } }
             g.starterOffsets.forEachIndexed { i, at -> put32(f.overlay, at, three[i]) }
             f.scripts?.let { sc -> for ((at, which) in f.scriptSites(sc)) put16(sc, at, three[which]) }
+            g.packedStarters?.let { ps ->
+                for (i in 0 until 3) { put32(f.arm9!!, ps.arm9Offset + i * 4, three[i]); put32(f.packedOverlay!!, ps.overlayOffset + i * 4, three[i]) }
+            }
             g.sprites?.let { spritePatch(it) }
             g.text?.let { starterText(it, three) }
         }
@@ -518,6 +599,7 @@ object DsRandomizer {
 
         /** The starter screen's questions: the new species' name, then each line's own "!" and question. */
         fun starterText(t: StarterText, three: List<Int>) {
+            if (t.hgss) return heartGoldText(t, three)
             val msg = Narc(f.msg!!)
             val names = Narc(cart.file(cart.fileId(t.path))).member(t.names)
             val file = msg.member(t.bank)
@@ -538,6 +620,41 @@ object DsRandomizer {
             file.copyInto(f.msg, msg.start(t.bank))
         }
 
+        /** HeartGold's lines (see [StarterText]): the game's own words round the new name. */
+        fun heartGoldText(t: StarterText, three: List<Int>) {
+            val msg = Narc(f.msg!!)
+            val names = msg.member(t.names)
+            val file = msg.member(t.bank)
+            fun plain(codes: IntArray): List<Int> {
+                // Its characters, control codes ({COLOR}) left out.
+                val out = ArrayList<Int>()
+                var j = 0
+                while (j < codes.size && codes[j] != 0xFFFF) {
+                    if (codes[j] == 0xFFFE) { j += 3 + codes.getOrElse(j + 2) { 0 }; continue }
+                    out += codes[j++]
+                }
+                return out
+            }
+            t.lines.forEachIndexed { i, line ->
+                val old = Gen4Text.codes(file, line)
+                // Up to the name's colour code ("Professor Elm: So, you like "), the name, the line's last character ("?").
+                val cut = old.indexOf(0xFFFE).also { check(it > 0) { "no name in line $line" } }
+                val last = plain(old).last()
+                val name = Gen4Text.codes(names, three[i]).takeWhile { it != 0xFFFF }
+                Gen4Text.rewrite(file, line, (old.take(cut) + name + last).toIntArray())
+            }
+            t.inBall.forEachIndexed { i, line ->
+                val text = plain(Gen4Text.codes(file, line))
+                // From " is" on: " is\nin this Poké Ball!".
+                val at = (0 until text.size - 2).first {
+                    Gen4Text.charOf(text[it]) == " " && Gen4Text.charOf(text[it + 1]) == "i" && Gen4Text.charOf(text[it + 2]) == "s"
+                }
+                val name = Gen4Text.codes(names, three[i]).takeWhile { it != 0xFFFF }
+                Gen4Text.rewrite(file, line, (name + text.drop(at)).toIntArray())
+            }
+            file.copyInto(f.msg, msg.start(t.bank))
+        }
+
         fun wild() {
             if (o.wild == RomRandomizer.Wild.OFF) return
             val global = HashMap<Int, Int>()
@@ -547,7 +664,7 @@ object DsRandomizer {
             }
             var area = HashMap<Int, Int>()
             var member = -1
-            encounterSites(g.gen, Narc(f.enc)) { m, at, width ->
+            encounterSites(g.gen, Narc(f.enc), hgss = g.hgss, each = { m, at, width ->
                 if (m != member) { area = HashMap(); member = m }
                 val raw = if (width == 4) u32(f.enc, at) else u16(f.enc, at)
                 val was = raw and speciesMask(g.gen)
@@ -559,7 +676,7 @@ object DsRandomizer {
                 }
                 // Gen 5's form bits go with the old species: the new one is its plain form.
                 if (width == 4) put32(f.enc, at, now) else put16(f.enc, at, now)
-            }
+            })
         }
 
         fun trainers() {

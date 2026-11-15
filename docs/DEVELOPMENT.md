@@ -1347,6 +1347,16 @@ than Platinum's), learnsets as (move, level) pairs; a trainer Pokémon's form wo
 buffers, the rival's comparison), the same in both, each swapped for its starter. Their GUIDE (`Gen5World`'s `code`) reads
 the shuffle like Platinum's. A zipped cart is unpacked into the new file and shuffled in place (`randomizeInPlace`); it's
 checked only then. Checked headless: the user's Black 2 save met a shuffled wild Pokémon in Route 19's grass.
+HeartGold / SoulSilver (`hgss`, pret/pokeheartgold): EncounterData records (0xC4, u16 species: morning / day / night grass,
+radio, surf, Rock Smash, three rods, swarms), Platinum's trainer layout. Their starters are in compressed code (`PackedStarters`):
+choose_starter.c's `species` in the ARM9 binary (0x108514 decompressed: what you're given, and what the screen draws, since it
+draws the Pokémon made from them) and choose_starter_app.c's `sSpecies` in overlay 61 (0x1A98: the cries). `Blz` decompresses
+both and recompresses them to their exact old size (an optimal parse, the front left raw as far as needed, padding), so the
+header, the secure area, the overlay table and the file table never change. msg_0190's lines 1-3 / 4-6 become
+"Professor Elm: So, you like <NAME>?" / "<NAME> is in this Poké Ball!". Later scenes pick the rival's team by comparing the
+starter with 152 / 155: a shuffled one always gets the third team (shuffled like the rest). Test it from a boot, never a save
+state: a state brings back the ARM9 binary as it was in RAM (the retail one), so only overlays and text show the change.
+Checked headless: Elm's machine showed and gave the shuffled starters, Falkner's team was shuffled.
 
 SIMILAR STRENGTH keeps a swap within 10% of the base stat total, widening by 5% until six candidates fit. Ruby / Sapphire have
 no GF header, so their base stats come from the records (`speciesInfo`). FireRed rev 0 / LeafGreen rev 0 / Ruby and Sapphire
