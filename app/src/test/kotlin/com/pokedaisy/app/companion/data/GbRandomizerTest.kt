@@ -37,6 +37,25 @@ class GbRandomizerTest {
         assumeTrue("no Game Boy carts here", ran > 0)
     }
 
+    /** Opening an untouched cart asks [GbRandomizer.recognise] on the main thread: it must say no, quickly, and never run
+     * another game's table walks on it (Gold's map walk on plain Red never ended, and the app hung opening Red). */
+    @Test
+    fun `an untouched cart isn't taken for a made one, and only its own game's header matches`() {
+        each { g, rom ->
+            val t0 = System.nanoTime()
+            assertNull(g.title, GbRandomizer.recognise(rom))
+            val ms = (System.nanoTime() - t0) / 1_000_000
+            assertTrue("${g.title}: recognise took $ms ms", ms < 2000)
+            assertSame(g.title, g, GbRandomizer.gameOf(rom))
+            for (other in GbRandomizer.GAMES) assertEquals("${g.title} as ${other.title}", other === g, GbRandomizer.headerIs(rom, other))
+        }
+        // Another game's walks on a cart stay bounded: Gold's map walk read 11 million "headers" off Red (~1 s on a desktop,
+        // past the Thor's 5 s ANR limit with the garbage collection). Every cart through every game's: well under that.
+        var spent = 0L
+        each { _, rom -> for (other in GbRandomizer.GAMES) { val t = System.nanoTime(); GbRandomizer.madeHash(rom, other); spent += System.nanoTime() - t } }
+        assertTrue("every cart as every game: ${spent / 1_000_000} ms", spent / 1_000_000 < 600)
+    }
+
     @Test
     fun `hashes are the cart's`() {
         val found = ArrayList<Triple<GbRandomizer.Game, String, String?>>()

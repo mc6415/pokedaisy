@@ -108,16 +108,35 @@ object GbRandomizer {
             starters = elm(0x78C7F, 0x78CC1, 0x78CFD), moves = 0x41AFB, field = Field(0x94000, 0x67C1)),
     )
 
+    /** More map headers than any Game Boy game has (Crystal: ~400): past it the table isn't one. */
+    private const val MAX_MAP_HEADERS = 2048
+
     /** Pokédex numbers of the legendaries and mythicals up to Gen 2. */
     private val LEGENDARY = setOf(144, 145, 146, 150, 151, 243, 244, 245, 249, 250, 251)
 
     /** The game this cart is when the tool can take it: the untouched cart, or one it made. */
     fun gameOf(rom: ByteArray): Game? = GAMES.firstOrNull { g -> sha1(rom) == g.retailSha1 } ?: recognise(rom)
 
-    /** [rom] is a cart this tool made (not the untouched one): its game. */
+    /** [rom] is a cart this tool made (not the untouched one): its game. Only the game its header names is tried: another
+     * game's tables read off this cart are garbage, and Gold's map walk on plain Red never ended (the app hung opening it). */
     fun recognise(rom: ByteArray): Game? {
         val sha = sha1(rom)
-        return GAMES.firstOrNull { g -> g.madeSha1.isNotEmpty() && sha != g.retailSha1 && madeHash(rom, g) == g.madeSha1 }
+        return GAMES.firstOrNull { g ->
+            headerIs(rom, g) && g.madeSha1.isNotEmpty() && sha != g.retailSha1 && madeHash(rom, g) == g.madeSha1
+        }
+    }
+
+    /** Each cart's header title (0x134-0x142; the tool never writes the header but its checksum). */
+    private val HEADER_TITLES = mapOf(
+        "Red" to "POKEMON RED", "Blue" to "POKEMON BLUE", "Yellow" to "POKEMON YELLOW",
+        "Gold" to "POKEMON_GLDAAUE", "Silver" to "POKEMON_SLVAAXE", "Crystal" to "PM_CRYSTAL\u0000BYTE",
+    )
+
+    /** [rom]'s header title is [g]'s. */
+    internal fun headerIs(rom: ByteArray, g: Game): Boolean {
+        val want = HEADER_TITLES[g.title] ?: return false
+        if (rom.size < 0x150) return false
+        return (0 until 15).all { i -> (rom[0x134 + i].toInt() and 0xFF) == (want.getOrNull(i)?.code ?: 0) }
     }
 
     /** A randomized copy of [rom], or null when [gameOf] can't take it. */
@@ -425,7 +444,9 @@ object GbRandomizer {
             for ((k, start) in groups.withIndex()) {
                 var a = start
                 // The last group runs up to the first map's attributes, which follow it.
-                while (if (k + 1 < groups.size) a < groups[k + 1] else headers.none { far(f.maps / 0x4000, u16(it + 3)) <= a }) {
+                // Bounded: a map table read wrong (not this game's) must end, not walk forever.
+                while (headers.size < MAX_MAP_HEADERS && a + 9 <= b.size &&
+                    if (k + 1 < groups.size) a < groups[k + 1] else headers.none { far(f.maps / 0x4000, u16(it + 3)) <= a }) {
                     headers += a
                     a += 9
                 }
