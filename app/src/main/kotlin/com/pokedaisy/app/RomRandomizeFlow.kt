@@ -75,15 +75,15 @@ class RomRandomizeFlow(
                     RomArchive.readAt(f, 0xAC, 0x11)?.let { h ->
                         val code = String(h, 0, 4, Charsets.US_ASCII)
                         val rev = h[0x10].toInt() and 0xFF
-                        (code == "BPRE" && rev == 1) || (code == "BPEE" && rev == 0)
+                        RomRandomizer.GAMES.any { it.code == code && it.rev == rev }
                     } == true
             }
             val found = ArrayList<Base>()
             files.forEachIndexed { i, f ->
                 val bytes = runCatching { RomArchive.open(f).use { it.readBytes() } }.getOrNull()
-                val game = bytes?.let { RomRandomizer.gameOf(it) }?.first
-                // Already-randomized copies are left out: the tool starts from the player's own cart.
-                if (game != null && GameTitles.label(activity, prefs, f).let { !it.contains("Randomized", ignoreCase = true) }) {
+                // Only the player's own carts: copies already randomized (by this tool or another) are left out.
+                val game = bytes?.let { b -> RomRandomizer.gameOf(b)?.takeIf { RomRandomizer.sha1(b) == it.retailSha1 } }
+                if (game != null) {
                     found += Base(f, GameTitles.label(activity, prefs, f), game.title)
                 }
                 postFor(token) { if (step is Step.Looking) step = Step.Looking((i + 1f) / files.size) }
@@ -190,14 +190,14 @@ fun RandomizeWindow(flow: RomRandomizeFlow, m: GbaTextMetrics, small: GbaTextMet
                     Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
                         when (step) {
                             is RomRandomizeFlow.Step.Looking -> Padded(m) {
-                                Message(tr("Looking for FireRed and Emerald… {0}%", (step.progress * 100).toInt()), m)
+                                Message(tr("Looking for your games… {0}%", (step.progress * 100).toInt()), m)
                                 Spacer(Modifier.height(m.u * 3))
                                 SyncProgressBar(step.progress, m)
                             }
                             RomRandomizeFlow.Step.NotFound -> Padded(m) {
                                 Message(tr("NO GAME TO RANDOMIZE"), m, value = true)
                                 Spacer(Modifier.height(m.u * 2))
-                                Message(tr("RANDOMIZE works on the English FireRed (Rev 1) and Emerald. Add one to your library or a ROMs folder, then try again."), small)
+                                Message(tr("RANDOMIZE works on the English FireRed and LeafGreen (Rev 1), Ruby and Sapphire (Rev 2) and Emerald. Add one to your library or a ROMs folder, then try again."), small)
                             }
                             is RomRandomizeFlow.Step.Ready -> ReadyRows(flow, step, m, small) { choosing = it }
                             is RomRandomizeFlow.Step.Making -> Padded(m) {

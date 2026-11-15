@@ -46,6 +46,18 @@ class TelemetrySampler {
     private var romSha1: String? = null
     private var fireRedEngine = false
 
+    /** The whole cart, read off the bus. */
+    private fun readRom(reader: MemoryReader, size: Int): ByteArray {
+        val out = ByteArray(size)
+        var off = 0
+        while (off < size) {
+            val n = minOf(0x10000, size - off)
+            reader.readCoreMemory(0x08000000L + off, n).copyInto(out, off)
+            off += n
+        }
+        return out
+    }
+
     private fun romHash(reader: MemoryReader, size: Long): String = sha1HexChunked(reader, 0x08000000L, size).also { romSha1 = it }
     // A Game Boy game's (Gen 1) addresses instead of [nativeCfg].
     private var gen1Cfg: Gen1Config? = null
@@ -445,7 +457,9 @@ class TelemetrySampler {
                     // The shiny marks, shiny icons and SHINY ODDS: only on a ROM whose hash is retail's (ShinyOdds.RETAIL_SHA1S).
                     // BOXES too: the configs' storage was checked on retail captures only (every box record's checksum held).
                     val hash = runCatching { romHash(reader, size) }.getOrNull()
-                    val retail = hash in ShinyOdds.RETAIL_SHA1S
+                    // A cart the library's RANDOMIZE made from retail counts as retail: it changes data only, never code or RAM.
+                    val retail = hash in ShinyOdds.RETAIL_SHA1S ||
+                        size == 0x1000000L && runCatching { RomRandomizer.recognise(readRom(reader, size.toInt())) }.getOrNull() != null
                     retailRom = retail
                     // Retail LeafGreen's battle cursors: on its own configs, checked on the retail carts only.
                     val cfg = when {

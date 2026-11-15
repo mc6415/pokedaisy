@@ -478,7 +478,7 @@ class LibraryActivity : ComponentActivity() {
             com.pokedaisy.app.companion.ui.LibraryTool("PATCH", "PATCH A ROM", "Turn a .bps patch into a game", nf.badge(nf.ROM_PATCH)) {
                 pickPatch.launch(arrayOf("*/*"))
             },
-            com.pokedaisy.app.companion.ui.LibraryTool("RANDOM", "RANDOMIZE", "A new game from FireRed or Emerald, shuffled", nf.badge(nf.RANDOMIZER)) {
+            com.pokedaisy.app.companion.ui.LibraryTool("RANDOM", "RANDOMIZE", "A shuffled new game from your GBA Pokémon", nf.badge(nf.RANDOMIZER)) {
                 randomizer.start()
             },
             com.pokedaisy.app.companion.ui.LibraryTool("LINK", "LINK PLAY", "Trade and battle between your games", nf.badge(nf.LINK_PLAY)) {

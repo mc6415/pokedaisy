@@ -258,6 +258,11 @@ object GameTitles {
 
     /** [rom]'s name as retail randomized by Universal Pokémon Randomizer ZX ([RandomizedRetail]), or null. Blocking. */
     internal fun randomizedTitle(rom: File, code: String?): String? {
+        // The library's own RANDOMIZE output (LeafGreen, Ruby, Sapphire; FireRed / Emerald's pass the check below too).
+        if (code in setOf("BPGE", "AXVE", "AXPE") && RomArchive.romSize(rom) == 0x1000000L) {
+            val game = runCatching { com.pokedaisy.app.companion.data.RomRandomizer.recognise(RomArchive.open(rom).use { it.readBytes() }) }.getOrNull()
+            return game?.let { RETAIL[it.retailSha1] }?.let { it + RANDOMIZED }
+        }
         if (code != "BPRE" && code != "BPEE") return null
         val size = RomArchive.romSize(rom)
         val hit = com.pokedaisy.app.companion.data.RandomizedRetail.matchStream(code, RomIdentity.revision(rom), size) { RomArchive.open(rom).source() }

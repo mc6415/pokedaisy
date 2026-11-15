@@ -1310,60 +1310,30 @@ evolution (`DexDetails`, `EvolutionSource`; their caches now drop on a ROM chang
 
 ### Making one: TOOLS > RANDOMIZE
 
-`RomRandomizer.kt` (pure Kotlin, in the shared module) randomizes the player's own retail English FireRed rev 1 or Emerald,
-writing only bytes inside `RandomizedRetailRom.ranges`, so its output is recognised by the masked hash above like UPR's
-and gets the same companion; `randomize` checks both (no byte outside the mask, and `RandomizedRetail.matchStream` gives the
-same entry back) before it returns. It changes three things, from a seed (`kotlin.random.Random(seed)`: same ROM, options
-and seed = the same file):
+`RomRandomizer.kt` (pure Kotlin, in the shared module) randomizes the player's own retail English FireRed / LeafGreen rev 1,
+Ruby / Sapphire rev 2 or Emerald (`RomRandomizer.GAMES`: each cart's table offsets, its SHA-1 and `madeSha1`). It writes only
+its `sites`: the starters' species words, FireRed / LeafGreen's Oak lines from the starter's name to the end of their 0xFF run,
+each wild slot's species and each trainer Pokémon's species (+ its moves where the trainer picks them). They're found through
+pointers it never writes (gWildMonHeaders' tables, gTrainers' parties), so the list is the same in the cart and in anything made
+from it, and a file hashes to `madeSha1` with them (and the clock registers 0xC4-0xC9) zeroed exactly when it is the tool's
+output (`recognise`): the Poller then sets `retailRom` for LeafGreen / Ruby / Sapphire (their battle cursors, SHINY ODDS,
+BOXES), and GameTitles names it "(Randomized)". FireRed and Emerald's sites all lie inside UPR's mask, so their output is
+randomized retail as above. `randomize` checks both before it returns. Same ROM, options and seed
+(`kotlin.random.Random(seed)`) = the same file.
 
-- Starters: the species words UPR's offsets file names (FireRed: six in Oak's lab scripts, two per ball, at
-  `StarterPokemon` 0x169C2D + 0 / 466, 5 / 515, 520 / 461; Emerald: `sStarterMon` 0x5B1DF8), and FireRed's Oak lines from the
-  name to their 0xFF, rewritten in our own words (`starterLine`, inside the mask's range for that line).
+- Starters: FireRed / LeafGreen's six words in Oak's lab scripts (two per ball, `oaksLab`: UPR's `StarterPokemon`, FireRed
+  0x169C2D, LeafGreen 0x169C09) and Oak's lines rewritten in our own words; Ruby / Sapphire / Emerald's `sStarterMon`.
   `THREE_STAGE` = not an evolution of anything, not legendary, and an evolution that evolves again (gEvolutionTable).
-- Wild Pokémon: every slot of every encounter table off gWildMonHeaders (found by the same code signature as the mask's
-  generator); per slot, per table (a map of species) or one map for the whole game.
+- Wild Pokémon: every slot of every encounter table; per slot, per table or one map for the whole game.
 - Trainers: every party's species at +4; a party with its own moves (flag bit 0) gets the last four moves the new species
   has learnt by the trainer's level (gLevelUpLearnsets), at +6 or +8 with a held item (bit 1).
 
-SIMILAR STRENGTH keeps a swap within 10% of the base stat total, widening by 5% until six candidates fit. FireRed rev 0 isn't
-offered: its table addresses aren't in our records yet (add a `Game` row once they are). `RomRandomizeFlow.kt` is the
-library's window; `RomRandomizerTest` runs it on the retail ROMs. Checked headless: a new Emerald game (the
+SIMILAR STRENGTH keeps a swap within 10% of the base stat total, widening by 5% until six candidates fit. Ruby / Sapphire have
+no GF header, so their base stats come from the records (`speciesInfo`). FireRed rev 0 / LeafGreen rev 0 / Ruby and Sapphire
+rev 0 / 1 aren't offered yet (a `Game` row each: its offsets, then `madeSha1` from its cart). `RomRandomizeFlow.kt` is the
+library's window; `RomRandomizerTest` runs it on every cart it finds. Checked headless: a new Emerald game (the
 `emerald_coop_newgame.txt` boot) got a random starter, Route 101 a random wild Pokémon, and Roxanne (the
 `randomized_emerald_trainer.txt` script) a random team with learnset moves.
-
-### GUIDE
-
-HERE's area data (`GuideAreas*Gen.kt`) is retail's, so `allAreaThings` lays the ROM over it (`randomizedAreas`, from
-`RandomizedGuide`, read at detection): each item ball / hidden item's item by its flag (the generator maps every flag to its
-site, all 339 FireRed and 274 Emerald), each trade's two species from its table row, a gift / static Pokémon's species
-where only one static has that retail species (FireRed 6, Emerald 5; the others are left out). NPC item gifts and key
-items stay. The hand-written pages mark what a randomizer moves (`Randomized.HIDE`: GIFT POKéMON, LEGENDARY POKéMON, the
-evolution stone entry, FireRed's sleeping-Pokémon STUCK? entry) and TIPS gets a `Randomized.ONLY` section;
-`gameGuide(id)` filters by `gameRandomized` (`randomized = null`: every line, for `GuideTranslationsTest`).
-
-### EXPAND, field reads and the rest
-
-`WideScreen.tablesCrc` hands `pkWideConfigure` / the field reads retail's CRC for a randomized cart (UPR leaves the maps,
-tilesets, sprites and the RAM `pk_wide.c` reads alone; per-ROM caches - FF music, rom-art, cheats, favorites - stay on the
-file's own CRC). Checked with mgba_dump's `wideon 22 <retail CRC>` (the new CRC argument) + `widecheck` + `widestats` on one
-seed of each game, every option on: walking, 636 of 637 frames exact (the first after `wideon` has no snapshot, retail
-the same); a scripted wild battle and a trainer battle with `layers 0x18` + `widecheck all`: exactly as many inexact frames
-as retail on the same script. The field item / FLY / PC functions pass their code CRCs, WILD ENCOUNTERS' switch and REUSABLE
-TMS' sites are found where retail's are (`RandomizedRetailTest`), and PLAYER LOOK is offered (`PlayerLookRunner`). The
-library names it "Pokémon FireRed (Randomized)" (`GameTitles.randomizedTitle`, translated when shown), the website's ROM
-check takes the same rule (`compat.js`' `randomizedRetailOf`, over `compat.json`'s `randomizedRetail`).
-
-Test ROMs: `Pokemon FireRed Randomized (v4.6.1) (Rev 0, seed ...).gba`, `(Rev 1, seed ...)`, `Pokemon Emerald Randomized
-(v4.6.1) (seed ...).gba` in the ROM folder (every option on); fixtures `firered_randomized*`, `emerald_randomized*` boot the
-retail saves (UPR keeps the save format).
-
-### Not done yet
-
-- NEXT BOSS keeps the leaders' usual names when UPR renamed the trainers (the gym's own text still uses them).
-- Gift / static Pokémon whose retail species isn't unique among the statics (two of a kind) aren't listed in HERE.
-- Shops (the few UPR randomizes) aren't in the guide; the hand-written shop lines that UPR could change are hidden.
-- The starters' choice isn't shown anywhere new (the game's own lab shows them).
-- LeafGreen, Ruby, Sapphire, other languages and other randomizers.
 
 ## Retail engine (unknown hacks edited in place)
 
