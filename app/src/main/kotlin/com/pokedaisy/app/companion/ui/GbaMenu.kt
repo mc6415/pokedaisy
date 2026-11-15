@@ -840,6 +840,8 @@ fun <T> OptionSelector(
     badge: (T) -> String? = { null },
     /** A few words above the options in the subtitles' grey (SHINY ODDS' disclaimer), or null. */
     note: String? = null,
+    /** A grey line under an option saying what it does (an English key, translated where drawn), or null. */
+    description: (T) -> String? = { null },
 ) {
     OptionOverlay(onDismiss, Modifier.widthIn(max = 480.dp)) {
         BoxWithConstraints {
@@ -849,6 +851,8 @@ fun <T> OptionSelector(
             val noteRoom = if (note != null) subtitleMetrics(m).lineHeight * 2 + u * 8 else 0.dp
             val room = if (maxHeight == Dp.Infinity) m.rowHeight * 20 else maxHeight - u * 40 - m.lineHeight - noteRoom
             val rowHeight = (room / (options.size + 1)).coerceIn(m.rowHeight, m.rowHeight * 1.3f)
+            // A described option's row has its line under the label too.
+            val describedHeight = m.rowHeight + subtitleMetrics(m).lineHeight + u * 2
             // The D-pad's row (index, options.size = CANCEL): while it's on another one, the current choice keeps
             // its marker but not the white, so one row is lit.
             var focusedRow by remember { mutableStateOf(-1) }
@@ -865,9 +869,11 @@ fun <T> OptionSelector(
                         }
                         options.forEachIndexed { i, opt ->
                             val on = opt == selected
+                            val info = description(opt)
                             OptionLine(
                                 label(opt), if (on) "◀" else null, selected = on && (focusedRow < 0 || focusedRow == i), m,
-                                height = rowHeight, labelWeight = 0.85f, divider = true, labelBadge = badge(opt),
+                                height = if (info != null) maxOf(rowHeight, describedHeight) else rowHeight, labelWeight = 0.85f,
+                                divider = true, labelBadge = badge(opt), subtitle = info,
                                 onFocus = { focusedRow = i },
                             ) { onPick(opt) }
                         }

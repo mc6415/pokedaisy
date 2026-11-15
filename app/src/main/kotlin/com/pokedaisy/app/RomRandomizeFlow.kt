@@ -392,6 +392,20 @@ class RomRandomizeFlow(
             if (o.learnsets) add(tr("Random moves learned by level"))
         }
 
+        /** What each choice does, a line under it (English keys: [OptionLine] translates subtitles). */
+        fun startersInfo(s: RomRandomizer.Starters) = when (s) {
+            RomRandomizer.Starters.THREE_STAGE -> tk("Three that evolve twice, like the game's own.")
+            RomRandomizer.Starters.RANDOM -> tk("Any three Pokémon but legendaries.")
+            RomRandomizer.Starters.OFF -> tk("The game's own three.")
+        }
+
+        fun wildInfo(w: RomRandomizer.Wild) = when (w) {
+            RomRandomizer.Wild.PER_AREA -> tk("Each kind swapped for another, route by route.")
+            RomRandomizer.Wild.RANDOM -> tk("Anything can turn up anywhere.")
+            RomRandomizer.Wild.GLOBAL -> tk("Each kind becomes one other kind, all game.")
+            RomRandomizer.Wild.OFF -> tk("The game's own wild Pokémon.")
+        }
+
         fun startersLabel(s: RomRandomizer.Starters) = when (s) {
             RomRandomizer.Starters.OFF -> tk("AS THEY ARE")
             RomRandomizer.Starters.RANDOM -> tk("ANY POKéMON")
@@ -507,10 +521,12 @@ fun RandomizeWindow(flow: RomRandomizeFlow, m: GbaTextMetrics, small: GbaTextMet
         "STARTERS" -> OptionSelector(
             tr("STARTERS"), RomRandomizer.Starters.entries, flow.options.starters, { tr(RomRandomizeFlow.startersLabel(it)) }, m,
             onPick = { flow.options = flow.options.copy(starters = it); choosing = null }, onDismiss = { choosing = null },
+            description = { RomRandomizeFlow.startersInfo(it) },
         )
         "WILD" -> OptionSelector(
             tr("WILD POKéMON"), RomRandomizer.Wild.entries, flow.options.wild, { tr(RomRandomizeFlow.wildLabel(it)) }, m,
             onPick = { flow.options = flow.options.copy(wild = it); choosing = null }, onDismiss = { choosing = null },
+            description = { RomRandomizeFlow.wildInfo(it) },
         )
     }
 }
@@ -525,6 +541,10 @@ private fun WizardPage(
     fun shuffled(b: Boolean) = tr(if (b) "SHUFFLED" else "AS THEY ARE")
     val base = step.bases.getOrElse(flow.base) { step.bases[0] }
     @Composable fun heading(text: String) { Padded(m) { Message(text, m, value = true) } }
+    // A setting with what its value does in a grey line under it.
+    val described = m.rowHeight + com.pokedaisy.app.companion.ui.subtitleMetrics(m).lineHeight + m.u * 2
+    @Composable fun row(label: String, value: String, info: String, last: Boolean = false, onClick: () -> Unit) =
+        OptionLine(label, value, false, m, height = described, divider = !last, subtitle = info, onClick = onClick)
     when (flow.page) {
         RomRandomizeFlow.Page.GAME -> {
             heading(tr("Which game?"))
@@ -545,32 +565,47 @@ private fun WizardPage(
             }
         }
         RomRandomizeFlow.Page.STYLE -> Unit
+        // CUSTOM's pages: each row says, in a grey line under it, what its value does.
         RomRandomizeFlow.Page.POKEMON -> {
             heading(tr("POKéMON"))
-            OptionLine(tr("STARTERS"), tr(RomRandomizeFlow.startersLabel(o.starters)), false, m, divider = true) { choose("STARTERS") }
-            OptionLine(tr("WILD POKéMON"), tr(RomRandomizeFlow.wildLabel(o.wild)), false, m, divider = true) { choose("WILD") }
-            OptionLine(tr("SIMILAR STRENGTH"), onOff(o.similarStrength), false, m, divider = true) {
+            row(tr("STARTERS"), tr(RomRandomizeFlow.startersLabel(o.starters)), RomRandomizeFlow.startersInfo(o.starters)) { choose("STARTERS") }
+            row(tr("WILD POKéMON"), tr(RomRandomizeFlow.wildLabel(o.wild)), RomRandomizeFlow.wildInfo(o.wild)) { choose("WILD") }
+            row(tr("SIMILAR STRENGTH"), onOff(o.similarStrength),
+                if (o.similarStrength) tk("Swaps stay close in strength.") else tk("A swap can be much stronger or weaker.")) {
                 flow.options = o.copy(similarStrength = !o.similarStrength)
             }
-            OptionLine(tr("LEGENDARIES"), tr(if (o.noLegendaries) "NONE" else "ALLOWED"), false, m) {
+            row(tr("LEGENDARIES"), tr(if (o.noLegendaries) "NONE" else "ALLOWED"),
+                if (o.noLegendaries) tk("Kept out of the grass and trainers' teams.") else tk("Can turn up in the grass and in teams."), last = true) {
                 flow.options = o.copy(noLegendaries = !o.noLegendaries)
             }
         }
         RomRandomizeFlow.Page.TRAINERS -> {
             heading(tr("TRAINERS"))
-            OptionLine(tr("TEAMS"), shuffled(o.trainers), false, m, divider = RomRandomizeFlow.takesHeldItems(base)) {
+            val held = RomRandomizeFlow.takesHeldItems(base)
+            row(tr("TEAMS"), shuffled(o.trainers),
+                if (o.trainers) tk("Every trainer gets a new team at the same levels.") else tk("Trainers keep their own teams."), last = !held) {
                 flow.options = o.copy(trainers = !o.trainers)
             }
             // Only where the picked game takes them: Red / Blue / Yellow's trainers hold nothing.
-            if (RomRandomizeFlow.takesHeldItems(base)) {
-                OptionLine(tr("HELD ITEMS"), onOff(o.trainerItems), false, m) { flow.options = o.copy(trainerItems = !o.trainerItems) }
+            if (held) {
+                row(tr("HELD ITEMS"), onOff(o.trainerItems),
+                    if (o.trainerItems) tk("Trainers' Pokémon hold items picked at random.") else tk("Held items as the game has them."), last = true) {
+                    flow.options = o.copy(trainerItems = !o.trainerItems)
+                }
             }
         }
         RomRandomizeFlow.Page.EXTRAS -> {
             heading(tr("EXTRAS"))
-            OptionLine(tr("FIELD ITEMS"), shuffled(o.fieldItems), false, m, divider = true) { flow.options = o.copy(fieldItems = !o.fieldItems) }
-            OptionLine(tr("BASE STATS"), shuffled(o.baseStats), false, m, divider = true) { flow.options = o.copy(baseStats = !o.baseStats) }
-            OptionLine(tr("LEARNSETS"), tr(if (o.learnsets) "RANDOM" else "AS THEY ARE"), false, m) {
+            row(tr("FIELD ITEMS"), shuffled(o.fieldItems),
+                if (o.fieldItems) tk("Items swap places. Key items stay put.") else tk("Items stay where the game puts them.")) {
+                flow.options = o.copy(fieldItems = !o.fieldItems)
+            }
+            row(tr("BASE STATS"), shuffled(o.baseStats),
+                if (o.baseStats) tk("Each Pokémon's stats in a new order, the same total.") else tk("Stats as the game has them.")) {
+                flow.options = o.copy(baseStats = !o.baseStats)
+            }
+            row(tr("LEARNSETS"), tr(if (o.learnsets) "RANDOM" else "AS THEY ARE"),
+                if (o.learnsets) tk("New moves learned at the same levels.") else tk("Moves as the game has them."), last = true) {
                 flow.options = o.copy(learnsets = !o.learnsets)
             }
         }

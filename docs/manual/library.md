@@ -129,7 +129,7 @@ RANDOMIZE asks three things, a page each. `BACK` (or the arrow at the top) goes 
 
 4. **Ready.** The last page says in plain words what will change. `GAME` and `STYLE` take you back to change them, and `SEED` is the number the shuffle is made from: the same game, settings and seed always make the same game, so a friend can play the same run. Tap it for another number. Then tap `RANDOMIZE`. When it's done, the new game is in your library as, for example, "Pokémon Ruby (Randomized, seed 123456)", so two runs of one game are easy to tell apart, and `PLAY` starts it.
 
-`CUSTOM`'s pages:
+`CUSTOM`'s pages. Under each row a short line says what its setting does right now, and the `STARTERS` and `WILD POKéMON` lists say what each choice does too:
 
 | Row | What it does |
 | --- | --- |
