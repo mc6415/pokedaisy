@@ -179,6 +179,14 @@ class LibraryActivity : ComponentActivity() {
             bump()
         }
     }
+    /** TOOLS > RANDOMIZE: a randomized copy of the player's retail FireRed / Emerald (internal for ui-preview). */
+    internal val randomizer by lazy {
+        RomRandomizeFlow(this) { out ->
+            generateAutoCoverAsync(out)
+            identifyGames()
+            bump()
+        }
+    }
     /** SETTINGS opened as the rail's / bar's tab: its own GAMES / TOOLS come back here as the place to show. */
     private val settingsTab = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         when (r.data?.getStringExtra(SettingsActivity.EXTRA_SECTION)) {
@@ -469,6 +477,9 @@ class LibraryActivity : ComponentActivity() {
         return listOf(
             com.pokedaisy.app.companion.ui.LibraryTool("PATCH", "PATCH A ROM", "Turn a .bps patch into a game", nf.badge(nf.ROM_PATCH)) {
                 pickPatch.launch(arrayOf("*/*"))
+            },
+            com.pokedaisy.app.companion.ui.LibraryTool("RANDOM", "RANDOMIZE", "A new game from FireRed or Emerald, shuffled", nf.badge(nf.RANDOMIZER)) {
+                randomizer.start()
             },
             com.pokedaisy.app.companion.ui.LibraryTool("LINK", "LINK PLAY", "Trade and battle between your games", nf.badge(nf.LINK_PLAY)) {
                 startActivity(Intent(this, LinkActivity::class.java))
@@ -817,6 +828,8 @@ class LibraryActivity : ComponentActivity() {
                 onPlay = ::play,
                 onAskSupport = { rom -> Thread({ val url = RomSupportRequest.url(rom); runOnUiThread { openUrl(url) } }, "pokedaisy-support-url").start() },
             )
+
+            RandomizeWindow(randomizer, m, small, onPlay = ::play)
 
             UpdateDialog(updates, m, small)
 
@@ -1941,7 +1954,7 @@ class LibraryActivity : ComponentActivity() {
     /** Every window over the main screen (pass keys to them, not the launcher). */
     private val libraryDialogOpen
         get() = searching || pickingSort || addMenu || renaming != null || deleting != null || gameInfo != null || coverPickerFor != null ||
-            pendingImport != null || patcher.step != null || saveLoad != null || backupPick != null || updates.release != null || crashAsk ||
+            pendingImport != null || patcher.step != null || randomizer.step != null || saveLoad != null || backupPick != null || updates.release != null || crashAsk ||
             (expandIntro && !crashAsk) || battleStyleIntroShown || ssIntroShown || whatsNewShown || supportShown || seasonalShown
 
     /** BACK for the library's windows (OptionOverlay & co.): the newest open one closes. */

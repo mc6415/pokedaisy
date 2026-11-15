@@ -3,7 +3,7 @@ title: Your game library
 summary: Add games, sort and favorite them, set covers, and use each game's menu for saves, info, cheats and more.
 section: start
 order: 4
-keywords: [shortcut, home screen, launcher icon, search, find a game, filter, support, donate, donation, tip, patreon, ko-fi, kofi, buy me a coffee, games list, add rom, import, folder, folders, multiple folders, several folders, add folder, zip, 7z, archive, cover, box art, artwork, icon, steamgriddb, rename, delete, hide, favourite, star, sort, grid, list view, frontend, es-de, esde, iisu, cocoon, launcher, filter, tabs, recently played, history, hacks, game boy, gbc, gba, console, platform, patch, patching, bps, apply patch, base rom, checksum, crc32, rom hack patch, tools, toolbox, rail, bottom bar, where is settings]
+keywords: [shortcut, home screen, launcher icon, search, find a game, filter, support, donate, donation, tip, patreon, ko-fi, kofi, buy me a coffee, games list, add rom, import, folder, folders, multiple folders, several folders, add folder, zip, 7z, archive, cover, box art, artwork, icon, steamgriddb, rename, delete, hide, favourite, star, sort, grid, list view, frontend, es-de, esde, iisu, cocoon, launcher, filter, tabs, recently played, history, hacks, game boy, gbc, gba, console, platform, patch, patching, bps, apply patch, base rom, checksum, crc32, rom hack patch, tools, toolbox, rail, bottom bar, where is settings, randomize, randomizer, randomise, randomiser, randomized run, random starters, random wild, random trainers, shuffle, seed]
 ---
 
 The library is the first thing you see when you open PokeDaisy: every game you've added, in the order you pick. Tap a game to play it.
@@ -36,6 +36,7 @@ Down the left edge of the library are three buttons: `GAMES`, `TOOLS` and `SETTI
 | Tool | What it does |
 | --- | --- |
 | `PATCH A ROM` | Turns a `.bps` patch into a game (see [Patch a ROM hack](#patch-a-rom-hack)). |
+| `RANDOMIZE` | Makes a new, shuffled game from your FireRed or Emerald (see [Randomize a game](#randomize-a-game)). |
 | `LINK PLAY` | Runs two to four GBA games joined as if by a link cable, to trade and battle between them (see [Link play](link-play.md)). |
 | `SAVE EDITOR` | Opens a game's save: rearrange the PC, change the bag, money and moves (see [Save editor and save trades](save-trade.md)). |
 | `TRADE SAVES` | Trades Pokémon between two of your games' save files (see [Save editor and save trades](save-trade.md)). |
@@ -106,6 +107,29 @@ Your original game is never changed: the patched game is a new file, named after
 If you see `BASE ROM NOT FOUND`, none of your games has the checksum the patch wants. The message says which game it is when PokeDaisy knows it (an exact version, such as the first or second release of FireRed). Add that game to your library or a ROMs folder, then try again. Most hacks want a clean, unmodified US FireRed or Emerald: a game that was already patched, or another language or version, has a different checksum.
 
 If the companion doesn't support the patched game, you're told so and it stays out of the library, but the file is still saved. `ASK FOR SUPPORT` asks for the game to be added. If it was saved in PokeDaisy's own games folder, Settings > `HIDDEN GAMES` can still show it in the library.
+
+### Randomize a game
+
+A randomized run plays a game you know with everything shuffled: a different first partner, other Pokémon in the grass, new teams for every trainer. `RANDOMIZE` under `TOOLS` makes one from your own copy of the English FireRed (its second release, Rev 1) or Emerald.
+
+1. Tap `TOOLS`, then `RANDOMIZE`. PokeDaisy looks through your library for those games.
+2. Pick what to shuffle:
+
+| Row | What it does |
+| --- | --- |
+| `GAME` | Which of your games to start from, when you have more than one. |
+| `STARTERS` | The three Pokémon you choose your partner from. `EVOLVE TWICE` (the default) picks Pokémon that evolve two times, like the real ones; `ANY POKéMON` can be anything but a legendary; `AS THEY ARE` keeps them. In FireRed the professor names the new ones when you choose. |
+| `WILD POKéMON` | What you meet in the grass, caves, water and with a rod. `PER AREA` (the default) swaps each kind of Pokémon for another on each route, so a route still has its common and rare ones. `EVERY ENCOUNTER` picks anew for every slot, `SWAPPED EVERYWHERE` swaps each kind for one other kind across the whole game, and `AS THEY ARE` keeps them. |
+| `TRAINERS` | Gives every trainer, the leaders and your rival too, a new team at the same levels. Trainers who had moves picked for them get the moves their new Pokémon know by then. |
+| `SIMILAR STRENGTH` | Keeps each swap close in strength to what it replaces (their base stats added up), so an early route doesn't fill with fully evolved Pokémon. |
+| `LEGENDARIES` | `NONE` keeps legendary Pokémon out of the grass and out of trainers' teams. |
+| `SEED` | The number the shuffle is made from. The same game, options and seed always make the same game, so a friend can play the same run. Tap it for another number. |
+
+3. Tap `RANDOMIZE`. When it's done, the new game is in your library as "Pokémon FireRed (Randomized)" or "Pokémon Emerald (Randomized)", and `PLAY` starts it.
+
+Your own game is never changed: the randomized one is a new file, named with its seed (`Pokemon FireRed Randomized (seed 123456).gba`), saved where a [patched game](#patch-a-rom-hack) would go. It has its own save, so start a new game in it. The companion reads it like any [randomized game](supported-games.md): everything it shows comes from what was shuffled, and the [guide](guide.md#randomized-games) follows it.
+
+If you see `NO GAME TO RANDOMIZE`, none of your games is one it works on. A FireRed or Emerald that was already patched or randomized, another language or FireRed's first release (Rev 0) won't do.
 
 ### File types
 

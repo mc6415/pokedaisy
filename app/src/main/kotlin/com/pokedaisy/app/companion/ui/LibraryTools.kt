@@ -304,7 +304,31 @@ internal object ToolIcons {
         ),
     )
 
+    /** RANDOMIZE: a white die, its pips red, lit from the top left. */
+    private val random = TabIcons.TabIcon(
+        listOf(
+            "................",
+            "..kkkkkkkkkkkk..",
+            ".kwwwwwwwwwwwwk.",
+            ".kwrrwwwwwwrrwk.",
+            ".kwrrwwwwwwrrwk.",
+            ".kwwwwwwwwwwwsk.",
+            ".kwwwwwrrwwwwsk.",
+            ".kwwwwwrrwwwwsk.",
+            ".kwwwwwwwwwwwsk.",
+            ".kwwwwwwwwwwwsk.",
+            ".kwrrwwwwwwrrsk.",
+            ".kwrrwwwwwwrrsk.",
+            ".kwssssssssssdk.",
+            "..kkkkkkkkkkkk..",
+            "................",
+            "................",
+        ),
+        mapOf('k' to OUTLINE, 'w' to WHITE, 's' to Color(0xFFC0C0D0), 'd' to Color(0xFF9090A8), 'r' to Color(0xFFE04040)),
+    )
+
     fun of(id: String): TabIcons.TabIcon? = when (id) {
+        "RANDOM" -> random
         "PATCH" -> patch
         "LINK" -> link
         "EDIT" -> edit

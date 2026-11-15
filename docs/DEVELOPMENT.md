@@ -1308,6 +1308,29 @@ evolution (`DexDetails`, `EvolutionSource`; their caches now drop on a ROM chang
 `PokedexTables`) and the TM table's (any move on a TM, retail's HMs). `guideTablesMatchRom` skips its probe trainer's name
 (`byName = false`): UPR's trainer names renamed BROCK.
 
+### Making one: TOOLS > RANDOMIZE
+
+`RomRandomizer.kt` (pure Kotlin, in the shared module) randomizes the player's own retail English FireRed rev 1 or Emerald,
+writing only bytes inside `RandomizedRetailRom.ranges`, so its output is recognised by the masked hash above like UPR's
+and gets the same companion; `randomize` checks both (no byte outside the mask, and `RandomizedRetail.matchStream` gives the
+same entry back) before it returns. It changes three things, from a seed (`kotlin.random.Random(seed)`: same ROM, options
+and seed = the same file):
+
+- Starters: the species words UPR's offsets file names (FireRed: six in Oak's lab scripts, two per ball, at
+  `StarterPokemon` 0x169C2D + 0 / 466, 5 / 515, 520 / 461; Emerald: `sStarterMon` 0x5B1DF8), and FireRed's Oak lines from the
+  name to their 0xFF, rewritten in our own words (`starterLine`, inside the mask's range for that line).
+  `THREE_STAGE` = not an evolution of anything, not legendary, and an evolution that evolves again (gEvolutionTable).
+- Wild Pokémon: every slot of every encounter table off gWildMonHeaders (found by the same code signature as the mask's
+  generator); per slot, per table (a map of species) or one map for the whole game.
+- Trainers: every party's species at +4; a party with its own moves (flag bit 0) gets the last four moves the new species
+  has learnt by the trainer's level (gLevelUpLearnsets), at +6 or +8 with a held item (bit 1).
+
+SIMILAR STRENGTH keeps a swap within 10% of the base stat total, widening by 5% until six candidates fit. FireRed rev 0 isn't
+offered: its table addresses aren't in our records yet (add a `Game` row once they are). `RomRandomizeFlow.kt` is the
+library's window; `RomRandomizerTest` runs it on the retail ROMs. Checked headless: a new Emerald game (the
+`emerald_coop_newgame.txt` boot) got a random starter, Route 101 a random wild Pokémon, and Roxanne (the
+`randomized_emerald_trainer.txt` script) a random team with learnset moves.
+
 ### GUIDE
 
 HERE's area data (`GuideAreas*Gen.kt`) is retail's, so `allAreaThings` lays the ROM over it (`randomizedAreas`, from

@@ -8,7 +8,7 @@ keywords: [options, preferences, configuration, config, defaults, menu, referenc
 
 PokeDaisy has two settings screens. **Settings** on the top screen opens from the library (`SETTINGS`, beside your games) and has everything, including the things that need a keyboard or a file picker. **SETTINGS** on the companion is the gear tab on the bottom screen, there while you play; changes made there show on the game straight away.
 
-The tools (`PATCH A ROM`, `LINK PLAY`, `SAVE EDITOR`, `TRADE SAVES`) aren't settings: they're under the library's `TOOLS`, beside `SETTINGS` (see [Games, tools and settings](library.md#games-tools-and-settings)).
+The tools (`PATCH A ROM`, `RANDOMIZE`, `LINK PLAY`, `SAVE EDITOR`, `TRADE SAVES`) aren't settings: they're under the library's `TOOLS`, beside `SETTINGS` (see [Games, tools and settings](library.md#games-tools-and-settings)).
 
 Many rows are on both. They're the same setting, so changing it on one screen changes it on the other. The tables below list each screen's rows in the order the app shows them, with the default in **bold**. A row with an arrow at its right end opens a page of its own; the others flip, or open a short list to pick from. On a wide enough screen both lists have their groups as tabs down the left side: tap one to jump to that group, and the tab of the group you're in stays lit, following the cursor as you move through the list.
 

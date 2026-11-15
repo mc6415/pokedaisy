@@ -2606,6 +2606,15 @@ fun main(args: Array<String>) {
         Shot("library-patch-not-found-unknown", tw, th, td, activity { LibraryActivity().apply { patcher.step = fakePatch("unknown") } }),
         Shot("library-patch-looking", tw, th, td, activity { LibraryActivity().apply { patcher.step = fakePatch("looking") } }),
         Shot("library-patch-failed", tw, th, td, activity { LibraryActivity().apply { patcher.step = fakePatch("failed") } }),
+        // RANDOMIZE: the options over two games, randomizing, done, and no game to take.
+        Shot("library-randomize-ready", tw, th, td, activity { LibraryActivity().apply { randomizer.step = fakeRandomize("ready") } }),
+        Shot("library-randomize-ready-phone", 1080, 2400, 2.625f, activity { LibraryActivity().apply { randomizer.step = fakeRandomize("ready") } }),
+        Shot("library-randomize-wild", tw, th, td, activity { LibraryActivity().apply { randomizer.step = fakeRandomize("ready") } }) {
+            onNodeWithText("WILD POKéMON").performClick()
+        },
+        Shot("library-randomize-making", tw, th, td, activity { LibraryActivity().apply { randomizer.step = fakeRandomize("making") } }),
+        Shot("library-randomize-done", tw, th, td, activity { LibraryActivity().apply { randomizer.step = fakeRandomize("done") } }),
+        Shot("library-randomize-not-found", tw, th, td, activity { LibraryActivity().apply { randomizer.step = fakeRandomize("notfound") } }),
         // REPLACE COVER: a known game's icons, a search's game list, and no API key.
         Shot("library-cover-picker", tw, th, td, activity {
             LibraryActivity().apply { coverPickerFor = File("firered-hack.gba"); coverSourceOverride = FakeCoverSource(known = true) }
@@ -3193,6 +3202,21 @@ fun PreviewGame(content: @Composable () -> Unit) {
     androidx.compose.foundation.layout.Box(
         androidx.compose.ui.Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0xFF58A848)),
     ) { content() }
+}
+
+/** RANDOMIZE's window in each state (no ROM read). */
+private fun fakeRandomize(state: String): com.pokedaisy.app.RomRandomizeFlow.Step {
+    val dir = "/storage/emulated/0/ROMs/gba"
+    val bases = listOf(
+        com.pokedaisy.app.RomRandomizeFlow.Base(File("$dir/Pokemon - FireRed Version (USA, Europe) (Rev 1).gba"), "Pokémon FireRed", "FireRed"),
+        com.pokedaisy.app.RomRandomizeFlow.Base(File("$dir/Pokemon - Emerald Version (USA, Europe).gba"), "Pokémon Emerald", "Emerald"),
+    )
+    return when (state) {
+        "ready" -> com.pokedaisy.app.RomRandomizeFlow.Step.Ready(bases)
+        "making" -> com.pokedaisy.app.RomRandomizeFlow.Step.Making(bases[0])
+        "done" -> com.pokedaisy.app.RomRandomizeFlow.Step.Done(File("$dir/Pokemon FireRed Randomized (seed 482913).gba"), "Pokémon FireRed (Randomized)")
+        else -> com.pokedaisy.app.RomRandomizeFlow.Step.NotFound
+    }
 }
 
 /** PATCH A ROM's window in each state, over a made-up hack (no real patch or ROM). */
