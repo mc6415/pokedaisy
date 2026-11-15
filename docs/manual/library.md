@@ -81,7 +81,7 @@ The easiest way if you already keep your games in folders. Link them in first-ti
 - `+` > `MANAGE ROMS FOLDERS` opens the list of linked folders, with how many games each one has. `REMOVE` takes a folder's games out of the library. Your files stay where they are.
 - A folder inside one you already linked is already covered, so it isn't added twice. Link a folder that holds ones you linked before, and it takes their place.
 
-Games in a linked folder are your own files, so the library never deletes them. Their menu has `HIDE` instead of `DELETE`.
+Games in a linked folder are your own files, so the library never deletes them. Their menu has `HIDE` instead of `DELETE`, except for games PokeDaisy made itself with [`RANDOMIZE`](#randomize-a-game), which you can delete wherever they are.
 
 ### Import with +
 
@@ -127,7 +127,7 @@ A randomized run plays a game you know with everything shuffled: a different fir
 
 3. Tap `RANDOMIZE`. When it's done, the new game is in your library as, for example, "Pokémon Ruby (Randomized, seed 123456)", so two runs of one game are easy to tell apart, and `PLAY` starts it.
 
-Your own game is never changed: the randomized one is a new file, named with its seed (`Pokemon FireRed Randomized (seed 123456).gba`), saved where a [patched game](#patch-a-rom-hack) would go. A DS game is the size of the whole cart (128 MB for Platinum), so it takes a few seconds, with a bar. It has its own save, so start a new game in it. The companion treats it as the game it came from, with every feature that game has, and reads the shuffled Pokémon from it: the [guide](guide.md)'s wild Pokémon and leaders' teams follow the shuffle.
+Your own game is never changed: the randomized one is a new file, named with its seed (`Pokemon FireRed Randomized (seed 123456).gba`), saved where a [patched game](#patch-a-rom-hack) would go. A DS game is the size of the whole cart (128 MB for Platinum), so it takes a few seconds, with a bar. It has its own save, so start a new game in it. When you're done with a run, its menu's `DELETE` removes it, even from a linked folder. The companion treats it as the game it came from, with every feature that game has, and reads the shuffled Pokémon from it: the [guide](guide.md)'s wild Pokémon and leaders' teams follow the shuffle.
 
 If you see `NO GAME TO RANDOMIZE`, none of your games is one it works on. A game that was already patched or randomized, another language or another release (such as FireRed's first, Rev 0) won't do.
 
@@ -185,7 +185,7 @@ Long-press a game, in the list or the grid, to open its menu. In list view, the 
 | `CHEATS` | Opens the game's cheat codes in Settings. See [Cheats](cheats.md). |
 | `ADD TO HOME` | Puts a shortcut to the game on your device's home screen. A tap on it starts the game straight away. |
 | `HIDE` | Takes the game off the library without touching any files. |
-| `DELETE` | Deletes the game file. Saves and save states are kept. Only for imported games, never your linked folder's. |
+| `DELETE` | Deletes the game file. Saves and save states are kept. Only for imported games and games `RANDOMIZE` made, never your linked folder's own. |
 
 `LOAD SAVE`, `RESTORE BACKUP` and `SAVE FOLDER` are explained in [Saves, backups and save states](saves.md#load-a-save-file).
 

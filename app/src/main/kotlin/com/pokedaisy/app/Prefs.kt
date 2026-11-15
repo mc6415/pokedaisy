@@ -834,6 +834,11 @@ class Prefs(context: Context) {
         get() = p.getString("hidden_roms", null)?.split("\n")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
         set(v) = p.edit().putString("hidden_roms", v.joinToString("\n")).apply()
 
+    /** Games the app made itself (by path: RANDOMIZE's output), which the library can DELETE even in a linked folder. */
+    var madeRoms: Set<String>
+        get() = p.getString("made_roms", null)?.split("\n")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
+        set(v) = p.edit().putString("made_roms", v.joinToString("\n")).apply()
+
     /** The player's favorite games (by path): first in the library whatever its order, a star on each. */
     var favoriteRoms: Set<String>
         get() = p.getString("favorite_roms", null)?.split("\n")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()

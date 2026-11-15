@@ -132,6 +132,7 @@ class RomRandomizeFlow(
                 return@Thread
             }
             RomAdded.record(activity, listOf(file), initial = false)
+            prefs.madeRoms = prefs.madeRoms + file.absolutePath
             if (file.absoluteFile.parentFile == importedDir.absoluteFile) RomFolder.checkImported(activity) else RomFolder.scan(activity, prefs)
             GameTitles.identify(activity, listOf(file))
             val label = GameTitles.label(activity, prefs, file)
@@ -198,6 +199,15 @@ class RomRandomizeFlow(
     }
 
     companion object {
+        /** A file named the way this tool names its output ("... Randomized (seed 123456).gba", " (2)" and all). */
+        private val MADE_NAME = Regex("""^Pokemon .+ Randomized \(seed \d+\)( \(\d+\))?\.(gba|nds)$""")
+
+        /** [rom] is a game RANDOMIZE made: written by it ([Prefs.madeRoms]), or named as it names them and read as randomized. */
+        fun madeByTool(prefs: Prefs, rom: File, randomized: Boolean): Boolean =
+            rom.absolutePath in prefs.madeRoms || randomized && namedByTool(rom.name)
+
+        internal fun namedByTool(name: String) = MADE_NAME.matches(name)
+
         /** "Pokemon FireRed Randomized (seed 123456).gba". */
         fun outputName(b: Base, seed: Long) = RomUris.sanitizeFileName("Pokemon ${b.game} Randomized (seed $seed).gba")
 

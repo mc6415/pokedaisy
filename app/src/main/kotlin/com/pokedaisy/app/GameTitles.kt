@@ -255,6 +255,10 @@ object GameTitles {
     internal fun seedIn(fileName: String): String? = SEED.find(fileName)?.groupValues?.get(1)
     private val SEED = Regex("""\bseed[ _-]?(\d{1,20})""", RegexOption.IGNORE_CASE)
 
+    /** [rom] is read as a randomized game (UPR's or RANDOMIZE's), if [identify] has looked at this exact file. Cheap. */
+    fun isRandomized(context: Context, rom: File): Boolean =
+        cache(context)[rom.absolutePath]?.takeIf { it.matches(rom) }?.title?.endsWith(RANDOMIZED) == true
+
     /** What a randomized retail cart is cached as ([RandomizedRetail]): retail's name and this, in English. */
     private const val RANDOMIZED = " (Randomized)"
 

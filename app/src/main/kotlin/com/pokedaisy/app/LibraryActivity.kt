@@ -951,7 +951,9 @@ class LibraryActivity : ComponentActivity() {
                     m = m,
                     onDismiss = { deleting = null },
                     onConfirm = {
+                        val linked = RomFolder.isLinked(prefs, rom)
                         rom.delete()
+                        prefs.madeRoms = prefs.madeRoms - rom.absolutePath
                         RomAdded.forget(this@LibraryActivity, rom)
                         prefs.favoriteRoms = prefs.favoriteRoms - rom.absolutePath
                         prefs.setRomDisplayName(rom, null)
@@ -962,6 +964,8 @@ class LibraryActivity : ComponentActivity() {
                         GameMedia.forget(GameMedia.root(this@LibraryActivity), rom)
                         if (prefs.lastRomPath == rom.absolutePath) prefs.lastRomPath = null
                         deleting = null
+                        // A linked folder's list is the scan's: look again so the game leaves it.
+                        if (linked) rescanRomsFolder()
                         bump()
                     },
                 )
@@ -1242,8 +1246,8 @@ class LibraryActivity : ComponentActivity() {
                 }
             })
             add(RomMenuItem(tr("HIDE"), Icons.Filled.VisibilityOff) { hideRom(rom) })
-            // A linked folder's ROM is the player's own file: it can be hidden, never deleted.
-            if (!RomFolder.isLinked(prefs, rom)) {
+            // A linked folder's ROM is the player's own file: it can be hidden, never deleted - unless the app made it (RANDOMIZE).
+            if (!RomFolder.isLinked(prefs, rom) || RomRandomizeFlow.madeByTool(prefs, rom, GameTitles.isRandomized(this@LibraryActivity, rom))) {
                 add(RomMenuItem(tr("DELETE"), Icons.Filled.Delete, danger = true, opens = true, onClick = onDelete))
             }
         }
