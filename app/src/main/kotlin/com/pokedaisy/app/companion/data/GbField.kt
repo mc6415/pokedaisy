@@ -122,7 +122,7 @@ sealed class GbField {
         private val flags7 = flags6 + 1
 
         // wFontLoaded (right before wWalkCounter in every cart) bit 0: a text box is up. The games without an EXPAND
-        // scene (the European Yellows, Red / Blue) have only these to go by.
+        // scene (the European Yellows, German Red / Blue) have only these to go by.
         private fun free(g: GameCalls) = u8(g, walkCounter) == 0 && u8(g, walkCounter - 1) and 1 == 0 && u8(g, JOY_IGNORE) == 0 &&
             u8(g, flags5) and 0xA0 == 0 && u8(g, inBattle) == 0 && u8(g, flags6) and 0x1C == 0
 

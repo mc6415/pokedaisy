@@ -55,6 +55,14 @@ static const struct GbGame { uint32_t crc; int gen; uint32_t a[GB_CONFIG]; } GB_
     // Pokémon Yellow Legacy v1.0.10: its pokeyellow.sym (its build is the patched cart byte for byte).
     { 0xE7D07A3Fu, 1, { 0xC100, 0xC200, 0xC6E8, 0xD3AC, 0xD3AE, 0xD3B0, 0xD3B4, 0xD3B5, 0xD3BD, 0xD578, 0xD3FA, 0xD057,
                         0xCFC3, 0xD5F3, 0xD61B, GB_LINEAR(0x3F, 0x41F2), GB_LINEAR(0x3F, 0x43E4), 0xCC2D, 0xD746 } },
+    // Pokémon Red / Blue (USA, Europe): pret/pokered's symbols (pokered.sym = pokeblue.sym for every one of these; both
+    // builds are the carts byte for byte). Yellow's RAM + 1 from wCurrentTileBlockMapViewPointer up, the map header
+    // tables at their own places; no Color palettes (a Super Game Boy cart: gbCgb off).
+#define GB_RED_BLUE { 0xC100, 0xC200, 0xC6E8, 0xD35F, 0xD361, 0xD363, 0xD367, 0xD368, 0xD370, 0xD52B, 0xD3AD, 0xD057, \
+                      0xCFC4, 0xD5A6, 0xD5CE, 0x01AE, GB_LINEAR(0x03, 0x423D), 0xCC2D, 0xD747 }
+    { 0x9F7FDD53u, 1, GB_RED_BLUE },
+    { 0xD6DA8A1Au, 1, GB_RED_BLUE },
+#undef GB_RED_BLUE
     // Pokémon Crystal rev 1, rev 0, Australia: pret/pokecrystal's symbols, the same in all three builds.
 #define GB_CRYSTAL { 0, 0, 0xC800, 0xD194, 0xDCB7, 0xD196, 0xD199, 0xD19E, 0xD1A8, 0xD1DC, 0xD19D, 0xD22D, 0xD0ED, 0, 0, \
                      GB_LINEAR(0x25, 0x4000), 0, 0xCF74, 0xDA72, 0xD1E6, 0x13, 0xD4D6, 0xD71E, 0xD81E, 0xD154, 0xD82E, \
@@ -765,6 +773,7 @@ static inline uint32_t gbBgTileBase(int t, uint8_t attr) {
 
 static void (*gbOrigWritePalette)(struct GBVideoRenderer*, int, uint16_t);
 static void (*gbOrigWriteVRAM)(struct GBVideoRenderer*, uint16_t);
+static uint8_t (*gbOrigWriteRegister)(struct GBVideoRenderer*, uint16_t, uint8_t);
 static struct GBVideoRenderer* gbHooked;
 static struct GB* gbHookGb;
 static bool gbPalTorn, gbLastPalTorn;
@@ -783,14 +792,24 @@ static void gbHookWriteVRAM(struct GBVideoRenderer* r, uint16_t address) {
     gbOrigWriteVRAM(r, address);
 }
 
+/** A Super Game Boy cart's BGP / OBP0 / OBP1: mGBA takes them as the renderer's shade lookup (writeVideoRegister), not
+ * through writePalette - Red / Blue's battle flashes change BGP mid-frame. */
+static uint8_t gbHookWriteRegister(struct GBVideoRenderer* r, uint16_t address, uint8_t value) {
+    if ((address == GB_REG_BGP || address == GB_REG_OBP0 || address == GB_REG_OBP1) && gbHookGb && gbHookGb->model < GB_MODEL_CGB)
+        gbMarkTorn();
+    return gbOrigWriteRegister(r, address, value);
+}
+
 static void gbHookPalettes(struct GB* gb) {
     struct GBVideoRenderer* r = gb->video.renderer;
     gbHookGb = gb;
     if (!r || r == gbHooked || r->writePalette == gbHookWritePalette) return;
     gbOrigWritePalette = r->writePalette;
     gbOrigWriteVRAM = r->writeVRAM;
+    gbOrigWriteRegister = r->writeVideoRegister;
     r->writePalette = gbHookWritePalette;
     r->writeVRAM = gbHookWriteVRAM;
+    r->writeVideoRegister = gbHookWriteRegister;
     gbHooked = r;
 }
 

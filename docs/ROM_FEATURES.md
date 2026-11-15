@@ -11,7 +11,7 @@ change to any of the places listed under "Where it's decided" updates its rows h
 | Yellow (GB) | USA/Europe | ✅ ¹² | ✅ | ✅ ¹ | ✅ ⁸ | — | ✅ ¹³ | — | n/a | n/a | ✅ ¹³ | ✅ ¹³ | — | n/a | n/a | — | — |
 | Yellow (GB) | DE / FR / IT / ES | n/a | ✅ | ✅ ¹ | ✅ ⁸ | — | ✅ ¹³ | — | n/a | n/a | ✅ ¹³ | ✅ ¹³ | — | n/a | n/a | — | — |
 | Yellow Legacy (GB) | 1.0.10 | ✅ ¹² | ✅ | ✅ ¹ | ✅ ⁸ | — | ✅ ¹³ | — | n/a | n/a | ✅ ¹³ | ✅ ¹³ | — | n/a | n/a | — | — |
-| Red / Blue (GB) | USA/Europe | n/a | ✅ | ✅ ¹ | ✅ ⁸ | — | ✅ ¹³ | — | n/a | n/a | ✅ ¹³ | ✅ ¹³ | — | n/a | n/a | — | — |
+| Red / Blue (GB) | USA/Europe | ✅ ¹² | ✅ | ✅ ¹ | ✅ ⁸ | — | ✅ ¹³ | — | n/a | n/a | ✅ ¹³ | ✅ ¹³ | — | n/a | n/a | — | — |
 | Red / Blue (GB) | DE (Rote Edition / Blaue Edition) | n/a | ✅ | ✅ ¹ | ✅ ⁸ | — | ✅ ¹³ | — | n/a | n/a | ✅ ¹³ | ✅ ¹³ | — | n/a | n/a | — | — |
 | PureRed / PureBlue (GB) | 2.7.6 | n/a | ✅ | ✅ ¹ | ✅ ⁸ | — | ✅ ¹³ | — | n/a | n/a | ✅ ¹³ | ✅ ¹³ | — | n/a | n/a | — | — |
 | Gold / Silver (GBC) | USA/Europe | ✅ ¹² | ✅ | ✅ ¹ | ✅ ⁸ | — | — | — | n/a | n/a | n/a | n/a | — | n/a | — | — | — |
@@ -202,6 +202,14 @@ change to any of the places listed under "Where it's decided" updates its rows h
     fixture's save: Route 29 east across the connection into New Bark Town and back, the START menu, OPTION (the field's
     strips, its colours), a wild battle (plain bars) and RUN, every map frame exact (4332 in Gold, 1902 in Silver) but
     those the game wrote VRAM or a palette in mid-frame. The German carts aren't on it.
+    Red / Blue (USA, Europe; 2026-11-15) have Yellow's over pokered's symbols (`GB_RED_BLUE`: one row, both carts'
+    addresses equal; Yellow's RAM + 1). They run as a Super Game Boy (no Color palettes, `gbCgb` off), where mGBA takes
+    BGP / OBP0 / OBP1 as the renderer's shade lookup (`writeVideoRegister`), not through `writePalette`: that hook marks
+    a mid-frame write too now (`gbHookWriteRegister`), or the battle intro's flashes and a door's fade, which change BGP
+    partway down the screen, counted as misses. Checked headless from the player's saves: Blue out of Oak's lab into
+    Pallet Town, north into Route 1 and back, START, a wild battle (plain bars); Red in Oak's lab with its rival's scene
+    and text boxes; every map frame exact (1605 in Blue, 2879 in Red) but those written mid-frame; Yellow's run unchanged.
+    The German carts aren't on it.
     Polished Crystal has it on 3.2.3's normal build only (CRC32 `f98367e4`; Keegan's profile, first in the libretro core, now
     the app's too): its own structs and LZ (`pk_wide_gb_polished.inc`, addresses from the release's `.sym` by
     `scripts/gen_polished_wide.py`). Checked headless on the new-game save: a walk round its route and grass, the START menu and OPTION
