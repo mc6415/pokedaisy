@@ -26,6 +26,8 @@ class DsRandomizerTest {
         "CPUE" to "Pokemon - Platinum Version (USA) (Rev 1).nds",
         "IPKE" to "Pokemon - HeartGold Version (USA).nds",
         "IPGE" to "Pokemon - SoulSilver Version (USA, Australia).nds",
+        "IRBO" to "Pokemon - Black Version (USA, Europe) (NDSi Enhanced).nds",
+        "IRAO" to "Pokemon - White Version (USA, Europe) (NDSi Enhanced).nds",
         "IREO" to "Pokemon - Black Version 2 (USA, Europe) (NDSi Enhanced).nds",
         "IRDO" to "Pokemon - White Version 2 (USA, Europe) (NDSi Enhanced).nds",
     )
@@ -114,12 +116,12 @@ class DsRandomizerTest {
         val (starters, evo) = FileSystem.SYSTEM.openReadOnly(a).use { h ->
             val cart = DsRandomizer.Cart(h)
             val evo = DsRandomizer.Narc(cart.file(cart.fileId(g.evolutions)))
-            val three = if (g.packedStarters != null) {
+            val three = if (g.packedStarters?.arm9Offset != null) {
                 // What you're given (ARM9) and the starter app's copy (overlay 61) agree.
                 val ps = g.packedStarters!!
                 val a9 = Blz.decompress(cart.arm9())
                 val ov = Blz.decompress(cart.file(cart.overlayFile(ps.overlay, allowCompressed = true)))
-                val given = (0 until 3).map { u32(a9, ps.arm9Offset + it * 4) }
+                val given = (0 until 3).map { u32(a9, ps.arm9Offset!! + it * 4) }
                 assertEquals(given, (0 until 3).map { u32(ov, ps.overlayOffset + it * 4) })
                 given
             } else if (g.starterOverlay != null) {
@@ -129,7 +131,13 @@ class DsRandomizerTest {
                 val sc = DsRandomizer.Narc(cart.file(cart.fileId(g.starterScripts!!.path)))
                 val bySite = g.starterScripts!!.sites.groupBy({ it.which }, { site -> sc.member(site.member).let { u16(it, site.offset) } })
                 for ((_, v) in bySite) assertEquals(1, v.toSet().size)
-                (0 until 3).map { bySite.getValue(it).first() }
+                val given = (0 until 3).map { bySite.getValue(it).first() }
+                // Gen 5: the choice screen's own list (a compressed overlay) shows the same three.
+                g.packedStarters?.let { ps ->
+                    val ov = Blz.decompress(cart.file(cart.overlayFile(ps.overlay, allowCompressed = true)))
+                    assertEquals(given, (0 until 3).map { u16(ov, ps.overlayOffset + it * 2) })
+                }
+                given
             }
             three to evo
         }
@@ -157,6 +165,30 @@ class DsRandomizerTest {
             assertFalse(BLACK2_WORLD.party(156, null).map { it.species } == cheren.map { it.species })
             // White 2's GUIDE isn't Black 2's cart.
             assertEquals(white2Cheren, WHITE2_WORLD.party(156, null))
+        } finally {
+            DsRandomizer.shuffle = null
+        }
+    }
+
+    @Test
+    fun `the GUIDE reads a shuffled Black`() = each { g, f ->
+        if (g.code != "IRBO") return@each
+        val a = tmp.root.resolve("${g.code}-guide.nds").toOkioPath()
+        assertTrue(DsRandomizer.randomize(f.toOkioPath(), a, RomRandomizer.Options(), 7L))
+        val shuffle = DsRandomizer.readShuffle(a)!!
+        fun wild(z: Int) = BLACK_WORLD.encounters(0, z, null).let { it.grass + it.water + it.superRod }.map { it.species }.toSet()
+        val zone = (0 until 700).first { wild(it).isNotEmpty() }
+        val trainer = (1 until 900).first { BLACK_WORLD.party(it, null).isNotEmpty() }
+        val before = wild(zone)
+        val team = BLACK_WORLD.party(trainer, null)
+        val whiteTeam = WHITE_WORLD.party(trainer, null)
+        try {
+            DsRandomizer.shuffle = shuffle
+            assertFalse(wild(zone) == before)
+            assertEquals(shuffle.team(trainer), BLACK_WORLD.party(trainer, null))
+            assertFalse(BLACK_WORLD.party(trainer, null).map { it.species } == team.map { it.species })
+            // White's GUIDE isn't Black's cart.
+            assertEquals(whiteTeam, WHITE_WORLD.party(trainer, null))
         } finally {
             DsRandomizer.shuffle = null
         }

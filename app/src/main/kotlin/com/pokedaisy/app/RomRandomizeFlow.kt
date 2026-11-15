@@ -303,7 +303,7 @@ fun RandomizeWindow(flow: RomRandomizeFlow, m: GbaTextMetrics, small: GbaTextMet
                             RomRandomizeFlow.Step.NotFound -> Padded(m) {
                                 Message(tr("NO GAME TO RANDOMIZE"), m, value = true)
                                 Spacer(Modifier.height(m.u * 2))
-                                Message(tr("RANDOMIZE works on the English Red, Blue, Yellow, Gold, Silver, Crystal (Rev 1), FireRed and LeafGreen (Rev 1), Ruby and Sapphire (Rev 2), Emerald, Platinum (Rev 1), HeartGold, SoulSilver, Black 2 and White 2. Add one to your library or a ROMs folder, then try again."), small)
+                                Message(tr("RANDOMIZE works on the English Red, Blue, Yellow, Gold, Silver, Crystal (Rev 1), FireRed and LeafGreen (Rev 1), Ruby and Sapphire (Rev 2), Emerald, Platinum (Rev 1), HeartGold, SoulSilver, Black, White, Black 2 and White 2. Add one to your library or a ROMs folder, then try again."), small)
                             }
                             is RomRandomizeFlow.Step.Ready -> ReadyRows(flow, step, m, small) { choosing = it }
                             is RomRandomizeFlow.Step.Making -> Padded(m) {

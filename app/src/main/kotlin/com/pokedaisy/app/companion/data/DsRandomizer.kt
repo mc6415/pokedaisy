@@ -7,13 +7,13 @@ import okio.Path
 import kotlin.random.Random
 
 /**
- * RANDOMIZE on the DS games (Platinum; Black 2 / White 2): a copy of the player's own cart with its starters, wild Pokémon
+ * RANDOMIZE on the DS games (Platinum, HeartGold / SoulSilver; Black / White, Black 2 / White 2): a copy of the player's own cart with its starters, wild Pokémon
  * and trainers' teams shuffled by a seed, like [RomRandomizer] on the GBA ones and with the same [RomRandomizer.Options].
  *
  * The data lives in the cart's file system: the wild Pokémon a record per encounter set (Platinum's WildEncounters in
  * `pl_enc_data.narc`; Gen 5's 0xE8-byte blocks, one per season, in `/a/1/2/7`), the trainers' teams their party archive
- * (the layout from the trainer records), the starters three words in an overlay (Platinum) or in event scripts (Black 2 /
- * White 2: [StarterSite]s). Every swap keeps each file its size, so the cart is copied and those bytes written in place:
+ * (the layout from the trainer records), the starters three words in an overlay (Platinum) or in event scripts (Gen 5:
+ * [StarterSite]s, plus the choice screen's own list, [PackedStarters]). Every swap keeps each file its size, so the cart is copied and those bytes written in place:
  * no file moves, the header and the file table stay the cart's.
  *
  * A cart this tool made is told by the files it writes ([Game.madeSha1]: their bytes with every site zeroed, hashed
@@ -69,11 +69,13 @@ object DsRandomizer {
     class StarterText(val path: String, val bank: Int, val lines: List<Int>, val names: Int, val inBall: List<Int> = emptyList(), val hgss: Boolean = false)
 
     /**
-     * Starters held in compressed code: three u32s at [arm9Offset] of the decompressed ARM9 binary (choose_starter.c's
-     * `species`: what you're given) and at [overlayOffset] of overlay [overlay] (choose_starter_app.c's `sSpecies`: the cries).
-     * Both are recompressed to their own size ([Blz.compressTo]), so the cart's header, secure area and tables stay as they are.
+     * Starters held in compressed code: three words of [width] bytes at [arm9Offset] of the decompressed ARM9 binary
+     * (HeartGold's choose_starter.c `species`: what you're given; null = none there) and at [overlayOffset] of overlay
+     * [overlay] (HeartGold's choose_starter_app.c `sSpecies`, the cries; Gen 5's choice screen, which draws its three from
+     * this list while the scripts hand one over). Both are recompressed to their own size ([Blz.compressTo]), so the cart's
+     * header, secure area and tables stay as they are.
      */
-    class PackedStarters(val arm9Offset: Int, val overlay: Int, val overlayOffset: Int)
+    class PackedStarters(val arm9Offset: Int?, val overlay: Int, val overlayOffset: Int, val width: Int = 4)
 
     /** A starter's species word (u16) in script [member] at [offset]: [which] starter it is (0, 1, 2 = grass, fire, water). */
     class StarterSite(val member: Int, val offset: Int, val which: Int)
@@ -92,6 +94,23 @@ object DsRandomizer {
         StarterSite(854, 0xB6F, 0), StarterSite(854, 0xEB0, 0), StarterSite(854, 0xECE, 1), StarterSite(854, 0xED9, 2),
         StarterSite(854, 0x106F, 0), StarterSite(854, 0x108D, 1), StarterSite(854, 0x1098, 2), StarterSite(878, 0x1DB, 2),
         StarterSite(878, 0x1F9, 1), StarterSite(878, 0x204, 0),
+    ))
+
+    // Black / White (the same in both): the starter scene in the player's room (782: the choice var 0x8021 and the names put
+    // in its text, then given from the var), and every later scene naming them (12, 76, 112, 304, 634, 782). Each a word after
+    // a SetVar or a species-name buffer command (0x0057), the only two ways these scripts name a starter.
+    private val BW_STARTERS = StarterScripts("/a/0/5/7", listOf(
+        StarterSite(12, 0x3D6, 0), StarterSite(12, 0x3F9, 1), StarterSite(12, 0x409, 2),
+        StarterSite(76, 0x196, 2), StarterSite(76, 0x1B4, 0), StarterSite(76, 0x1BF, 1),
+        StarterSite(76, 0x269, 2), StarterSite(76, 0x287, 0), StarterSite(76, 0x292, 1),
+        StarterSite(112, 0x2C7, 2), StarterSite(112, 0x2E5, 0), StarterSite(112, 0x2F0, 1),
+        StarterSite(304, 0xF9, 0), StarterSite(304, 0x11C, 1), StarterSite(304, 0x12C, 2),
+        StarterSite(304, 0x19C, 0), StarterSite(304, 0x1C4, 1), StarterSite(304, 0x1D9, 2),
+        StarterSite(634, 0x1E5, 2), StarterSite(634, 0x203, 0), StarterSite(634, 0x20E, 1),
+        StarterSite(634, 0x58F, 0), StarterSite(634, 0x5AD, 1), StarterSite(634, 0x5B8, 2),
+        StarterSite(782, 0x27F, 0), StarterSite(782, 0x284, 0), StarterSite(782, 0x2AF, 1), StarterSite(782, 0x2B4, 1),
+        StarterSite(782, 0x2CC, 2), StarterSite(782, 0x2D1, 2), StarterSite(782, 0x338, 2), StarterSite(782, 0x356, 1),
+        StarterSite(782, 0x361, 0), StarterSite(782, 0x5D4, 2), StarterSite(782, 0x5F2, 1), StarterSite(782, 0x5FD, 0),
     ))
 
     val GAMES = listOf(
@@ -119,12 +138,24 @@ object DsRandomizer {
             text = StarterText("/a/0/2/7", bank = 190, lines = listOf(1, 2, 3), names = 237, inBall = listOf(4, 5, 6), hgss = true),
         )
     } + listOf(
-        Triple("IREO", "Black 2", "16e96e0e57675205a8c900f34e2103159204b30f" to "b6ad711f472164ab7f2167100e7198c04c217d9a"),
-        Triple("IRDO", "White 2", "ab919dfae9392a39e312258cea525be4248f84ce" to "6f7728967faaa93544d690220528c51cf55945da"),
+        Triple("IRBO", "Black", "c060bea912a27d2ef015a988835162085c8da792" to "9794bbb95f87b62bd56654aede3cc50fd4bb2336"),
+        Triple("IRAO", "White", "e95249da2e07af3c16b647d96d238aee1f703ddf" to "3c94756236f8ce7ee22f6517ad3cbdd4cfea8b7e"),
+    ).map { (code, title, hashes) ->
+        // No decomp: the archives from the cart (scripts/gen_gen5_guide.py's FILES_BW), the choice screen overlay 223's list.
+        Game(
+            code, 0, title, hashes.first, hashes.second, gen = 5, starterScripts = BW_STARTERS,
+            packedStarters = PackedStarters(null, 223, 0x3170, width = 2),
+            encounters = "/a/1/2/6", trainers = "/a/0/9/2", trainerParties = "/a/0/9/3",
+            personal = "/a/0/1/6", evolutions = "/a/0/1/9", learnsets = "/a/0/1/8", speciesCount = 649,
+        )
+    } + listOf(
+        Triple("IREO", "Black 2", "ffcc48eb6842c4c6dbced54e9af694ac7d94977e" to "9ff96c28f8b78254506e98e1d92476b1ae2dd653"),
+        Triple("IRDO", "White 2", "bad98509975c186e32ac423455ed1a7ddda49673" to "da6eb397bc1fdb1e001e57b8c27ccd64bf8e3fa4"),
     ).map { (code, title, hashes) ->
         // pret has no decomp of these: the archives from the cart (scripts/gen_gen5_guide.py reads the same ones).
         Game(
             code, 0, title, hashes.first, hashes.second, gen = 5, starterScripts = B2W2_STARTERS,
+            packedStarters = PackedStarters(null, 316, 0x2C14, width = 2),
             encounters = "/a/1/2/7", trainers = "/a/0/9/1", trainerParties = "/a/0/9/2",
             personal = "/a/0/1/6", evolutions = "/a/0/1/9", learnsets = "/a/0/1/8", speciesCount = 649,
         )
@@ -306,7 +337,7 @@ object DsRandomizer {
         val scripts = scriptsId?.let { cart.file(it) }
         val trdata = Narc(cart.file(cart.fileId(g.trainers)))
         // HeartGold / SoulSilver: the ARM9 binary and the starter app's overlay, as stored and decompressed.
-        val arm9Blob = g.packedStarters?.let { cart.arm9() }
+        val arm9Blob = g.packedStarters?.takeIf { it.arm9Offset != null }?.let { cart.arm9() }
         val arm9 = arm9Blob?.let { Blz.decompress(it) }
         val packedOverlayId = g.packedStarters?.let { cart.overlayFile(it.overlay, allowCompressed = true) }
         val packedOverlayBlob = packedOverlayId?.let { cart.file(it) }
@@ -336,7 +367,7 @@ object DsRandomizer {
             val po = packedOverlay?.copyOf() ?: ByteArray(0)
             if (zeroed) {
                 g.packedStarters?.let { ps ->
-                    for (k in 0 until 12) { a9[ps.arm9Offset + k] = 0; po[ps.overlayOffset + k] = 0 }
+                    for (k in 0 until 3 * ps.width) { ps.arm9Offset?.let { a9[it + k] = 0 }; po[ps.overlayOffset + k] = 0 }
                 }
                 for (at in g.starterOffsets) for (i in 0 until 4) o[at + i] = 0
                 g.sprites?.let { sp -> for (i in 0 until sp.len) o[sp.at + i] = 0 }
@@ -562,7 +593,11 @@ object DsRandomizer {
             g.starterOffsets.forEachIndexed { i, at -> put32(f.overlay, at, three[i]) }
             f.scripts?.let { sc -> for ((at, which) in f.scriptSites(sc)) put16(sc, at, three[which]) }
             g.packedStarters?.let { ps ->
-                for (i in 0 until 3) { put32(f.arm9!!, ps.arm9Offset + i * 4, three[i]); put32(f.packedOverlay!!, ps.overlayOffset + i * 4, three[i]) }
+                for (i in 0 until 3) {
+                    ps.arm9Offset?.let { put32(f.arm9!!, it + i * 4, three[i]) }
+                    if (ps.width == 2) put16(f.packedOverlay!!, ps.overlayOffset + i * 2, three[i])
+                    else put32(f.packedOverlay!!, ps.overlayOffset + i * 4, three[i])
+                }
             }
             g.sprites?.let { spritePatch(it) }
             g.text?.let { starterText(it, three) }
