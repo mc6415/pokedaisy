@@ -2625,6 +2625,7 @@ fun main(args: Array<String>) {
             onNodeWithText("WILD POKéMON").performClick()
         },
         Shot("library-randomize-extras-phone", 1080, 2400, 2.625f, activity { LibraryActivity().apply { randomizer.wizard("ready", com.pokedaisy.app.RomRandomizeFlow.Page.EXTRAS) } }),
+        Shot("library-randomize-rules", tw, th, td, activity { LibraryActivity().apply { randomizer.wizard("ready", com.pokedaisy.app.RomRandomizeFlow.Page.RULES) } }),
         Shot("library-randomize-trainers", tw, th, td, activity { LibraryActivity().apply { randomizer.wizard("ready", com.pokedaisy.app.RomRandomizeFlow.Page.TRAINERS) } }),
         Shot("library-randomize-extras", tw, th, td, activity { LibraryActivity().apply { randomizer.wizard("ready", com.pokedaisy.app.RomRandomizeFlow.Page.EXTRAS) } }),
         Shot("library-randomize-ready", tw, th, td, activity { LibraryActivity().apply { randomizer.wizard("ready", com.pokedaisy.app.RomRandomizeFlow.Page.READY) } }),

@@ -36,9 +36,19 @@ object RomRandomizer {
         val baseStats: Boolean = false,
         /** Each Pokémon learns random moves at its own levels, the first always one that does damage. */
         val learnsets: Boolean = false,
+        /** Trainers' levels raised by this percent (0, 10, 25, 50), at most 100. */
+        val levelScale: Int = 0,
+        /** No species twice in one area's wild list (as far as there are others to pick). */
+        val noDuplicates: Boolean = false,
+        /** Wild swaps go to species not placed yet first, so every one turns up somewhere. */
+        val allCatchable: Boolean = false,
+        /** A trainer's new Pokémon shares a type with the one it replaces (a leader keeps their theme). */
+        val trainersKeepType: Boolean = false,
+        /** Only this type's Pokémon in the grass, the starters and trainers' teams (null: any). */
+        val monotype: PokeType? = null,
     ) {
         val changesSomething get() = starters != Starters.OFF || wild != Wild.OFF || trainers || fieldItems || trainerItems ||
-            baseStats || learnsets
+            baseStats || learnsets || levelScale > 0
     }
 
     /** Where one retail game keeps what the tool changes (ROM offsets). */
@@ -77,31 +87,31 @@ object RomRandomizer {
 
     val GAMES = listOf(
         Game(
-            "BPRE", 1, "FireRed", "dd5945db9b930750cb39d00c84da8571feebf417", "d8ba71405fbb1662b1904c1e10955f58690da82e",
+            "BPRE", 1, "FireRed", "dd5945db9b930750cb39d00c84da8571feebf417", "ef09327e6b6f4c820a3b941a247a2f776b48cb22",
             trainers = 0x23EB38, trainerCount = 743, learnsets = 0x25D824, evolutions = 0x2597C4, baseStats = 0x2547F4,
             wildHeaders = 0x3C9D28, starterSites = oaksLab(0x169C2D), starterLines = listOf(0x18E2F1, 0x18E210, 0x18E283),
             speciesNames = 0x245F50, items = 0x3DB098, battleMoves = 0x250C74, mapGroups = 0x352718, keyPocket = 2,
         ),
         Game(
-            "BPGE", 1, "LeafGreen", "7862c67bdecbe21d1d69ce082ce34327e1c6ed5e", "0d7f2a3b96a56d4161ed0006e5baebab19cbb15b",
+            "BPGE", 1, "LeafGreen", "7862c67bdecbe21d1d69ce082ce34327e1c6ed5e", "750d127f3578c8e82c7963488c5757b42231ecd2",
             trainers = 0x23EB14, trainerCount = 743, learnsets = 0x25D804, evolutions = 0x2597A4, baseStats = 0x2547D0,
             wildHeaders = 0x3C9B64, starterSites = oaksLab(0x169C09), starterLines = listOf(0x18E2CD, 0x18E1EC, 0x18E25F),
             speciesNames = 0x245F2C, items = 0x3DAED4, battleMoves = 0x250C50, mapGroups = 0x3526F8, keyPocket = 2,
         ),
         Game(
-            "AXVE", 2, "Ruby", "5b64eacf892920518db4ec664e62a086dd5f5bc8", "1d312fe2af5c615f9c71fec9e25aecdf79b43e2a",
+            "AXVE", 2, "Ruby", "5b64eacf892920518db4ec664e62a086dd5f5bc8", "799496077bcc7fa01e9333f190cdd2c4e285aa9b",
             trainers = 0x1F0514, trainerCount = 694, learnsets = 0x207BE0, evolutions = 0x203B80, baseStats = 0x1FEC30,
             wildHeaders = 0x39D46C, starterSites = starterMon(0x3F76E0),
             items = 0x3C5580, battleMoves = 0x1FB144, mapGroups = 0x3085A0, keyPocket = 5,
         ),
         Game(
-            "AXPE", 2, "Sapphire", "89b45fb172e6b55d51fc0e61989775187f6fe63c", "eeb2f5de95626d24bb6c4ac28c5b9729cb436712",
+            "AXPE", 2, "Sapphire", "89b45fb172e6b55d51fc0e61989775187f6fe63c", "b1fb79727a7e5a333f14c3f39b6fd1f1169efa98",
             trainers = 0x1F04A4, trainerCount = 694, learnsets = 0x207B70, evolutions = 0x203B10, baseStats = 0x1FEBC0,
             wildHeaders = 0x39D2B4, starterSites = starterMon(0x3F773C),
             items = 0x3C55DC, battleMoves = 0x1FB0D4, mapGroups = 0x308530, keyPocket = 5,
         ),
         Game(
-            "BPEE", 0, "Emerald", "f3ae088181bf583e55daf962a92bb46f4f1d07b7", "b7116212d1470cd75dd0358a14f061ff9a847e1c",
+            "BPEE", 0, "Emerald", "f3ae088181bf583e55daf962a92bb46f4f1d07b7", "1e7179c3e165712ddd5dbaca1396a2278b06da62",
             trainers = 0x310030, trainerCount = 855, learnsets = 0x32937C, evolutions = 0x32531C, baseStats = 0x3203CC,
             wildHeaders = 0x552D48, starterSites = starterMon(0x5B1DF8),
             items = 0x5839A0, battleMoves = 0x31C898, mapGroups = 0x486578, keyPocket = 5,
@@ -210,6 +220,16 @@ object RomRandomizer {
     }.getOrNull()
 
     /** Every byte the tool may write in [rom] (found through pointers it never writes, so the same in its output). */
+    /** [rom] as the run modes' tests look at it ([CartView]). */
+    internal fun view(rom: ByteArray, g: Game): CartView {
+        val r = Reader(rom)
+        val wild = LinkedHashMap<Int, MutableList<Int>>()
+        r.wildSlots(g.wildHeaders) { slot, table -> wild.getOrPut(table) { ArrayList() } += r.u16(slot + 2) }
+        val trainers = ArrayList<Pair<Int, Int>>()
+        r.trainerMons(g) { m, _ -> trainers += r.u16(m + 4) to r.u16(m + 2) }
+        return CartView(wild.values.toList(), trainers) { s -> setOf(r.u8(g.baseStats + s * BASE_STRIDE + 6), r.u8(g.baseStats + s * BASE_STRIDE + 7)) }
+    }
+
     internal fun sites(rom: ByteArray, g: Game): List<IntRange> {
         val r = Reader(rom)
         val out = ArrayList<IntRange>()
@@ -223,6 +243,7 @@ object RomRandomizer {
         }
         r.wildSlots(g.wildHeaders) { slot, _ -> out += slot + 2..slot + 3 }
         r.trainerMons(g) { mon, moves ->
+            out += mon + 2..mon + 3
             out += mon + 4..mon + 5
             if (moves >= 0) out += moves until moves + 8
         }
@@ -356,18 +377,11 @@ object RomRandomizer {
         }
         val evolvedFrom: Set<Int> = evolvesTo.values.flatten().toSet()
 
-        val pool = ALL.filter { !o.noLegendaries || it !in LEGENDARY }
+        /** Base stats' two type bytes (+6, +7). */
+        fun types(s: Int) = setOf(u8(g.baseStats + s * BASE_STRIDE + 6), u8(g.baseStats + s * BASE_STRIDE + 7))
 
-        fun pick(from: List<Int>, like: Int): Int {
-            if (!o.similarStrength) return from.random(rnd)
-            val target = bst(like)
-            var band = 0.1
-            while (true) {
-                val near = from.filter { kotlin.math.abs(bst(it) - target) <= target * band }
-                if (near.size >= 6 || band > 1.0) return (near.ifEmpty { from }).random(rnd)
-                band += 0.05
-            }
-        }
+        val picker = SpeciesPicker(ALL.filter { !o.noLegendaries || it !in LEGENDARY }, o, rnd, ::bst, ::types, o.monotype?.id(3))
+        val pool get() = picker.pool
 
         fun all() {
             // Stats and learnsets first: the strength match keeps working (the totals stay) and trainers' moves follow.
@@ -375,6 +389,7 @@ object RomRandomizer {
             if (o.learnsets) learnsets()
             starters()
             wild()
+            if (o.levelScale > 0) levels()
             if (o.trainers) trainers()
             if (o.trainerItems) trainerItems()
             if (o.fieldItems) fieldItems()
@@ -429,10 +444,10 @@ object RomRandomizer {
         fun starters() {
             val pickFrom = when (o.starters) {
                 Starters.OFF -> return
-                Starters.RANDOM -> ALL.filter { it !in LEGENDARY }
-                Starters.THREE_STAGE -> ALL.filter { s ->
+                Starters.RANDOM -> picker.themed(ALL.filter { it !in LEGENDARY })
+                Starters.THREE_STAGE -> picker.themed(ALL.filter { s ->
                     s !in evolvedFrom && s !in LEGENDARY && evolvesTo[s].orEmpty().any { evolvesTo[it].orEmpty().isNotEmpty() }
-                }
+                })
             }.toMutableList()
             val three = List(3) { pickFrom.random(rnd).also { pickFrom.remove(it) } }
             for ((which, at) in g.starterSites) put16(at, three[which])
@@ -465,24 +480,28 @@ object RomRandomizer {
             if (o.wild == Wild.GLOBAL) {
                 val left = pool.toMutableList()
                 for (s in ALL) {
-                    val to = pick(left.ifEmpty { pool }, s)
+                    val to = picker.pick(s, from = left.ifEmpty { pool }, wild = true)
                     left.remove(to)
                     global[s] = to
                 }
             }
-            // PER_AREA: one map per encounter table.
+            // PER_AREA: one map per encounter table; NO DUPLICATES: what the table already has is avoided.
             var area = HashMap<Int, Int>()
+            var used = HashSet<Int>()
             var table = -1
             wildSlots(g.wildHeaders) { slot, at ->
-                if (at != table) { area = HashMap(); table = at }
+                if (at != table) { area = HashMap(); used = HashSet(); table = at }
                 val sp = slot + 2
                 val was = u16(sp)
                 if (was !in 1..SPECIES) return@wildSlots
-                put16(sp, when (o.wild) {
-                    Wild.RANDOM -> pick(pool, was)
-                    Wild.PER_AREA -> area.getOrPut(was) { pick(pool, was) }
+                val avoid = if (o.noDuplicates) used else emptySet<Int>()
+                val now = when (o.wild) {
+                    Wild.RANDOM -> picker.pick(was, avoid, wild = true)
+                    Wild.PER_AREA -> area.getOrPut(was) { picker.pick(was, avoid, wild = true) }
                     else -> global.getValue(was)
-                })
+                }
+                used += now
+                put16(sp, now)
             }
         }
 
@@ -490,13 +509,19 @@ object RomRandomizer {
             trainerMons(g) { m, moves ->
                 val was = u16(m + 4)
                 if (was !in 1..SPECIES) return@trainerMons
-                val now = pick(pool, was)
+                val now = picker.pick(was, keepType = o.trainersKeepType)
                 put16(m + 4, now)
                 if (moves >= 0) {
                     val list = movesAt(now, u8(m + 2))
                     for (k in 0 until 4) put16(moves + k * 2, list.getOrElse(k) { 0 })
                 }
             }
+        }
+
+        /** LEVELS: every trainer Pokémon's level (u16 at +2) raised, before [trainers] works out a new team's moves for them. */
+        fun levels() {
+            // Hand-picked moves stay as they are when the team isn't shuffled.
+            trainerMons(g) { m, _ -> put16(m + 2, SpeciesPicker.scaled(u16(m + 2), o.levelScale)) }
         }
 
         /** The last four moves [species] has learnt by [level], as the game picks a wild one's. */

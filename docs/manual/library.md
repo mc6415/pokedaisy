@@ -125,7 +125,7 @@ RANDOMIZE asks three things, a page each. `BACK` (or the arrow at the top) goes 
 | `WILD ONLY` | The same starters and wild Pokémon, but trainers keep their teams. |
 | `CHAOS` | Everything: any Pokémon as a starter, a random one in every encounter, trainers' teams and held items, the items lying around, base stats and the moves Pokémon learn, legendaries allowed. |
 | `LAST TIME` | The settings you used the last time you made a game. It shows once you've made one. |
-| `CUSTOM` | Pick every setting yourself, on three short pages: `POKéMON`, `TRAINERS` and `EXTRAS` (below). |
+| `CUSTOM` | Pick every setting yourself, on four short pages: `POKéMON`, `RULES`, `TRAINERS` and `EXTRAS` (below). |
 
 4. **Ready.** The last page says in plain words what will change. `GAME` and `STYLE` take you back to change them, and `SEED` is the number the shuffle is made from: the same game, settings and seed always make the same game, so a friend can play the same run. Tap it for another number. Then tap `RANDOMIZE`. When it's done, the new game is in your library as, for example, "Pokémon Ruby (Randomized, seed 123456)", so two runs of one game are easy to tell apart, and `PLAY` starts it.
 
@@ -138,11 +138,21 @@ RANDOMIZE asks three things, a page each. `BACK` (or the arrow at the top) goes 
 | `SIMILAR STRENGTH` | Keeps each swap close in strength to what it replaces (their base stats added up), so an early route doesn't fill with fully evolved Pokémon. |
 | `LEGENDARIES` | `NONE` keeps legendary Pokémon out of the grass and out of trainers' teams. |
 
+The `RULES` page, for run rules like a Nuzlocke's:
+
+| Row | What it does |
+| --- | --- |
+| `NO DUPLICATES` | `ON` never puts the same Pokémon twice in one area's wild list (as long as there are others to pick), so every catch on a route is a different one. |
+| `EVERY POKéMON` | `ON` spreads the wild swaps over Pokémon that haven't turned up yet first, so as many kinds as possible can be caught somewhere. |
+| `ONE TYPE` | Picks one type, and only Pokémon of that type turn up: in the grass, as starters and in trainers' teams. Red, Blue and Yellow have no `DARK` or `STEEL` Pokémon to pick. |
+
 The `TRAINERS` page (`HELD ITEMS` is there for every game but Red, Blue and Yellow, whose trainers' Pokémon hold nothing):
 
 | Row | What it does |
 | --- | --- |
 | `TEAMS` | `SHUFFLED` gives every trainer, the leaders and your rival too, a new team at the same levels. Trainers who had moves picked for them get the moves their new Pokémon know by then. |
+| `KEEP TYPES` | `ON` gives each trainer's new Pokémon a type the old one had, so a leader keeps their theme (a water gym stays water). |
+| `LEVELS` | Raises every trainer's Pokémon by `+10%`, `+25%` or `+50%` (never past level 100), for a harder run. |
 | `HELD ITEMS` | `ON` gives every Pokémon of the trainers who use held items one of the items trainers hold somewhere in the game. |
 
 The `EXTRAS` page:

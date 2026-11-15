@@ -22,6 +22,11 @@ class RomRandomizeFlowTest {
         assertEquals(o, RomRandomizeFlow.decode(RomRandomizeFlow.encode(o)))
         assertEquals(null, RomRandomizeFlow.decode(null))
         assertEquals(null, RomRandomizeFlow.decode("NOT,A,SETTING"))
+        // The run modes too, and a setup saved before them (nine fields) reads with them off.
+        val modes = o.copy(levelScale = 25, noDuplicates = true, allCatchable = true, trainersKeepType = true,
+            monotype = com.pokedaisy.app.companion.data.PokeType.DRAGON)
+        assertEquals(modes, RomRandomizeFlow.decode(RomRandomizeFlow.encode(modes)))
+        assertEquals(o.copy(levelScale = 0), RomRandomizeFlow.decode(RomRandomizeFlow.encode(o).split(',').take(9).joinToString(",")))
     }
 
     @Test

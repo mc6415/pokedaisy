@@ -201,6 +201,18 @@ class GbRandomizerTest {
         }
     }
 
+
+    @Test
+    fun `run modes do what they say`() = each { g, rom ->
+        val retail = GbRandomizer.view(rom, g)
+        val themed = GbRandomizer.randomize(rom, RunModesCheck.THEMED, 21L)!!
+        assertSame(g, GbRandomizer.recognise(themed))
+        RunModesCheck.themed(g.title, g.gen, retail, GbRandomizer.view(themed, g))
+        val spread = GbRandomizer.randomize(rom, RunModesCheck.SPREAD, 22L)!!
+        val without = GbRandomizer.randomize(rom, RunModesCheck.SPREAD.copy(allCatchable = false), 22L)!!
+        RunModesCheck.spread(g.title, retail, GbRandomizer.view(spread, g), GbRandomizer.view(without, g))
+    }
+
     @Test
     fun `anything else is refused`() = each { g, rom ->
         val other = rom.copyOf().also { it[0x2000] = (it[0x2000] + 1).toByte() }

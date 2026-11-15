@@ -242,6 +242,19 @@ class DsRandomizerTest {
         }
     }
 
+
+    @Test
+    fun `run modes do what they say`() = each { g, f ->
+        val retail = DsRandomizer.view(f.toOkioPath())!!
+        fun made(o: RomRandomizer.Options, seed: Long, name: String): CartView {
+            val a = tmp.root.resolve("${g.code}-$name.nds").toOkioPath()
+            assertTrue(DsRandomizer.randomize(f.toOkioPath(), a, o, seed))
+            return DsRandomizer.view(a)!!.also { java.io.File(a.toString()).delete() }
+        }
+        RunModesCheck.themed(g.title, g.gen, retail, made(RunModesCheck.THEMED, 21L, "themed"))
+        RunModesCheck.spread(g.title, retail, made(RunModesCheck.SPREAD, 22L, "spread"), made(RunModesCheck.SPREAD.copy(allCatchable = false), 22L, "without"))
+    }
+
     @Test
     fun `the GUIDE reads a shuffled Black 2`() = each { g, f ->
         if (g.code != "IREO") return@each

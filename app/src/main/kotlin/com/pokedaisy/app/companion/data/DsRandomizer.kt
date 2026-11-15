@@ -126,7 +126,7 @@ object DsRandomizer {
 
     val GAMES = listOf(
         Game(
-            "CPUE", 1, "Platinum", "55ac97b09ff4333d5a4aad24fb26ac1133f7dfc9", "fe3052c8381781ae9dfb8479988c4ce888ec7072",
+            "CPUE", 1, "Platinum", "55ac97b09ff4333d5a4aad24fb26ac1133f7dfc9", "e49e0e0cac331493d39c1e59a1ca9a1c335d727f",
             starterOverlay = 78, starterOffsets = listOf(0x1BC0, 0x1BC4, 0x1BC8),
             encounters = "/fielddata/encountdata/pl_enc_data.narc",
             trainers = "/poketool/trainer/trdata.narc", trainerParties = "/poketool/trainer/trpoke.narc",
@@ -139,8 +139,8 @@ object DsRandomizer {
             balls = Balls("/fielddata/script/scr_seq.narc", 404, events = "/fielddata/eventdata/zone_event.narc"),
         ),
     ) + listOf(
-        Triple("IPKE", "HeartGold", "900df66d390866f97f82e1ff2c2edc98870209ad" to "8db5a9281431ac690958d0af35c6be1ed2b9a7cf"),
-        Triple("IPGE", "SoulSilver", "4562c3ef0374f1e08591342f43075b0d3d44195b" to "7dc35b4283aa40cf3835bcf04cd973cafbfacb70"),
+        Triple("IPKE", "HeartGold", "900df66d390866f97f82e1ff2c2edc98870209ad" to "ebcf06e071c3d1d19aaad70476d288ef644a2b38"),
+        Triple("IPGE", "SoulSilver", "4562c3ef0374f1e08591342f43075b0d3d44195b" to "12b28c2ff99d7dc4bdd078a25a2b72c0e59a0555"),
     ).map { (code, title, hashes) ->
         // pret/pokeheartgold: choose_starter.c's species (ARM9), choose_starter_app.c's sSpecies (overlay 61), msg_0190.
         Game(
@@ -151,8 +151,8 @@ object DsRandomizer {
             balls = Balls("/a/0/1/2", 141, events = "/a/0/3/2"),
         )
     } + listOf(
-        Triple("IRBO", "Black", "0a92d35ef541f9c915fc9cb70d7b171267402ca0" to "9740c7867149194aefef662a8d541907b8138719"),
-        Triple("IRAO", "White", "09e827becf04aa7577e617bb9906ef1fcbe1e65a" to "9d147da3567ee2151ad3310e207af65f42cf0438"),
+        Triple("IRBO", "Black", "0a92d35ef541f9c915fc9cb70d7b171267402ca0" to "7c0927e50101fb202476fe1addd59c1ec9614036"),
+        Triple("IRAO", "White", "09e827becf04aa7577e617bb9906ef1fcbe1e65a" to "b4caa2a084d6477a134cf6e51769ef0e71763645"),
     ).map { (code, title, hashes) ->
         // No decomp: the archives from the cart (scripts/gen_gen5_guide.py's FILES_BW), the choice screen overlay 223's list.
         Game(
@@ -163,8 +163,8 @@ object DsRandomizer {
             balls = Balls("/a/0/5/7", 864, at = 2, events = "/a/1/2/5"),
         )
     } + listOf(
-        Triple("IREO", "Black 2", "74ea944a90b5c067579a318c05b2e3385ad3f7c5" to "c2f924bfaf632cc79d109b0164e4a8b069f844d3"),
-        Triple("IRDO", "White 2", "d831b4f7e464b2acc51a6abfcb85c3132376cc66" to "07bec8e18c99f35d841c29c85212ede640e3730e"),
+        Triple("IREO", "Black 2", "74ea944a90b5c067579a318c05b2e3385ad3f7c5" to "d4d9f718bc40a751067c2b5dbac06c729a170c34"),
+        Triple("IRDO", "White 2", "d831b4f7e464b2acc51a6abfcb85c3132376cc66" to "baed0d5289644766fd96c090527c1878d3373422"),
     ).map { (code, title, hashes) ->
         // pret has no decomp of these: the archives from the cart (scripts/gen_gen5_guide.py reads the same ones).
         Game(
@@ -403,6 +403,7 @@ object DsRandomizer {
                 g.sprites?.let { sp -> for (i in 0 until sp.len) o[sp.at + i] = 0 }
                 encounterSites(g.gen, Narc(e), { _, at, width -> for (i in 0 until width) e[at + i] = 0 }, g.hgss)
                 trainerMons(Narc(p)) { at, moves ->
+                    p[at + 2] = 0
                     p[at + 4] = 0; p[at + 5] = 0
                     // Gen 5's form word goes with the species.
                     if (g.gen == 5) { p[at + 6] = 0; p[at + 7] = 0 }
@@ -604,6 +605,25 @@ object DsRandomizer {
         return out
     }
 
+    /** [path] as the run modes' tests look at it ([CartView]): each encounter member's species, every trainer Pokémon. */
+    internal fun view(path: Path): CartView? = FileSystem.SYSTEM.openReadOnly(path).use { h ->
+        val cart = Cart(h)
+        val g = gameOfHeader(cart) ?: return@use null
+        val f = Files(cart, g)
+        val wild = LinkedHashMap<Int, MutableList<Int>>()
+        encounterSites(g.gen, Narc(f.enc), hgss = g.hgss, each = { m, at, width ->
+            val raw = if (width == 4) u32(f.enc, at) else u16(f.enc, at)
+            val s = raw and speciesMask(g.gen)
+            if (s in 1..g.speciesCount) wild.getOrPut(m) { ArrayList() } += s
+        })
+        val trainers = ArrayList<Pair<Int, Int>>()
+        f.trainerMons(Narc(f.parties)) { at, _ -> trainers += (u16(f.parties, at + 4) and speciesMask(g.gen)) to (f.parties[at + 2].toInt() and 0xFF) }
+        val personal = Narc(f.personal)
+        CartView(wild.values.toList(), trainers) { s ->
+            if (s !in 1..g.speciesCount) emptySet() else personal.member(s).let { m -> setOf(m[6].toInt() and 0xFF, m[7].toInt() and 0xFF) }
+        }
+    }
+
     /** [path]'s item balls by flag ([ballItems]), any cart of a known game (the tests check retail's against the GUIDE). */
     internal fun ballItems(path: Path): Map<Int, Int>? = FileSystem.SYSTEM.openReadOnly(path).use { h ->
         val cart = Cart(h)
@@ -692,18 +712,19 @@ object DsRandomizer {
             (0 until m.size / 6).mapNotNull { k -> if (u16(m, k * 6) == 0) null else u16(m, k * 6 + 4).takeIf { it in 1..g.speciesCount } }
         }
         val evolvedFrom = evolvesTo.values.flatten().toSet()
-        val pool = all.filter { !o.noLegendaries || it !in LEGENDARY }
-
-        fun pick(from: List<Int>, like: Int): Int {
-            if (!o.similarStrength || like !in 1..g.speciesCount) return from.random(rnd)
-            val target = bst(like)
-            var band = 0.1
-            while (true) {
-                val near = from.filter { kotlin.math.abs(bst(it) - target) <= target * band }
-                if (near.size >= 6 || band > 1.0) return near.ifEmpty { from }.random(rnd)
-                band += 0.05
-            }
+        /** Each species record's two type bytes (+6, +7), read once (BASE STATS shuffles only the six stats before them). */
+        private val typeOf: Map<Int, Set<Int>> by lazy {
+            val n = personal
+            all.associateWith { sp -> n.member(sp).let { m -> setOf(m[6].toInt() and 0xFF, m[7].toInt() and 0xFF) } }
         }
+        fun types(s: Int) = typeOf[s].orEmpty()
+
+        val picker = SpeciesPicker(
+            all.filter { !o.noLegendaries || it !in LEGENDARY }, o, rnd,
+            bst = { if (it in 1..g.speciesCount) bst(it) else 0 }, types = { if (it in 1..g.speciesCount) types(it) else emptySet() },
+            monotype = o.monotype?.id(g.gen),
+        )
+        val pool get() = picker.pool
 
         fun all() {
             // Stats and learnsets first: the strength match keeps working (the totals stay) and trainers' moves follow.
@@ -711,9 +732,17 @@ object DsRandomizer {
             if (o.learnsets) learnsets()
             starters()
             wild()
+            if (o.levelScale > 0) levels()
             if (o.trainers) trainers()
             if (o.trainerItems) trainerItems()
             if (o.fieldItems) fieldItems()
+        }
+
+        /** LEVELS: every trainer Pokémon's level (the byte at +2 of its record) raised. */
+        fun levels() {
+            f.trainerMons(Narc(f.parties)) { at, _ ->
+                f.parties[at + 2] = SpeciesPicker.scaled(f.parties[at + 2].toInt() and 0xFF, o.levelScale).toByte()
+            }
         }
 
         /** The item balls' items, shuffled among the same balls (HMs and key items not among them). */
@@ -762,10 +791,10 @@ object DsRandomizer {
         fun starters() {
             val from = when (o.starters) {
                 RomRandomizer.Starters.OFF -> return
-                RomRandomizer.Starters.RANDOM -> all.filter { it !in LEGENDARY }
-                RomRandomizer.Starters.THREE_STAGE -> all.filter { s ->
+                RomRandomizer.Starters.RANDOM -> picker.themed(all.filter { it !in LEGENDARY })
+                RomRandomizer.Starters.THREE_STAGE -> picker.themed(all.filter { s ->
                     s !in evolvedFrom && s !in LEGENDARY && evolvesTo[s].orEmpty().any { evolvesTo[it].orEmpty().isNotEmpty() }
-                }
+                })
             }.toMutableList()
             val three = List(3) { from.random(rnd).also { from.remove(it) } }
             g.starterOffsets.forEachIndexed { i, at -> put32(f.overlay, at, three[i]) }
@@ -873,20 +902,24 @@ object DsRandomizer {
             val global = HashMap<Int, Int>()
             if (o.wild == RomRandomizer.Wild.GLOBAL) {
                 val left = pool.toMutableList()
-                for (s in all) global[s] = pick(left.ifEmpty { pool }, s).also { left.remove(it) }
+                for (s in all) global[s] = picker.pick(s, from = left.ifEmpty { pool }, wild = true).also { left.remove(it) }
             }
+            // An area is an encounter archive member; NO DUPLICATES avoids what it already has.
             var area = HashMap<Int, Int>()
+            var used = HashSet<Int>()
             var member = -1
             encounterSites(g.gen, Narc(f.enc), hgss = g.hgss, each = { m, at, width ->
-                if (m != member) { area = HashMap(); member = m }
+                if (m != member) { area = HashMap(); used = HashSet(); member = m }
                 val raw = if (width == 4) u32(f.enc, at) else u16(f.enc, at)
                 val was = raw and speciesMask(g.gen)
                 if (was !in 1..g.speciesCount) return@encounterSites
+                val avoid = if (o.noDuplicates) used else emptySet<Int>()
                 val now = when (o.wild) {
-                    RomRandomizer.Wild.RANDOM -> pick(pool, was)
-                    RomRandomizer.Wild.PER_AREA -> area.getOrPut(was) { pick(pool, was) }
+                    RomRandomizer.Wild.RANDOM -> picker.pick(was, avoid, wild = true)
+                    RomRandomizer.Wild.PER_AREA -> area.getOrPut(was) { picker.pick(was, avoid, wild = true) }
                     else -> global.getValue(was)
                 }
+                used += now
                 // Gen 5's form bits go with the old species: the new one is its plain form.
                 if (width == 4) put32(f.enc, at, now) else put16(f.enc, at, now)
             })
@@ -896,7 +929,7 @@ object DsRandomizer {
             f.trainerMons(Narc(f.parties)) { at, moves ->
                 val was = u16(f.parties, at + 4) and speciesMask(g.gen)
                 if (was !in 1..g.speciesCount) return@trainerMons
-                val now = pick(pool, was)
+                val now = picker.pick(was, keepType = o.trainersKeepType)
                 put16(f.parties, at + 4, now)
                 // Gen 5's form is its own word: the new species' plain form.
                 if (g.gen == 5) put16(f.parties, at + 6, 0)

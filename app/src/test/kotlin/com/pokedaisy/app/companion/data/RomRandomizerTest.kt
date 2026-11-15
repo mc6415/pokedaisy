@@ -172,4 +172,15 @@ class RomRandomizerTest {
             ownRandomizedGuide = null
         }
     }
+
+    @Test
+    fun `run modes do what they say`() = each { g, rom ->
+        val retail = RomRandomizer.view(rom, g)
+        val themed = RomRandomizer.randomize(rom, RunModesCheck.THEMED, 21L)!!
+        assertEquals(g.title, g, RomRandomizer.recognise(themed))
+        RunModesCheck.themed(g.title, 3, retail, RomRandomizer.view(themed, g))
+        val spread = RomRandomizer.randomize(rom, RunModesCheck.SPREAD, 22L)!!
+        val without = RomRandomizer.randomize(rom, RunModesCheck.SPREAD.copy(allCatchable = false), 22L)!!
+        RunModesCheck.spread(g.title, retail, RomRandomizer.view(spread, g), RomRandomizer.view(without, g))
+    }
 }
