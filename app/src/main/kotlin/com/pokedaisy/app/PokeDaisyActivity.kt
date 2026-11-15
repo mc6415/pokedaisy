@@ -2641,8 +2641,11 @@ class PokeDaisyActivity : Activity() {
         val gbRom = if (gameBoy) runCatching { r.readBytes() }.getOrNull() else null
         com.pokedaisy.app.companion.data.Gen1Dex.rom = gbRom
         // STEADY FF music: a Gen 1 cart's (and Crystal's) songs come from its own sound engine (Gen1MusicRenderer).
+        // A cart the library's RANDOMIZE made (GbRandomizer) answers to its original's hash: only species and moves moved, so its
+        // music and code are the original's.
         gen1Music = gbRom?.let {
-            val sha1 = java.security.MessageDigest.getInstance("SHA-1").digest(it).joinToString("") { b -> "%02x".format(b) }
+            val sha1 = com.pokedaisy.app.companion.data.GbRandomizer.recognise(it)?.retailSha1
+                ?: java.security.MessageDigest.getInstance("SHA-1").digest(it).joinToString("") { b -> "%02x".format(b) }
             com.pokedaisy.app.companion.data.Gen1Music.forSha1(sha1)
         }
         ffMusicRenderer = when {
