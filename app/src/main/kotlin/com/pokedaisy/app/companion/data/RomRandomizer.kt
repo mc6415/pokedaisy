@@ -134,14 +134,15 @@ object RomRandomizer {
     fun sha1(b: ByteArray) = b.toByteString().sha1().hex()
 
     /** [rom] with [sites] zeroed, hashed. */
-    internal fun madeHash(rom: ByteArray, game: Game): String? {
-        val sites = runCatching { sites(rom, game) }.getOrNull() ?: return null
+    internal fun madeHash(rom: ByteArray, game: Game): String? = runCatching {
+        // A file that isn't the cart (a hack under its header) can point anywhere: sites() throws on that, and it's no match.
+        val sites = sites(rom, game)
         val copy = rom.copyOf()
         for (r in sites) for (i in r) copy[i] = 0
         // The cart's clock registers: a state load writes them into the running ROM (the Poller's hashes skip them too).
         for (i in 0xC4..0xC9) copy[i] = 0
-        return sha1(copy)
-    }
+        sha1(copy)
+    }.getOrNull()
 
     /** Every byte the tool may write in [rom] (found through pointers it never writes, so the same in its output). */
     internal fun sites(rom: ByteArray, g: Game): List<IntRange> {
@@ -151,8 +152,8 @@ object RomRandomizer {
         // Oak's lines: from the name to the end of the 0xFF run that ends the text (the tool pads its shorter line with 0xFF).
         for (at in g.starterLines) {
             var end = at
-            while (r.u8(end) != 0xFF) end++
-            while (r.u8(end + 1) == 0xFF) end++
+            while (r.u8(end) != 0xFF && end - at < 0x200) end++
+            while (r.u8(end + 1) == 0xFF && end - at < 0x200) end++
             out += at..end
         }
         r.wildSlots(g.wildHeaders) { slot, _ -> out += slot + 2..slot + 3 }
@@ -160,6 +161,7 @@ object RomRandomizer {
             out += mon + 4..mon + 5
             if (moves >= 0) out += moves until moves + 8
         }
+        require(out.all { it.first >= 0 && it.last < rom.size && it.last - it.first < 0x200 }) { "not this game's tables" }
         return out
     }
 

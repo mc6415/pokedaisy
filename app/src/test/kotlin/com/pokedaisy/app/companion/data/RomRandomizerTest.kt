@@ -107,5 +107,11 @@ class RomRandomizerTest {
         assertNull(g.title, RomRandomizer.gameOf(other))
         assertNull(g.title, RomRandomizer.recognise(other))
         assertNull(g.title, RomRandomizer.randomize(other, RomRandomizer.Options(), 1L))
+        // A hack under the cart's header whose tables point anywhere (a party pointer out of the ROM): no match, no crash.
+        val hack = rom.copyOf()
+        val party = g.trainers + 40 + 36
+        for (i in 0 until 4) hack[party + i] = 0x78
+        assertNull(g.title, RomRandomizer.gameOf(hack))
+        assertNull(g.title, RomRandomizer.recognise(hack))
     }
 }

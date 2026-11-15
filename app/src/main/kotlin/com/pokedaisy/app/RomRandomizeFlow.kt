@@ -82,7 +82,7 @@ class RomRandomizeFlow(
             files.forEachIndexed { i, f ->
                 val bytes = runCatching { RomArchive.open(f).use { it.readBytes() } }.getOrNull()
                 // Only the player's own carts: copies already randomized (by this tool or another) are left out.
-                val game = bytes?.let { b -> RomRandomizer.gameOf(b)?.takeIf { RomRandomizer.sha1(b) == it.retailSha1 } }
+                val game = bytes?.let { b -> runCatching { RomRandomizer.gameOf(b)?.takeIf { RomRandomizer.sha1(b) == it.retailSha1 } }.getOrNull() }
                 if (game != null) {
                     found += Base(f, GameTitles.label(activity, prefs, f), game.title)
                 }
