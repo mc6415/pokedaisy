@@ -44,7 +44,7 @@ class RomRandomizeFlow(
     private val onAdded: (File) -> Unit,
 ) {
     /** A ROM the tool can take: [label] is the library's name for it. */
-    class Base(val file: File, val label: String, val game: String, val ds: Boolean = false)
+    class Base(val file: File, val label: String, val game: String, val ds: Boolean = false, val gb: Boolean = false)
 
     sealed class Step {
         class Looking(val progress: Float) : Step()
@@ -88,7 +88,11 @@ class RomRandomizeFlow(
                     com.pokedaisy.app.companion.data.DsRandomizer.GAMES.any { it.code == code && it.rev == rev }
                 } == true
             }
-            val total = (files.size + carts.size).coerceAtLeast(1)
+            // Game Boy carts (2 MB at most, zipped ones too): read whole.
+            val gbCarts = RomFolder.allRomFiles(activity, prefs).filter { f ->
+                runCatching { RomIdentity.isGameBoy(f) && RomArchive.romSize(f) <= 0x200000 }.getOrDefault(false)
+            }
+            val total = (files.size + carts.size + gbCarts.size).coerceAtLeast(1)
             val found = ArrayList<Base>()
             carts.forEachIndexed { i, f ->
                 val game = if (RomArchive.isArchive(f)) {
@@ -102,6 +106,14 @@ class RomRandomizeFlow(
                 }
                 if (game != null) found += Base(f, GameTitles.label(activity, prefs, f), game.title, ds = true)
                 postFor(token) { if (step is Step.Looking) step = Step.Looking((i + 1f) / total) }
+            }
+            gbCarts.forEachIndexed { i, f ->
+                val bytes = runCatching { RomArchive.open(f).use { it.readBytes() } }.getOrNull()
+                val game = bytes?.let { b ->
+                    com.pokedaisy.app.companion.data.GbRandomizer.GAMES.firstOrNull { com.pokedaisy.app.companion.data.GbRandomizer.sha1(b) == it.retailSha1 }
+                }
+                if (game != null) found += Base(f, GameTitles.label(activity, prefs, f), game.title, gb = true)
+                postFor(token) { if (step is Step.Looking) step = Step.Looking((carts.size + files.size + i + 1f) / total) }
             }
             files.forEachIndexed { i, f ->
                 val bytes = runCatching { RomArchive.open(f).use { it.readBytes() } }.getOrNull()
@@ -132,6 +144,14 @@ class RomRandomizeFlow(
         Thread({
             val result = runCatching {
                 if (b.ds) return@runCatching makeDs(b, opts, s, token)
+                if (b.gb) {
+                    val bytes = RomArchive.open(b.file).use { it.readBytes() }
+                    val out = com.pokedaisy.app.companion.data.GbRandomizer.randomize(bytes, opts, s) ?: error("not randomizable")
+                    val platform = RomPatcher.platformOf(out)
+                    val ext = RomPatcher.extensionFor(b.file, platform)
+                    val dir = RomPatcher.outputDir(platform, b.file, prefs.romsFolders, importedDir)
+                    return@runCatching write(out, dir, RomUris.sanitizeFileName("Pokemon ${b.game} Randomized (seed $s).$ext"))
+                }
                 val bytes = RomArchive.open(b.file).use { it.readBytes() }
                 val out = RomRandomizer.randomize(bytes, opts, s) ?: error("not randomizable")
                 val dir = RomPatcher.outputDir(RomPatcher.Platform.GBA, b.file, prefs.romsFolders, importedDir)
@@ -208,7 +228,7 @@ class RomRandomizeFlow(
         var n = 2
         while (out.exists()) {
             if (out.length() == bytes.size.toLong() && out.readBytes().contentEquals(bytes)) return out
-            out = File(dir, "$stem ($n).gba")
+            out = File(dir, "$stem ($n).${name.substringAfterLast('.')}")
             n++
         }
         val tmp = File(dir, ".${out.name}.part")
@@ -225,11 +245,11 @@ class RomRandomizeFlow(
         /** The GAME list's order (by [Base.game]): versions in pairs, the newest games first. */
         private val ORDER = listOf(
             "Black 2", "White 2", "Black", "White", "HeartGold", "SoulSilver", "Platinum",
-            "Emerald", "FireRed", "LeafGreen", "Ruby", "Sapphire",
+            "Emerald", "FireRed", "LeafGreen", "Ruby", "Sapphire", "Crystal", "Gold", "Silver", "Yellow", "Red", "Blue",
         )
 
         /** A file named the way this tool names its output ("... Randomized (seed 123456).gba", " (2)" and all). */
-        private val MADE_NAME = Regex("""^Pokemon .+ Randomized \(seed \d+\)( \(\d+\))?\.(gba|nds)$""")
+        private val MADE_NAME = Regex("""^Pokemon .+ Randomized \(seed \d+\)( \(\d+\))?\.(gba|nds|gb|gbc)$""")
 
         /** [rom] is a game RANDOMIZE made: written by it ([Prefs.madeRoms]), or named as it names them and read as randomized. */
         fun madeByTool(prefs: Prefs, rom: File, randomized: Boolean): Boolean =
@@ -276,7 +296,7 @@ fun RandomizeWindow(flow: RomRandomizeFlow, m: GbaTextMetrics, small: GbaTextMet
                             RomRandomizeFlow.Step.NotFound -> Padded(m) {
                                 Message(tr("NO GAME TO RANDOMIZE"), m, value = true)
                                 Spacer(Modifier.height(m.u * 2))
-                                Message(tr("RANDOMIZE works on the English FireRed and LeafGreen (Rev 1), Ruby and Sapphire (Rev 2), Emerald, Platinum (Rev 1), HeartGold, SoulSilver, Black 2 and White 2. Add one to your library or a ROMs folder, then try again."), small)
+                                Message(tr("RANDOMIZE works on the English Red, Blue, Yellow, Gold, Silver, Crystal (Rev 1), FireRed and LeafGreen (Rev 1), Ruby and Sapphire (Rev 2), Emerald, Platinum (Rev 1), HeartGold, SoulSilver, Black 2 and White 2. Add one to your library or a ROMs folder, then try again."), small)
                             }
                             is RomRandomizeFlow.Step.Ready -> ReadyRows(flow, step, m, small) { choosing = it }
                             is RomRandomizeFlow.Step.Making -> Padded(m) {

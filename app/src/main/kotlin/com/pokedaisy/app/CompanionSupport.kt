@@ -42,7 +42,9 @@ object CompanionSupport {
 
     fun isSupported(rom: File): Boolean {
         // Game Boy / Color: the exact carts the GB reader knows (Pokémon Yellow).
-        if (RomIdentity.isGameBoy(rom)) return TelemetrySampler.GAME_BOY_SUPPORT && RomIdentity.sha1(rom) in TelemetrySampler.SUPPORTED_GB_SHA1S
+        if (RomIdentity.isGameBoy(rom)) return TelemetrySampler.GAME_BOY_SUPPORT && (RomIdentity.sha1(rom) in TelemetrySampler.SUPPORTED_GB_SHA1S ||
+            // A cart the library's RANDOMIZE made from one of them.
+            RomArchive.romSize(rom) <= 0x200000 && runCatching { com.pokedaisy.app.companion.data.GbRandomizer.recognise(RomArchive.open(rom).use { it.readBytes() }) }.getOrNull() != null)
         // A DS cart: by its header's code and revision, as detect() takes it (a 128 MB+ ROM isn't hashed).
         if (RomIdentity.isNds(rom)) return TelemetrySampler.ndsSupported(RomIdentity.ndsGameCode(rom), RomIdentity.ndsRevision(rom)) ||
             // Origin HeartGold: a Japanese HeartGold's header, told apart by its code.

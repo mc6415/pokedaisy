@@ -271,6 +271,12 @@ object GameTitles {
 
     /** [rom]'s name as retail randomized by Universal Pokémon Randomizer ZX ([RandomizedRetail]), or null. Blocking. */
     internal fun randomizedTitle(rom: File, code: String?): String? {
+        // A Game Boy cart the library's RANDOMIZE made.
+        if (RomIdentity.isGameBoy(rom)) {
+            if (RomArchive.romSize(rom) > 0x200000) return null
+            val game = runCatching { com.pokedaisy.app.companion.data.GbRandomizer.recognise(RomArchive.open(rom).use { it.readBytes() }) }.getOrNull()
+            return game?.let { RETAIL[it.retailSha1] ?: "Pokémon ${it.title}" }?.let { it + RANDOMIZED }
+        }
         // A DS cart the library's RANDOMIZE made (its few written files checked, not the whole cart).
         if (RomIdentity.isNds(rom)) {
             if (!rom.extension.equals("nds", ignoreCase = true)) return null

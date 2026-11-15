@@ -828,7 +828,11 @@ class TelemetrySampler {
             digest.update(EmulatorCore.current.romRead(off, len) ?: break)
             off += len
         }
-        val hash = if (off == size && size > 0) digest.digest().hex() else null
+        val own = if (off == size && size > 0) digest.digest().hex() else null
+        // A cart the library's RANDOMIZE made is read as the one it came from (only data moved: species and moves).
+        val hash = own?.takeIf { it !in SUPPORTED_GB_SHA1S && size <= 0x200000 }?.let {
+            runCatching { GbRandomizer.recognise(EmulatorCore.current.romRead(0, size.toInt()) ?: ByteArray(0))?.retailSha1 }.getOrNull()
+        } ?: own
         when {
             GAME_BOY_SUPPORT && hash == RED_SHA1 -> { kind = GameKind.RED; gen1Cfg = GEN1_RED }
             GAME_BOY_SUPPORT && hash == BLUE_SHA1 -> { kind = GameKind.BLUE; gen1Cfg = GEN1_BLUE }

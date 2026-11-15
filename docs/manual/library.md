@@ -36,7 +36,7 @@ Down the left edge of the library are three buttons: `GAMES`, `TOOLS` and `SETTI
 | Tool | What it does |
 | --- | --- |
 | `PATCH A ROM` | Turns a `.bps` patch into a game (see [Patch a ROM hack](#patch-a-rom-hack)). |
-| `RANDOMIZE` | Makes a new, shuffled game from your FireRed, LeafGreen, Ruby, Sapphire, Emerald, Platinum, HeartGold, SoulSilver, Black 2 or White 2 (see [Randomize a game](#randomize-a-game)). |
+| `RANDOMIZE` | Makes a new, shuffled game from your Red, Blue, Yellow, Gold, Silver, Crystal, FireRed, LeafGreen, Ruby, Sapphire, Emerald, Platinum, HeartGold, SoulSilver, Black 2 or White 2 (see [Randomize a game](#randomize-a-game)). |
 | `LINK PLAY` | Runs two to four GBA games joined as if by a link cable, to trade and battle between them (see [Link play](link-play.md)). |
 | `SAVE EDITOR` | Opens a game's save: rearrange the PC, change the bag, money and moves (see [Save editor and save trades](save-trade.md)). |
 | `TRADE SAVES` | Trades Pokémon between two of your games' save files (see [Save editor and save trades](save-trade.md)). |
@@ -110,7 +110,7 @@ If the companion doesn't support the patched game, you're told so and it stays o
 
 ### Randomize a game
 
-A randomized run plays a game you know with everything shuffled: a different first partner, other Pokémon in the grass, new teams for every trainer. `RANDOMIZE` under `TOOLS` makes one from your own copy of an English game: FireRed or LeafGreen (their second release, Rev 1), Ruby or Sapphire (their third, Rev 2), Emerald, or on the DS Platinum (its second release, Rev 1), HeartGold, SoulSilver, Black 2 or White 2. A zipped DS game works too: it's unpacked into the new file as it's made.
+A randomized run plays a game you know with everything shuffled: a different first partner, other Pokémon in the grass, new teams for every trainer. `RANDOMIZE` under `TOOLS` makes one from your own copy of an English game: Red, Blue, Yellow, Gold, Silver or Crystal (its second release, Rev 1) on the Game Boy, FireRed or LeafGreen (their second release, Rev 1), Ruby or Sapphire (their third, Rev 2), Emerald, or on the DS Platinum (its second release, Rev 1), HeartGold, SoulSilver, Black 2 or White 2. A zipped DS game works too: it's unpacked into the new file as it's made.
 
 1. Tap `TOOLS`, then `RANDOMIZE`. PokeDaisy looks through your library for those games.
 2. Pick what to shuffle:
@@ -118,7 +118,7 @@ A randomized run plays a game you know with everything shuffled: a different fir
 | Row | What it does |
 | --- | --- |
 | `GAME` | Which of your games to start from, when you have more than one. |
-| `STARTERS` | The three Pokémon you choose your partner from. `EVOLVE TWICE` (the default) picks Pokémon that evolve two times, like the real ones; `ANY POKéMON` can be anything but a legendary; `AS THEY ARE` keeps them. In FireRed and LeafGreen the professor names the new ones when you choose; in Platinum the briefcase and in HeartGold and SoulSilver Professor Elm's machine show them, each with its name, and in Black 2 and White 2 every scene that names your starter (your rival's pick too) names the new ones. |
+| `STARTERS` | The three Pokémon you choose your partner from. `EVOLVE TWICE` (the default) picks Pokémon that evolve two times, like the real ones; `ANY POKéMON` can be anything but a legendary; `AS THEY ARE` keeps them. In FireRed and LeafGreen the professor names the new ones when you choose; in Platinum the briefcase and in HeartGold and SoulSilver Professor Elm's machine show them, each with its name, and in Red, Blue, Black 2 and White 2 every scene that names your starter (your rival's pick too) names the new ones. In Yellow your partner and your rival's stay as they are, since the story is built around them. |
 | `WILD POKéMON` | What you meet in the grass, caves, water and with a rod. `PER AREA` (the default) swaps each kind of Pokémon for another on each route, so a route still has its common and rare ones. `EVERY ENCOUNTER` picks anew for every slot, `SWAPPED EVERYWHERE` swaps each kind for one other kind across the whole game, and `AS THEY ARE` keeps them. |
 | `TRAINERS` | Gives every trainer, the leaders and your rival too, a new team at the same levels. Trainers who had moves picked for them get the moves their new Pokémon know by then. |
 | `SIMILAR STRENGTH` | Keeps each swap close in strength to what it replaces (their base stats added up), so an early route doesn't fill with fully evolved Pokémon. |

@@ -2590,7 +2590,14 @@ class PokeDaisyActivity : Activity() {
         val gba = !gameBoy && !nds
         // EXPAND: the GBA games pk_wide.c knows, and Game Boy ones pk_wide_gb.c does (Yellow, Crystal); the field reads are GBA only.
         // A randomized retail cart (RandomizedRetail) goes by retail's CRC here: retail's code, maps and sprites.
-        val tablesCrc = if (gba) WideScreen.tablesCrc(r, crc) else crc
+        // So does a Game Boy cart the library's RANDOMIZE made (GbRandomizer): its maps are the original's.
+        val tablesCrc = when {
+            gba -> WideScreen.tablesCrc(r, crc)
+            gameBoy && RomArchive.romSize(r) <= 0x200000 -> runCatching {
+                com.pokedaisy.app.companion.data.GbRandomizer.recognise(RomArchive.open(r).use { it.readBytes() })
+            }.getOrNull()?.let { "%08x".format(it.retailCrc) } ?: crc
+            else -> crc
+        }
         wideGame = if (nds || romBlocked != null) WideScreen.OFF else WideScreen.gameFor(tablesCrc)
         fieldGame = if (!gba || romBlocked != null) WideScreen.OFF else WideScreen.fieldGameFor(tablesCrc)
         wildFlag = 0L

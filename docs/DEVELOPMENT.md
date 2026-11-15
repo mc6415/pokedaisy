@@ -1357,6 +1357,16 @@ header, the secure area, the overlay table and the file table never change. msg_
 starter with 152 / 155: a shuffled one always gets the third team (shuffled like the rest). Test it from a boot, never a save
 state: a state brings back the ARM9 binary as it was in RAM (the retail one), so only overlays and text show the change.
 Checked headless: Elm's machine showed and gave the shuffled starters, Falkner's team was shuffled.
+The Game Boy games (`GbRandomizer.kt`: English Red, Blue, Yellow, Gold, Silver, Crystal rev 1; pret's builds are these carts
+byte for byte, so every table is a symbol): Gen 1's WildDataPointers maps (grass / water: a rate, ten (level, species)) and
+TrainerDataPointers' parties (a level then species, or 0xFF then pairs; to TrainerAI), internal ids checked against
+PokedexOrder; Gen 2's six wild lists (grass: three times x seven slots; water: three) and TrainerGroups' parties (name, type,
+mons with item / moves). Red / Blue's starters are every byte STARTER1-3 become (the decomp rebuilt with one changed, diffed:
+Oak's lab, the rival's choice and Route 22 teams, read_trainer_party's check, the title screen); Gold / Silver / Crystal's
+Elm's three ball scripts (pokepic, cry, getmonname, givepoke); Yellow keeps its Pikachu and Eevee. The global checksum is
+rewritten. A cart the tool made (`recognise`: its bytes with every site and the checksum zeroed hash to `madeSha1`) is read as
+its original by the Poller, CompanionSupport, GameTitles and EXPAND (the original's CRC). Checked headless: the user's Blue
+save in the shuffled Blue met Route 1's swapped table; the shuffled Crystal boots a save.
 
 SIMILAR STRENGTH keeps a swap within 10% of the base stat total, widening by 5% until six candidates fit. Ruby / Sapphire have
 no GF header, so their base stats come from the records (`speciesInfo`). FireRed rev 0 / LeafGreen rev 0 / Ruby and Sapphire
