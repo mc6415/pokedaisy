@@ -112,9 +112,11 @@ class RomRandomizeFlow(
                 }
                 postFor(token) { if (step is Step.Looking) step = Step.Looking((carts.size + i + 1f) / total) }
             }
+            // Each pair of versions together, newest first; copies of one game by their library names.
+            val sorted = found.sortedWith(compareBy<Base>({ ORDER.indexOf(it.game).let { i -> if (i < 0) ORDER.size else i } }, { it.label }))
             postFor(token) {
                 base = 0
-                step = if (found.isEmpty()) Step.NotFound else Step.Ready(found)
+                step = if (sorted.isEmpty()) Step.NotFound else Step.Ready(sorted)
             }
         }, "pokedaisy-randomize-look").apply { isDaemon = true; start() }
     }
@@ -220,6 +222,12 @@ class RomRandomizeFlow(
     }
 
     companion object {
+        /** The GAME list's order (by [Base.game]): versions in pairs, the newest games first. */
+        private val ORDER = listOf(
+            "Black 2", "White 2", "Black", "White", "HeartGold", "SoulSilver", "Platinum",
+            "Emerald", "FireRed", "LeafGreen", "Ruby", "Sapphire",
+        )
+
         /** A file named the way this tool names its output ("... Randomized (seed 123456).gba", " (2)" and all). */
         private val MADE_NAME = Regex("""^Pokemon .+ Randomized \(seed \d+\)( \(\d+\))?\.(gba|nds)$""")
 
