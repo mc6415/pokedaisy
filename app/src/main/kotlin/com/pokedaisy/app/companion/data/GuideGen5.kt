@@ -24,7 +24,7 @@ const val GEN5_VAR_MONTH = 0x10001
  * use, which Gen 5 kept (12 grass slots 20 / 20 / 10 / 10 / 10 / 10 / 5 / 5 / 4 / 4 / 1 / 1, 5 water slots 60 / 30 / 5
  * / 4 / 1 - fishing too).
  */
-class Gen5World(wildRaw: List<String>, bossesRaw: List<String>) : GuideWorld {
+class Gen5World(wildRaw: List<String>, bossesRaw: List<String>, private val code: String = "") : GuideWorld {
     private class Slot(val min: Int, val max: Int, val species: Int)
 
     /** One season's block: each way's rate (0 = none) and slots. */
@@ -105,9 +105,21 @@ class Gen5World(wildRaw: List<String>, bossesRaw: List<String>) : GuideWorld {
 
     private fun set(zone: Int, progress: SaveProgress?): EncSet? = wild.zones[zone]?.let { wild.sets[it]?.getOrNull(season(progress)) }
 
-    private fun merge(set: EncSet, method: Int, odds: List<Int>): List<EncounterSlot> =
+    /** Where zone [zone]'s species come from now: its wild set and the season's block. */
+    private class Place(val set: Int, val season: Int)
+
+    /** A cart the library's RANDOMIZE made from this game ([DsRandomizer.shuffle]): its species, slot for slot. */
+    private fun cartSpecies(place: Place, method: Int, slot: Int, was: Int): Int {
+        val shuffle = DsRandomizer.shuffle?.takeIf { code.isNotEmpty() && it.game.code == code } ?: return was
+        val global = (0 until method).sumOf { SLOT_COUNTS[it] } + slot
+        return shuffle.gen5Species(place.set, place.season, global)?.takeIf { it != 0 } ?: was
+    }
+
+    private fun merge(set: EncSet, place: Place, method: Int, odds: List<Int>): List<EncounterSlot> =
         if (set.rates[method] == 0) emptyList()
-        else set.slots[method].mapIndexed { i, s -> Triple(s, odds.getOrElse(i) { 0 }, i) }
+        else set.slots[method].mapIndexed { i, s ->
+            Triple(Slot(s.min, s.max, if (s.species == 0) 0 else cartSpecies(place, method, i, s.species)), odds.getOrElse(i) { 0 }, i)
+        }
             .filter { it.first.species != 0 }
             .groupBy { it.first.species }
             .map { (species, g) -> EncounterSlot(species, g.minOf { it.first.min }, g.maxOf { it.first.max }, g.sumOf { it.second }) }
@@ -115,31 +127,34 @@ class Gen5World(wildRaw: List<String>, bossesRaw: List<String>) : GuideWorld {
 
     override fun encounters(group: Int, num: Int, progress: SaveProgress?): MapEncounters {
         val set = set(num, progress) ?: return MapEncounters(emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList())
+        val place = Place(wild.zones.getValue(num), season(progress))
         return MapEncounters(
-            grass = merge(set, GRASS, LAND_ODDS),
-            water = merge(set, SURF, WATER_ODDS),
+            grass = merge(set, place, GRASS, LAND_ODDS),
+            water = merge(set, place, SURF, WATER_ODDS),
             rockSmash = emptyList(),
             oldRod = emptyList(),
             goodRod = emptyList(),
-            superRod = merge(set, FISH, WATER_ODDS),
+            superRod = merge(set, place, FISH, WATER_ODDS),
         )
     }
 
     /** Zone [zone]'s dark grass, rustling grass and rippling spots now. */
     fun extras(zone: Int, progress: SaveProgress?): Extras {
         val set = set(zone, progress) ?: return Extras(emptyList(), emptyList(), emptyList(), emptyList())
+        val place = Place(wild.zones.getValue(zone), season(progress))
         return Extras(
-            darkGrass = merge(set, DARK_GRASS, LAND_ODDS),
-            rustlingGrass = merge(set, RUSTLING_GRASS, LAND_ODDS),
-            ripplingWater = merge(set, RIPPLING_WATER, WATER_ODDS),
-            ripplingFishing = merge(set, RIPPLING_FISH, WATER_ODDS),
+            darkGrass = merge(set, place, DARK_GRASS, LAND_ODDS),
+            rustlingGrass = merge(set, place, RUSTLING_GRASS, LAND_ODDS),
+            ripplingWater = merge(set, place, RIPPLING_WATER, WATER_ODDS),
+            ripplingFishing = merge(set, place, RIPPLING_FISH, WATER_ODDS),
         )
     }
 
     /** Whether zone [zone]'s wild Pokémon change with the seasons. */
     fun seasonal(zone: Int): Boolean = wild.zones[zone]?.let { wild.sets[it] }?.let { s -> s.distinct().size > 1 } == true
 
-    override fun party(trainer: Int, progress: SaveProgress?): List<TrainerMon> = bosses.first[trainer].orEmpty()
+    override fun party(trainer: Int, progress: SaveProgress?): List<TrainerMon> =
+        DsRandomizer.shuffle?.takeIf { code.isNotEmpty() && it.game.code == code }?.team(trainer) ?: bosses.first[trainer].orEmpty()
 
     override fun clockNote(progress: SaveProgress?): String = SEASONS[season(progress)]
 
@@ -159,6 +174,8 @@ class Gen5World(wildRaw: List<String>, bossesRaw: List<String>) : GuideWorld {
         const val FISH = 5
         const val RIPPLING_FISH = 6
         const val METHODS = 7
+        /** Each way's slots in the block, in order (grass, dark grass, rustling grass: 12; the waters: 5). */
+        val SLOT_COUNTS = listOf(12, 12, 12, 5, 5, 5, 5)
         val SEASONS = listOf("SPRING", "SUMMER", "AUTUMN", "WINTER")
         val LAND_ODDS = listOf(20, 20, 10, 10, 10, 10, 5, 5, 4, 4, 1, 1)
         val WATER_ODDS = listOf(60, 30, 5, 4, 1)
@@ -167,8 +184,8 @@ class Gen5World(wildRaw: List<String>, bossesRaw: List<String>) : GuideWorld {
 
 val BLACK_WORLD = Gen5World(BLACK_WILD_RAW, BLACK_BOSSES_RAW)
 val WHITE_WORLD = Gen5World(WHITE_WILD_RAW, WHITE_BOSSES_RAW)
-val BLACK2_WORLD = Gen5World(BLACK2_WILD_RAW, BLACK2_BOSSES_RAW)
-val WHITE2_WORLD = Gen5World(WHITE2_WILD_RAW, WHITE2_BOSSES_RAW)
+val BLACK2_WORLD = Gen5World(BLACK2_WILD_RAW, BLACK2_BOSSES_RAW, "IREO")
+val WHITE2_WORLD = Gen5World(WHITE2_WILD_RAW, WHITE2_BOSSES_RAW, "IRDO")
 
 /** A boss NEXT BOSS shows: done once [done] is set, or by [doneIf]; its team is [world]'s for boss [key]. */
 internal fun gen5Boss(world: Gen5World, title: String, where: String, key: String, done: Int, doneIf: ((SaveProgress) -> Boolean)? = null): Boss =

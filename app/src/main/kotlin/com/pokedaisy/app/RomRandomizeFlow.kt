@@ -79,9 +79,10 @@ class RomRandomizeFlow(
                         RomRandomizer.GAMES.any { it.code == code && it.rev == rev }
                     } == true
             }
-            // DS carts (plain .nds: a zipped one would have to be unpacked first) by their header, then their files.
+            // DS carts by their header, then (a plain .nds) their files; a zipped one is checked once it's unpacked (make).
             val carts = RomFolder.allRomFiles(activity, prefs).filter { f ->
-                f.extension.equals("nds", ignoreCase = true) && RomArchive.readAt(f, 0xC, 0x13)?.let { h ->
+                val nds = if (RomArchive.isArchive(f)) RomArchive.romEntry(f)?.extension == "nds" else f.extension.equals("nds", ignoreCase = true)
+                nds && RomArchive.readAt(f, 0xC, 0x13)?.let { h ->
                     val code = String(h, 0, 4, Charsets.US_ASCII)
                     val rev = h[0x12].toInt() and 0xFF
                     com.pokedaisy.app.companion.data.DsRandomizer.GAMES.any { it.code == code && it.rev == rev }
@@ -90,7 +91,15 @@ class RomRandomizeFlow(
             val total = (files.size + carts.size).coerceAtLeast(1)
             val found = ArrayList<Base>()
             carts.forEachIndexed { i, f ->
-                val game = com.pokedaisy.app.companion.data.DsRandomizer.gameOf(f.toOkioPath(), retail = true)
+                val game = if (RomArchive.isArchive(f)) {
+                    // Unpacking 512 MB to look would be slow: by the header here, the files when it's made.
+                    RomArchive.readAt(f, 0xC, 0x13)?.let { h ->
+                        val code = String(h, 0, 4, Charsets.US_ASCII)
+                        com.pokedaisy.app.companion.data.DsRandomizer.GAMES.firstOrNull { it.code == code && it.rev == (h[0x12].toInt() and 0xFF) }
+                    }?.takeIf { !GameTitles.isRandomized(activity, f) }
+                } else {
+                    com.pokedaisy.app.companion.data.DsRandomizer.gameOf(f.toOkioPath(), retail = true)
+                }
                 if (game != null) found += Base(f, GameTitles.label(activity, prefs, f), game.title, ds = true)
                 postFor(token) { if (step is Step.Looking) step = Step.Looking((i + 1f) / total) }
             }
@@ -128,7 +137,9 @@ class RomRandomizeFlow(
             }
             val file = result.getOrNull()
             if (file == null) {
-                postFor(token) { step = Step.Failed(tr("The randomized ROM couldn't be saved. Check there's free space and try again.")) }
+                val message = if (result.exceptionOrNull() is NotTheCart) tr("This copy of the game has been changed, so RANDOMIZE can't use it. It needs the original cart's file.")
+                else tr("The randomized ROM couldn't be saved. Check there's free space and try again.")
+                postFor(token) { step = Step.Failed(message) }
                 return@Thread
             }
             RomAdded.record(activity, listOf(file), initial = false)
@@ -143,6 +154,9 @@ class RomRandomizeFlow(
         }, "pokedaisy-randomize").apply { isDaemon = true; start() }
     }
 
+    /** The picked cart (a zipped one, checked only once unpacked) turned out not to be the original. */
+    private class NotTheCart : Exception()
+
     /** A DS cart: copied, then its shuffled files written in place ([com.pokedaisy.app.companion.data.DsRandomizer]). */
     private fun makeDs(b: Base, opts: RomRandomizer.Options, s: Long, token: Int): File {
         val dir = RomPatcher.outputDir(RomPatcher.Platform.NDS, b.file, prefs.romsFolders, importedDir)
@@ -155,11 +169,18 @@ class RomRandomizeFlow(
         tmp.delete()
         var last = -1
         try {
-            val ok = com.pokedaisy.app.companion.data.DsRandomizer.randomize(b.file.toOkioPath(), tmp.toOkioPath(), opts, s) { p ->
-                val pct = (p * 100).toInt()
-                if (pct != last) { last = pct; postFor(token) { if (step is Step.Making) step = Step.Making(b, p) } }
+            val ok = if (RomArchive.isArchive(b.file)) {
+                // Unpacked straight into the new file, then shuffled where it is.
+                RomArchive.extract(b.file, tmp) ?: error("couldn't unpack ${b.file.name}")
+                postFor(token) { if (step is Step.Making) step = Step.Making(b, 0.9f) }
+                com.pokedaisy.app.companion.data.DsRandomizer.randomizeInPlace(tmp.toOkioPath(), opts, s)
+            } else {
+                com.pokedaisy.app.companion.data.DsRandomizer.randomize(b.file.toOkioPath(), tmp.toOkioPath(), opts, s) { p ->
+                    val pct = (p * 100).toInt()
+                    if (pct != last) { last = pct; postFor(token) { if (step is Step.Making) step = Step.Making(b, p) } }
+                }
             }
-            check(ok) { "not randomizable" }
+            if (!ok) throw NotTheCart()
             if (!tmp.renameTo(out)) throw java.io.IOException("couldn't name ${out.name}")
         } finally {
             tmp.delete()
@@ -247,7 +268,7 @@ fun RandomizeWindow(flow: RomRandomizeFlow, m: GbaTextMetrics, small: GbaTextMet
                             RomRandomizeFlow.Step.NotFound -> Padded(m) {
                                 Message(tr("NO GAME TO RANDOMIZE"), m, value = true)
                                 Spacer(Modifier.height(m.u * 2))
-                                Message(tr("RANDOMIZE works on the English FireRed and LeafGreen (Rev 1), Ruby and Sapphire (Rev 2), Emerald and Platinum (Rev 1). Add one to your library or a ROMs folder, then try again."), small)
+                                Message(tr("RANDOMIZE works on the English FireRed and LeafGreen (Rev 1), Ruby and Sapphire (Rev 2), Emerald, Platinum (Rev 1), Black 2 and White 2. Add one to your library or a ROMs folder, then try again."), small)
                             }
                             is RomRandomizeFlow.Step.Ready -> ReadyRows(flow, step, m, small) { choosing = it }
                             is RomRandomizeFlow.Step.Making -> Padded(m) {

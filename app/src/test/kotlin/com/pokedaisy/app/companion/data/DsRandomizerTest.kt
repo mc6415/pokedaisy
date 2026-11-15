@@ -22,7 +22,11 @@ import java.io.File
 class DsRandomizerTest {
     @get:Rule val tmp = TemporaryFolder()
 
-    private val carts = mapOf("CPUE" to "Pokemon - Platinum Version (USA) (Rev 1).nds")
+    private val carts = mapOf(
+        "CPUE" to "Pokemon - Platinum Version (USA) (Rev 1).nds",
+        "IREO" to "Pokemon - Black Version 2 (USA, Europe) (NDSi Enhanced).nds",
+        "IRDO" to "Pokemon - White Version 2 (USA, Europe) (NDSi Enhanced).nds",
+    )
 
     private fun cart(g: DsRandomizer.Game): File? =
         File(File(RETAIL_ROM_DIR).parentFile, "nds/" + carts.getValue(g.code)).takeIf { it.isFile }
@@ -35,6 +39,29 @@ class DsRandomizerTest {
             body(g, f)
         }
         assumeTrue("no DS carts here", ran > 0)
+    }
+
+    /** Calls [each] with every place [x] and [y] (the same size) differ, a chunk at a time (the carts run to 512 MB). */
+    private fun diff(x: File, y: File, each: (Long) -> Unit) {
+        x.inputStream().buffered(1 shl 20).use { ix ->
+            y.inputStream().buffered(1 shl 20).use { iy ->
+                val bx = ByteArray(1 shl 20); val by = ByteArray(1 shl 20)
+                var at = 0L
+                while (true) {
+                    val n = ix.readNBytes(bx, 0, bx.size)
+                    iy.readNBytes(by, 0, n)
+                    if (n <= 0) break
+                    if (!java.util.Arrays.equals(bx, 0, n, by, 0, n)) for (i in 0 until n) if (bx[i] != by[i]) each(at + i)
+                    at += n
+                }
+            }
+        }
+    }
+
+    private fun sameFiles(x: File, y: File): Boolean {
+        var same = true
+        diff(x, y) { same = false }
+        return same
     }
 
     private fun u16(b: ByteArray, o: Int) = (b[o].toInt() and 0xFF) or ((b[o + 1].toInt() and 0xFF) shl 8)
@@ -53,17 +80,15 @@ class DsRandomizerTest {
         val path = f.toOkioPath()
         assertSame(g, DsRandomizer.gameOf(path, retail = true))
         assertNull(DsRandomizer.recognise(path))
-        val a = tmp.root.resolve("a.nds").toOkioPath()
-        val b = tmp.root.resolve("b.nds").toOkioPath()
-        val c = tmp.root.resolve("c.nds").toOkioPath()
+        val a = tmp.root.resolve("${g.code}-a.nds").toOkioPath()
+        val b = tmp.root.resolve("${g.code}-b.nds").toOkioPath()
+        val c = tmp.root.resolve("${g.code}-c.nds").toOkioPath()
         assertTrue(DsRandomizer.randomize(path, a, RomRandomizer.Options(), 7L))
         assertTrue(DsRandomizer.randomize(path, b, RomRandomizer.Options(), 7L))
         assertTrue(DsRandomizer.randomize(path, c, RomRandomizer.Options(), 8L))
-        val orig = f.readBytes()
-        val ab = File(a.toString()).readBytes()
-        assertTrue(ab.contentEquals(File(b.toString()).readBytes()))
-        assertFalse(ab.contentEquals(File(c.toString()).readBytes()))
-        assertEquals(orig.size, ab.size)
+        assertTrue(sameFiles(File(a.toString()), File(b.toString())))
+        assertFalse(sameFiles(File(a.toString()), File(c.toString())))
+        assertEquals(f.length(), File(a.toString()).length())
         assertSame(g, DsRandomizer.recognise(a))
         assertNull(DsRandomizer.gameOf(a, retail = true))
         assertNotNull(DsRandomizer.gameOf(a))
@@ -71,31 +96,64 @@ class DsRandomizerTest {
         val spans = FileSystem.SYSTEM.openReadOnly(path).use { h ->
             val cart = DsRandomizer.Cart(h)
             listOfNotNull(
-                cart.span(cart.overlayFile(g.starterOverlay)), cart.span(cart.fileId(g.encounters)), cart.span(cart.fileId(g.trainerParties)),
-                g.text?.let { cart.span(cart.fileId(it.path)) },
+                g.starterOverlay?.let { cart.span(cart.overlayFile(it)) }, cart.span(cart.fileId(g.encounters)), cart.span(cart.fileId(g.trainerParties)),
+                g.text?.let { cart.span(cart.fileId(it.path)) }, g.starterScripts?.let { cart.span(cart.fileId(it.path)) },
             )
         }
         var changed = 0
-        for (i in orig.indices) if (orig[i] != ab[i]) {
+        diff(f, File(a.toString())) { i ->
             changed++
-            assertTrue("byte ${Integer.toHexString(i)}", spans.any { i.toLong() in it })
+            assertTrue("byte ${java.lang.Long.toHexString(i)}", spans.any { i in it })
         }
         assertTrue(changed > 1000)
-        // Starters: three different ones that evolve twice, none legendary.
-        val (ov, evo) = FileSystem.SYSTEM.openReadOnly(a).use { h ->
+        // Starters: three different ones that evolve twice; every place a starter is named agrees.
+        val (starters, evo) = FileSystem.SYSTEM.openReadOnly(a).use { h ->
             val cart = DsRandomizer.Cart(h)
-            cart.file(cart.overlayFile(g.starterOverlay)) to DsRandomizer.Narc(cart.file(cart.fileId(g.evolutions)))
+            val evo = DsRandomizer.Narc(cart.file(cart.fileId(g.evolutions)))
+            val three = if (g.starterOverlay != null) {
+                val ov = cart.file(cart.overlayFile(g.starterOverlay!!))
+                g.starterOffsets.map { u32(ov, it) }
+            } else {
+                val sc = DsRandomizer.Narc(cart.file(cart.fileId(g.starterScripts!!.path)))
+                val bySite = g.starterScripts!!.sites.groupBy({ it.which }, { site -> sc.member(site.member).let { u16(it, site.offset) } })
+                for ((_, v) in bySite) assertEquals(1, v.toSet().size)
+                (0 until 3).map { bySite.getValue(it).first() }
+            }
+            three to evo
         }
-        val starters = g.starterOffsets.map { u32(ov, it) }
         assertEquals(3, starters.toSet().size)
         fun targets(s: Int) = evo.member(s).let { m -> (0 until m.size / 6).filter { u16(m, it * 6) != 0 }.map { u16(m, it * 6 + 4) } }
         for (s in starters) assertTrue("starter $s", targets(s).any { targets(it).isNotEmpty() })
     }
 
     @Test
+    fun `the GUIDE reads a shuffled Black 2`() = each { g, f ->
+        if (g.code != "IREO") return@each
+        val a = tmp.root.resolve("${g.code}-a.nds").toOkioPath()
+        assertTrue(DsRandomizer.randomize(f.toOkioPath(), a, RomRandomizer.Options(), 7L))
+        val shuffle = DsRandomizer.readShuffle(a)!!
+        val zone = 6   // its wild set is 0, all year: a fishing / surfing spot
+        val before = BLACK2_WORLD.encounters(0, zone, null).let { it.water + it.superRod }.map { it.species }.toSet()
+        val cheren = BLACK2_WORLD.party(156, null)
+        val white2Cheren = WHITE2_WORLD.party(156, null)
+        try {
+            DsRandomizer.shuffle = shuffle
+            val after = BLACK2_WORLD.encounters(0, zone, null).let { it.water + it.superRod }.map { it.species }.toSet()
+            assertTrue(after.isNotEmpty())
+            assertFalse(after == before)
+            assertEquals(shuffle.team(156), BLACK2_WORLD.party(156, null))
+            assertFalse(BLACK2_WORLD.party(156, null).map { it.species } == cheren.map { it.species })
+            // White 2's GUIDE isn't Black 2's cart.
+            assertEquals(white2Cheren, WHITE2_WORLD.party(156, null))
+        } finally {
+            DsRandomizer.shuffle = null
+        }
+    }
+
+    @Test
     fun `the GUIDE reads a shuffled Platinum`() = each { g, f ->
         if (g.code != "CPUE") return@each
-        val a = tmp.root.resolve("a.nds").toOkioPath()
+        val a = tmp.root.resolve("${g.code}-a.nds").toOkioPath()
         assertTrue(DsRandomizer.randomize(f.toOkioPath(), a, RomRandomizer.Options(), 7L))
         assertNull(DsRandomizer.readShuffle(f.toOkioPath()))
         val shuffle = DsRandomizer.readShuffle(a)!!
@@ -118,7 +176,7 @@ class DsRandomizerTest {
 
     @Test
     fun `a cart that isn't one is refused`() = each { g, f ->
-        val bad = tmp.root.resolve("bad.nds")
+        val bad = tmp.root.resolve("${g.code}-bad.nds")
         f.copyTo(bad)
         // One byte of the encounter data changed outside a species word (an encounter rate).
         val enc = FileSystem.SYSTEM.openReadOnly(f.toOkioPath()).use { h -> DsRandomizer.Cart(h).let { it.span(it.fileId(g.encounters)) } }
@@ -130,6 +188,6 @@ class DsRandomizerTest {
             r.write(0x55)
         }
         assertNull(DsRandomizer.gameOf(bad.toOkioPath()))
-        assertFalse(DsRandomizer.randomize(bad.toOkioPath(), tmp.root.resolve("out.nds").toOkioPath(), RomRandomizer.Options(), 1L))
+        assertFalse(DsRandomizer.randomize(bad.toOkioPath(), tmp.root.resolve("${g.code}-out.nds").toOkioPath(), RomRandomizer.Options(), 1L))
     }
 }

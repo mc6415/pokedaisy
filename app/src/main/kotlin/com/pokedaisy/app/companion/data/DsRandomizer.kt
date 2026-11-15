@@ -7,29 +7,35 @@ import okio.Path
 import kotlin.random.Random
 
 /**
- * RANDOMIZE on the DS games (Platinum first): a copy of the player's own cart with its starters, wild Pokémon and
- * trainers' teams shuffled by a seed, like [RomRandomizer] on the GBA ones and with the same [RomRandomizer.Options].
+ * RANDOMIZE on the DS games (Platinum; Black 2 / White 2): a copy of the player's own cart with its starters, wild Pokémon
+ * and trainers' teams shuffled by a seed, like [RomRandomizer] on the GBA ones and with the same [RomRandomizer.Options].
  *
- * The data lives in the cart's file system: the starters are three words in overlay 78's literal pool (choose_starter_app.c's
- * STARTER_OPTION_*), the wild Pokémon a WildEncounters record per encounter set (`pl_enc_data.narc`), the trainers' teams
- * `trpoke.narc` (the party type from `trdata.narc`). Every swap keeps each file its size, so the cart is copied and those
- * bytes written in place: no file moves, the header and the file table stay the cart's.
+ * The data lives in the cart's file system: the wild Pokémon a record per encounter set (Platinum's WildEncounters in
+ * `pl_enc_data.narc`; Gen 5's 0xE8-byte blocks, one per season, in `/a/1/2/7`), the trainers' teams their party archive
+ * (the layout from the trainer records), the starters three words in an overlay (Platinum) or in event scripts (Black 2 /
+ * White 2: [StarterSite]s). Every swap keeps each file its size, so the cart is copied and those bytes written in place:
+ * no file moves, the header and the file table stay the cart's.
  *
- * A cart this tool made is told by those three files ([Game.madeSha1]: their bytes with [sites] zeroed, hashed together),
- * which is cheap next to hashing a 128 MB cart; [readCart] gives the GUIDE the shuffled wild sets and teams.
+ * A cart this tool made is told by the files it writes ([Game.madeSha1]: their bytes with every site zeroed, hashed
+ * together), which is cheap next to hashing a 128-512 MB cart; [readShuffle] gives the GUIDE the shuffled wild sets and teams.
  */
 object DsRandomizer {
     class Game(
         val code: String,
         val rev: Int,
         val title: String,
-        /** The three files ([starterOverlay], [encounters], [trainerParties]) as the retail cart has them, hashed together. */
+        /** The files the tool writes as the retail cart has them, hashed together. */
         val retailFilesSha1: String,
-        /** The same with [sites] zeroed: what every cart made from it hashes to. */
+        /** The same with every site zeroed: what every cart made from it hashes to. */
         val madeSha1: String,
-        val starterOverlay: Int,
+        /** 4: Platinum's layouts; 5: Black / White's. */
+        val gen: Int = 4,
+        /** The overlay with the starters' words (Platinum), or null. */
+        val starterOverlay: Int? = null,
         /** The starters' words in [starterOverlay], in the order the game shows them (grass, fire, water). */
-        val starterOffsets: List<Int>,
+        val starterOffsets: List<Int> = emptyList(),
+        /** The starters' places in event scripts (Gen 5), or null. */
+        val starterScripts: StarterScripts? = null,
         val encounters: String,
         val trainers: String,
         val trainerParties: String,
@@ -53,6 +59,25 @@ object DsRandomizer {
     /** The message [bank] in [path] whose [lines] ask about each starter; species names are bank [names]. */
     class StarterText(val path: String, val bank: Int, val lines: List<Int>, val names: Int)
 
+    /** A starter's species word (u16) in script [member] at [offset]: [which] starter it is (0, 1, 2 = grass, fire, water). */
+    class StarterSite(val member: Int, val offset: Int, val which: Int)
+
+    /** The script archive [path] and every place in it a starter's species is named (set, compared, put in text). */
+    class StarterScripts(val path: String, val sites: List<StarterSite>)
+
+    // Black 2 / White 2 (the same in both): Aspertia's starter scene (854: the choice var 0x8025 and the names put in its
+    // text), the rival's pick (794: the player's starter compared), later scenes naming them (808, 878).
+    private val B2W2_STARTERS = StarterScripts("/a/0/5/6", listOf(
+        StarterSite(794, 0xB3, 0), StarterSite(794, 0x105, 1), StarterSite(794, 0x157, 2), StarterSite(808, 0xB4, 0),
+        StarterSite(808, 0x188, 1), StarterSite(808, 0x25C, 2), StarterSite(854, 0x58B, 0), StarterSite(854, 0x590, 0),
+        StarterSite(854, 0x595, 0), StarterSite(854, 0x5C0, 1), StarterSite(854, 0x5C5, 1), StarterSite(854, 0x5CA, 1),
+        StarterSite(854, 0x5E2, 2), StarterSite(854, 0x5E7, 2), StarterSite(854, 0x5EC, 2), StarterSite(854, 0x7D0, 0),
+        StarterSite(854, 0x7EE, 1), StarterSite(854, 0x7F9, 2), StarterSite(854, 0xB33, 1), StarterSite(854, 0xB51, 2),
+        StarterSite(854, 0xB6F, 0), StarterSite(854, 0xEB0, 0), StarterSite(854, 0xECE, 1), StarterSite(854, 0xED9, 2),
+        StarterSite(854, 0x106F, 0), StarterSite(854, 0x108D, 1), StarterSite(854, 0x1098, 2), StarterSite(878, 0x1DB, 2),
+        StarterSite(878, 0x1F9, 1), StarterSite(878, 0x204, 0),
+    ))
+
     val GAMES = listOf(
         Game(
             "CPUE", 1, "Platinum", "03abfbcd7c99152bcaaccffdeb729d72c0f382cc", "6aacfe6af2c159707c9b4399d023f292bf843d9e",
@@ -66,10 +91,20 @@ object DsRandomizer {
             sprites = SpritePatch(at = 0x690, len = 42, getSpecies = 0x021D291C, makeSprite = 0x021D1468),
             text = StarterText("/msgdata/pl_msg.narc", bank = 360, lines = listOf(1, 2, 3), names = 412),
         ),
-    )
+    ) + listOf(
+        Triple("IREO", "Black 2", "16e96e0e57675205a8c900f34e2103159204b30f" to "b6ad711f472164ab7f2167100e7198c04c217d9a"),
+        Triple("IRDO", "White 2", "ab919dfae9392a39e312258cea525be4248f84ce" to "6f7728967faaa93544d690220528c51cf55945da"),
+    ).map { (code, title, hashes) ->
+        // pret has no decomp of these: the archives from the cart (scripts/gen_gen5_guide.py reads the same ones).
+        Game(
+            code, 0, title, hashes.first, hashes.second, gen = 5, starterScripts = B2W2_STARTERS,
+            encounters = "/a/1/2/7", trainers = "/a/0/9/1", trainerParties = "/a/0/9/2",
+            personal = "/a/0/1/6", evolutions = "/a/0/1/9", learnsets = "/a/0/1/8", speciesCount = 649,
+        )
+    }
 
-    /** National numbers of the legendaries and mythicals up to Gen 4. */
-    private val LEGENDARY = setOf(144, 145, 146, 150, 151, 243, 244, 245, 249, 250, 251) + (377..386) + (480..493)
+    /** National numbers of the legendaries and mythicals up to Gen 5. */
+    private val LEGENDARY = setOf(144, 145, 146, 150, 151, 243, 244, 245, 249, 250, 251) + (377..386) + (480..494) + (638..649)
 
     // Platinum's struct WildEncounters (include/struct_defs/wild_encounters.h), 0x1A8 bytes: every species word.
     private val GRASS = (0 until 12).map { 8 + it * 8 }
@@ -81,9 +116,30 @@ object DsRandomizer {
     private val SUPER_ROD = water(380)
     private val ENCOUNTER_SPECIES = GRASS + TIMED + SURF + OLD_ROD + GOOD_ROD + SUPER_ROD
 
-    /** Bytes of one trainer Pokémon by trdata's party type (struct_defs/trainer_data.h); its moves' place, or -1. */
-    private fun monStride(type: Int) = when (type) { 1 -> 16; 2 -> 10; 3 -> 18; else -> 8 }
-    private fun movesAt(type: Int) = when (type) { 1 -> 6; 3 -> 8; else -> -1 }
+    /** Gen 5's encounter block (0xE8 bytes): 56 slots of species (11 bits) + form, min level, max level, from +8. */
+    private const val GEN5_BLOCK = 0xE8
+    private const val GEN5_SLOTS = 56
+
+    /** A trainer Pokémon's record by the party type (bit 0 its moves, bit 1 an item; struct_defs/trainer_data.h, Gen 5 the
+     * same bits): 8 bytes (Platinum: IVs, level, species, seal; Gen 5: IVs, gender / ability, level, species, form), then the
+     * item, then the moves (Platinum's before the seal). */
+    private fun monStride(type: Int) = 8 + (if (type and 2 != 0) 2 else 0) + (if (type and 1 != 0) 8 else 0)
+    private fun itemAt(gen: Int, type: Int) = if (type and 2 != 0) (if (gen == 5) 8 else 6) else -1
+    private fun movesAt(gen: Int, type: Int) = if (type and 1 != 0) (if (gen == 5) 8 else 6) + (if (type and 2 != 0) 2 else 0) else -1
+    private fun speciesMask(gen: Int) = if (gen == 5) 0x7FF else 0x3FF
+
+    /** Every species word in encounter archive [narc]: its place and width (Platinum's are u32, Gen 5's u16). */
+    private fun encounterSites(gen: Int, narc: Narc, each: (member: Int, at: Int, width: Int) -> Unit) {
+        for (m in 0 until narc.size) {
+            val start = narc.start(m)
+            val size = narc.end(m) - start
+            if (gen == 5) {
+                for (b in 0 until size / GEN5_BLOCK) for (i in 0 until GEN5_SLOTS) each(m, start + b * GEN5_BLOCK + 8 + i * 4, 2)
+            } else {
+                for (s in ENCOUNTER_SPECIES) if (s + 4 <= size) each(m, start + s, 4)
+            }
+        }
+    }
 
     /** The cart's file system: its header, file table and names. */
     class Cart(private val h: FileHandle) {
@@ -183,32 +239,42 @@ object DsRandomizer {
     /** The files the tool writes (the starters' overlay, the encounters, the trainers' parties, the starter screen's text),
      * read from [cart]. */
     private class Files(val cart: Cart, val g: Game) {
-        val overlayId = cart.overlayFile(g.starterOverlay)
-        val overlayRam = cart.overlayRam(g.starterOverlay)
+        val overlayId = g.starterOverlay?.let { cart.overlayFile(it) }
+        val overlayRam = g.starterOverlay?.let { cart.overlayRam(it) } ?: 0
         val encId = cart.fileId(g.encounters)
         val partiesId = cart.fileId(g.trainerParties)
         val msgId = g.text?.let { cart.fileId(it.path) }
-        val overlay = cart.file(overlayId)
+        val scriptsId = g.starterScripts?.let { cart.fileId(it.path) }
+        val overlay = overlayId?.let { cart.file(it) } ?: ByteArray(0)
         val enc = cart.file(encId)
         val parties = cart.file(partiesId)
         val msg = msgId?.let { cart.file(it) }
+        val scripts = scriptsId?.let { cart.file(it) }
         val trdata = Narc(cart.file(cart.fileId(g.trainers)))
 
         /** Each file written, at its place in the cart. */
         fun written(): List<Pair<Long, ByteArray>> = listOfNotNull(
-            cart.span(overlayId).first to overlay, cart.span(encId).first to enc, cart.span(partiesId).first to parties,
-            msgId?.let { cart.span(it).first to msg!! },
+            overlayId?.let { cart.span(it).first to overlay }, cart.span(encId).first to enc, cart.span(partiesId).first to parties,
+            msgId?.let { cart.span(it).first to msg!! }, scriptsId?.let { cart.span(it).first to scripts!! },
         )
+
+        /** The starter sites' absolute places in [scripts]. */
+        fun scriptSites(sc: ByteArray): List<Pair<Int, Int>> {
+            val n = Narc(sc)
+            return g.starterScripts!!.sites.map { n.start(it.member) + it.offset to it.which }
+        }
 
         fun hash(zeroed: Boolean): String {
             val o = overlay.copyOf(); val e = enc.copyOf(); val p = parties.copyOf(); val m = msg?.copyOf() ?: ByteArray(0)
+            val sc = scripts?.copyOf() ?: ByteArray(0)
             if (zeroed) {
                 for (at in g.starterOffsets) for (i in 0 until 4) o[at + i] = 0
                 g.sprites?.let { sp -> for (i in 0 until sp.len) o[sp.at + i] = 0 }
-                val en = Narc(e)
-                for (k in 0 until en.size) for (s in ENCOUNTER_SPECIES) if (en.start(k) + s + 4 <= en.end(k)) for (i in 0 until 4) e[en.start(k) + s + i] = 0
+                encounterSites(g.gen, Narc(e)) { _, at, width -> for (i in 0 until width) e[at + i] = 0 }
                 trainerMons(Narc(p)) { at, moves ->
                     p[at + 4] = 0; p[at + 5] = 0
+                    // Gen 5's form word goes with the species.
+                    if (g.gen == 5) { p[at + 6] = 0; p[at + 7] = 0 }
                     if (moves >= 0) for (i in 0 until 8) p[moves + i] = 0
                 }
                 g.text?.let { t ->
@@ -220,8 +286,9 @@ object DsRandomizer {
                         for (i in 0 until len * 2) m[bank + off + i] = 0
                     }
                 }
+                if (scripts != null) for ((at, _) in scriptSites(sc)) { sc[at] = 0; sc[at + 1] = 0 }
             }
-            return (o + e + p + m).toByteString().sha1().hex()
+            return (o + e + p + m + sc).toByteString().sha1().hex()
         }
 
         /** Each trainer Pokémon in [narc] (trpoke): its record and its moves' place (-1 none), as absolute places in it. */
@@ -235,7 +302,7 @@ object DsRandomizer {
                 if (narc.end(t) - narc.start(t) < count * stride) continue
                 for (i in 0 until count) {
                     val at = narc.start(t) + i * stride
-                    each(at, movesAt(type).let { if (it < 0) -1 else at + it })
+                    each(at, movesAt(g.gen, type).let { if (it < 0) -1 else at + it })
                 }
             }
         }
@@ -269,7 +336,17 @@ object DsRandomizer {
      */
     class Shuffle(val game: Game, private val sets: List<ByteArray>, private val teams: Map<Int, List<TrainerMon>>) {
         /** Encounter set [set]'s species at byte [offset] of its record, or null when it has none there. */
-        fun speciesAt(set: Int, offset: Int): Int? = sets.getOrNull(set)?.takeIf { offset + 4 <= it.size }?.let { u32(it, offset) }
+        fun speciesAt(set: Int, offset: Int): Int? = sets.getOrNull(set)?.let { m ->
+            if (game.gen == 5) m.takeIf { offset + 2 <= it.size }?.let { u16(it, offset) and 0x7FF }
+            else m.takeIf { offset + 4 <= it.size }?.let { u32(it, offset) }
+        }
+
+        /** Gen 5: encounter set [set]'s species in season block [block] (0 when the set has one), way slot [slot] (0-55). */
+        fun gen5Species(set: Int, block: Int, slot: Int): Int? {
+            val blocks = (sets.getOrNull(set)?.size ?: 0) / GEN5_BLOCK
+            if (blocks == 0) return null
+            return speciesAt(set, (if (blocks == 1) 0 else block) * GEN5_BLOCK + 8 + slot * 4)
+        }
         fun team(trainer: Int): List<TrainerMon>? = teams[trainer]
     }
 
@@ -295,8 +372,9 @@ object DsRandomizer {
                 teams[t] = (0 until (head[3].toInt() and 0xFF)).mapNotNull { i ->
                     val at = i * stride
                     if (at + stride > m.size) return@mapNotNull null
-                    val moves = movesAt(type).let { o -> if (o < 0) emptyList() else (0 until 4).map { u16(m, at + o + it * 2) }.filter { it != 0 } }
-                    TrainerMon(u16(m, at + 4) and 0x3FF, u16(m, at + 2), if (type == 2 || type == 3) u16(m, at + 6) else 0, moves)
+                    val moves = movesAt(g.gen, type).let { o -> if (o < 0) emptyList() else (0 until 4).map { u16(m, at + o + it * 2) }.filter { it != 0 } }
+                    val item = itemAt(g.gen, type).let { o -> if (o < 0) 0 else u16(m, at + o) }
+                    TrainerMon(u16(m, at + 4) and speciesMask(g.gen), m[at + 2].toInt() and 0xFF, item, moves)
                 }
             }
             Shuffle(g, (0 until enc.size).map { enc.member(it) }, teams)
@@ -323,20 +401,25 @@ object DsRandomizer {
      * on an IO error (the half-written [output] is the caller's to delete).
      */
     fun randomize(input: Path, output: Path, options: RomRandomizer.Options, seed: Long, onProgress: (Float) -> Unit = {}): Boolean {
-        val shuffled = FileSystem.SYSTEM.openReadOnly(input).use { h ->
-            val cart = Cart(h)
-            val g = gameOfHeader(cart) ?: return false
-            val f = Files(cart, g)
+        // The cheap check first: a wrong cart isn't copied.
+        if (gameOf(input) == null) return false
+        copyWithProgress(input, output) { onProgress(it * 0.9f) }
+        return randomizeInPlace(output, options, seed).also { onProgress(1f) }
+    }
+
+    /** [cart] (a copy of the player's: the caller's own file, an unpacked archive) shuffled where it is. False, and nothing
+     * written, when the tool can't take it. */
+    fun randomizeInPlace(cart: Path, options: RomRandomizer.Options, seed: Long): Boolean {
+        val shuffled = FileSystem.SYSTEM.openReadOnly(cart).use { h ->
+            val c = Cart(h)
+            val g = gameOfHeader(c) ?: return false
+            val f = Files(c, g)
             if (f.hash(false) != g.retailFilesSha1 && f.hash(true) != g.madeSha1) return false
-            val run = Run(cart, g, f, options, Random(seed))
-            run.all()
+            Run(c, g, f, options, Random(seed)).all()
             check(f.hash(true) == g.madeSha1) { "randomizer wrote outside its sites" }
             f.written()
         }
-        onProgress(0.1f)
-        copyWithProgress(input, output) { onProgress(0.1f + it * 0.85f) }
-        FileSystem.SYSTEM.openReadWrite(output).use { h -> for ((at, bytes) in shuffled) h.write(at, bytes, 0, bytes.size) }
-        onProgress(1f)
+        FileSystem.SYSTEM.openReadWrite(cart).use { h -> for ((at, bytes) in shuffled) h.write(at, bytes, 0, bytes.size) }
         return true
     }
 
@@ -397,8 +480,9 @@ object DsRandomizer {
                     s !in evolvedFrom && s !in LEGENDARY && evolvesTo[s].orEmpty().any { evolvesTo[it].orEmpty().isNotEmpty() }
                 }
             }.toMutableList()
-            val three = g.starterOffsets.map { from.random(rnd).also { from.remove(it) } }
+            val three = List(3) { from.random(rnd).also { from.remove(it) } }
             g.starterOffsets.forEachIndexed { i, at -> put32(f.overlay, at, three[i]) }
+            f.scripts?.let { sc -> for ((at, which) in f.scriptSites(sc)) put16(sc, at, three[which]) }
             g.sprites?.let { spritePatch(it) }
             g.text?.let { starterText(it, three) }
         }
@@ -461,50 +545,54 @@ object DsRandomizer {
                 val left = pool.toMutableList()
                 for (s in all) global[s] = pick(left.ifEmpty { pool }, s).also { left.remove(it) }
             }
-            val enc = Narc(f.enc)
-            for (m in 0 until enc.size) {
-                val area = HashMap<Int, Int>()
-                for (s in ENCOUNTER_SPECIES) {
-                    val at = enc.start(m) + s
-                    if (at + 4 > enc.end(m)) continue
-                    val was = u32(f.enc, at)
-                    if (was !in 1..g.speciesCount) continue
-                    put32(f.enc, at, when (o.wild) {
-                        RomRandomizer.Wild.RANDOM -> pick(pool, was)
-                        RomRandomizer.Wild.PER_AREA -> area.getOrPut(was) { pick(pool, was) }
-                        else -> global.getValue(was)
-                    })
+            var area = HashMap<Int, Int>()
+            var member = -1
+            encounterSites(g.gen, Narc(f.enc)) { m, at, width ->
+                if (m != member) { area = HashMap(); member = m }
+                val raw = if (width == 4) u32(f.enc, at) else u16(f.enc, at)
+                val was = raw and speciesMask(g.gen)
+                if (was !in 1..g.speciesCount) return@encounterSites
+                val now = when (o.wild) {
+                    RomRandomizer.Wild.RANDOM -> pick(pool, was)
+                    RomRandomizer.Wild.PER_AREA -> area.getOrPut(was) { pick(pool, was) }
+                    else -> global.getValue(was)
                 }
+                // Gen 5's form bits go with the old species: the new one is its plain form.
+                if (width == 4) put32(f.enc, at, now) else put16(f.enc, at, now)
             }
         }
 
         fun trainers() {
             f.trainerMons(Narc(f.parties)) { at, moves ->
-                val was = u16(f.parties, at + 4) and 0x3FF
+                val was = u16(f.parties, at + 4) and speciesMask(g.gen)
                 if (was !in 1..g.speciesCount) return@trainerMons
                 val now = pick(pool, was)
                 put16(f.parties, at + 4, now)
+                // Gen 5's form is its own word: the new species' plain form.
+                if (g.gen == 5) put16(f.parties, at + 6, 0)
                 if (moves >= 0) {
-                    val list = movesAt(now, u16(f.parties, at + 2))
+                    val list = movesAt(now, f.parties[at + 2].toInt() and 0xFF)
                     for (k in 0 until 4) put16(f.parties, moves + k * 2, list.getOrElse(k) { 0 })
                 }
             }
         }
 
-        /** The last four moves [species] has learnt by [level] (wotbl: move | level << 9, to 0xFFFF). */
+        /** The last four moves [species] has learnt by [level] (Platinum's wotbl: move | level << 9, to 0xFFFF; Gen 5's:
+         * (move, level) pairs, to a 0xFFFF move). */
         fun movesAt(species: Int, level: Int): List<Int> {
             val m = learn.member(species)
             val known = ArrayList<Int>()
+            val step = if (g.gen == 5) 4 else 2
             var i = 0
-            while (i + 1 < m.size && u16(m, i) != 0xFFFF) {
-                val v = u16(m, i)
-                if (v shr 9 > level) break
-                val move = v and 0x1FF
+            while (i + step <= m.size && u16(m, i) != 0xFFFF) {
+                val move = if (g.gen == 5) u16(m, i) else u16(m, i) and 0x1FF
+                val at = if (g.gen == 5) u16(m, i + 2) else u16(m, i) shr 9
+                if (at > level) break
                 if (move !in known) {
                     if (known.size == 4) known.removeAt(0)
                     known += move
                 }
-                i += 2
+                i += step
             }
             return known
         }

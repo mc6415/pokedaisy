@@ -1340,6 +1340,13 @@ the line's length). A cart is the tool's when those files with the sites zeroed 
 BOSS's teams. Checked headless with nds_dump and field scripts (StartChooseStarterScene, StartTrainerBattle, Warp): the
 briefcase showed and gave the shuffled starters, Roark and Route 201's grass were shuffled. HG / SS and Gen 5 are next:
 each needs its starter places and `Game` row.
+Black 2 / White 2 (`gen = 5`, no decomp: the archives scripts/gen_gen5_guide.py reads) keep their wild sets as 0xE8-byte
+blocks (one, or four for the seasons) of 56 u16 species words, their parties at 8 bytes + item + moves (the moves 2 bytes later
+than Platinum's), learnsets as (move, level) pairs; a trainer Pokémon's form word goes with its species. The starters are
+30 u16 words in event scripts (`/a/0/5/6` members 794, 808, 854, 878: Aspertia's choice var 0x8025, the names its text
+buffers, the rival's comparison), the same in both, each swapped for its starter. Their GUIDE (`Gen5World`'s `code`) reads
+the shuffle like Platinum's. A zipped cart is unpacked into the new file and shuffled in place (`randomizeInPlace`); it's
+checked only then. Checked headless: the user's Black 2 save met a shuffled wild Pokémon in Route 19's grass.
 
 SIMILAR STRENGTH keeps a swap within 10% of the base stat total, widening by 5% until six candidates fit. Ruby / Sapphire have
 no GF header, so their base stats come from the records (`speciesInfo`). FireRed rev 0 / LeafGreen rev 0 / Ruby and Sapphire
