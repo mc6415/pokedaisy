@@ -2600,7 +2600,7 @@ class PokeDaisyActivity : Activity() {
         tmSites = emptyList()
         // REUSABLE TMS on a DS cart (retail only: Renegade Platinum keeps retail's header and this code, but wasn't tried)
         dsTmCart = nds && com.pokedaisy.app.companion.data.ReusableTms.dsProved(ndsCode, RomIdentity.ndsRevision(r)) &&
-            !(ndsCode == com.pokedaisy.app.companion.data.RenegadePlatinum.CODE && com.pokedaisy.app.companion.data.RenegadePlatinum.matches(r))
+            !(ndsCode == com.pokedaisy.app.companion.data.RenegadePlatinum.CODE && com.pokedaisy.app.companion.data.RenegadePlatinum.matches(r.toOkioPath()))
         if (::engine.isInitialized) engine.setReusableTms(tmSites, false)
         textPatch = null
         if (::engine.isInitialized) engine.setInstantText(null, false)
