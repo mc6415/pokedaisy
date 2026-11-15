@@ -916,6 +916,7 @@ fun platformLibrary(view: com.pokedaisy.app.LibraryView = com.pokedaisy.app.Libr
         "Pokemon - Crystal Version (USA, Europe) (Rev 1).gbc" to Triple("Pokémon Crystal", "GBC", "GBC"),
         "Pokemon Crystal Clear (v2.6.0).gbc" to Triple("Pokémon Crystal Clear", "HACK", "GBC"),
         "4997 - Pokemon - Platinum Version (USA).nds" to Triple("Pokémon Platinum", "NDS", "NDS"),
+        "Pokemon Emerald Randomized (seed 482913).gba" to Triple("Pokémon Emerald (Randomized)", "GBA", "GBA"),
     )
     extra.keys.forEach { File(roms, it).apply { writeText("x"); setLastModified(1_700_000_000_000L) } }
     // Dated a week ago like the others (datedLibrary), so they aren't NEW.
@@ -2154,6 +2155,7 @@ fun main(args: Array<String>) {
         Shot("library-views-gba", tw, th, td, activity { platformLibrary(com.pokedaisy.app.LibraryView.GBA); LibraryActivity() }),
         Shot("library-views-ds", tw, th, td, activity { platformLibrary(com.pokedaisy.app.LibraryView.DS); LibraryActivity() }),
         Shot("library-views-hacks", tw, th, td, activity { platformLibrary(com.pokedaisy.app.LibraryView.HACKS); LibraryActivity() }),
+        Shot("library-views-randomized", tw, th, td, activity { platformLibrary(com.pokedaisy.app.LibraryView.RANDOMIZED); LibraryActivity() }),
         // GAMES / TOOLS / SETTINGS: a rail down the left of a wide screen, a bar along the bottom of an upright one. Each with
         // the games, then TOOLS open.
         // A big game being got ready to start: the library dimmed under the rocking ball.

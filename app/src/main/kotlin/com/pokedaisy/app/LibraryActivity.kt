@@ -508,7 +508,10 @@ class LibraryActivity : ComponentActivity() {
     private fun quickViewsOf(library: List<File>): QuickViews {
         val platforms = library.associateWith { GameTitles.platform(this, it) }
         val categories = library.associateWith { GameTitles.category(this, it) }
-        return QuickViews(LibraryView.entries.associateWith { libraryViewOf(this, prefs, library, it, platforms::get, categories::get) })
+        val randomized = library.filter { GameTitles.isRandomized(this, it) }.toSet()
+        return QuickViews(LibraryView.entries.associateWith {
+            libraryViewOf(this, prefs, library, it, platforms::get, categories::get) { f -> f in randomized }
+        })
     }
 
     private fun pickQuickView(view: LibraryView) {

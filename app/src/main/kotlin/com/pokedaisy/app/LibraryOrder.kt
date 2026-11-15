@@ -124,9 +124,12 @@ private fun sorted(context: Context, prefs: Prefs, roms: List<File>, sort: Libra
 /**
  * The library's quick views (the pills over the games, [Prefs.libraryView]). [id] is what Prefs keeps (stable, never
  * renamed); [platform]: the console a platform view shows ([GameTitles.platform], so a hack shows under its base game's
- * too); [category]: the kind a view shows ([GameTitles.category]: HACKS).
+ * too); [category]: the kind a view shows ([GameTitles.category]: HACKS); [randomized]: randomized copies
+ * ([GameTitles.isRandomized]: the library's RANDOMIZE's, a randomizer's).
  */
-enum class LibraryView(val id: Int, val label: String, val platform: RomCategory? = null, val category: RomCategory? = null) {
+enum class LibraryView(
+    val id: Int, val label: String, val platform: RomCategory? = null, val category: RomCategory? = null, val randomized: Boolean = false,
+) {
     ALL(0, "ALL"),
     FAVORITES(1, "FAVORITES"),
     RECENT(2, "RECENT"),
@@ -134,10 +137,11 @@ enum class LibraryView(val id: Int, val label: String, val platform: RomCategory
     GBC(4, "GBC", platform = RomCategory.GBC),
     GBA(5, "GBA", platform = RomCategory.GBA),
     DS(6, "DS", platform = RomCategory.NDS),
-    HACKS(7, "HACKS", category = RomCategory.HACK);
+    HACKS(7, "HACKS", category = RomCategory.HACK),
+    RANDOMIZED(8, "RANDOMIZED", randomized = true);
 
-    /** A view of some games by what they are (a console, the hacks): shown only while the library has one. */
-    val byKind get() = platform != null || category != null
+    /** A view of some games by what they are (a console, the hacks, randomized copies): shown only while the library has one. */
+    val byKind get() = platform != null || category != null || randomized
 
     companion object {
         fun of(id: Int) = entries.firstOrNull { it.id == id } ?: ALL
@@ -147,11 +151,12 @@ enum class LibraryView(val id: Int, val label: String, val platform: RomCategory
 /**
  * [sorted] (the library in its order, [sortLibrary]) narrowed to [view]. RECENT is every game ever started,
  * the last played first whatever the order (favorites not first: it's a history). [platform] / [category]: a game's
- * console and kind, null until the background title pass has looked at it (then it's in no such view yet).
+ * console and kind, null until the background title pass has looked at it (then it's in no such view yet); [randomized]
+ * the same pass's word on whether it's a randomized copy.
  */
 fun libraryViewOf(
     context: Context, prefs: Prefs, sorted: List<File>, view: LibraryView,
-    platform: (File) -> RomCategory?, category: (File) -> RomCategory?,
+    platform: (File) -> RomCategory?, category: (File) -> RomCategory?, randomized: (File) -> Boolean = { false },
 ): List<File> = when (view) {
     LibraryView.ALL -> sorted
     LibraryView.FAVORITES -> prefs.favoriteRoms.let { fav -> sorted.filter { it.absolutePath in fav } }
@@ -161,5 +166,6 @@ fun libraryViewOf(
             .filter { prefs.romLastPlayed(it.absolutePath) > 0 || it.absolutePath in recent }
     }
     LibraryView.HACKS -> sorted.filter { category(it) == RomCategory.HACK }
+    LibraryView.RANDOMIZED -> sorted.filter(randomized)
     else -> sorted.filter { platform(it) == view.platform }
 }
