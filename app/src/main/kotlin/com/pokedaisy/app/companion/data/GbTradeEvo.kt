@@ -1,5 +1,21 @@
 package com.pokedaisy.app.companion.data
 
+/** TRADE EVOLUTIONS on a Game Boy game: [GbTradeEvo] (Gold / Silver / Crystal) or [Gen1TradeEvo] (Red / Blue / Yellow). */
+interface GbTradeEvolution {
+    /** Whether the cart has the code every step relies on. */
+    fun codeMatches(rom: (Long, Int) -> ByteArray?): Boolean
+
+    /** The party's trade evolutions: each evolving Pokémon by its key (the party read's `personality`) to its target's
+     * Pokédex number. */
+    fun targets(g: GameCalls): Map<Long, Int>
+
+    /** Starts the evolution of party slot [slot], which must still hold the Pokémon [key] and still evolve by trade. */
+    fun start(g: GameCalls, slot: Int, key: Long): TradeEvoResult
+
+    /** A few frames after [start]: whether the game took it; if not, it's withdrawn. */
+    fun taken(g: GameCalls): Boolean
+}
+
 /**
  * TRADE EVOLUTIONS on Gold / Silver / Crystal: the game's own evolution, run the way its link trade runs it. pret's
  * EvolvePokemon (engine/pokemon/evolve.asm) evolves the party slot in wCurPartyMon by its EvosAttacks entry; an
@@ -41,8 +57,8 @@ class GbTradeEvo(
     private val endOp: Int,
     /** The code each step relies on, by its place in the ROM file. */
     val signatures: List<Pair<Long, String>>,
-) {
-    fun codeMatches(rom: (Long, Int) -> ByteArray?): Boolean = signatures.all { (off, hex) ->
+) : GbTradeEvolution {
+    override fun codeMatches(rom: (Long, Int) -> ByteArray?): Boolean = signatures.all { (off, hex) ->
         val want = hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
         rom(off, want.size)?.contentEquals(want) == true
     }
@@ -70,7 +86,7 @@ class GbTradeEvo(
     }
 
     /** The party's trade evolutions: each evolving Pokémon by its key ([gen2MonKey]) to its target species. */
-    fun targets(g: GameCalls): Map<Long, Int> {
+    override fun targets(g: GameCalls): Map<Long, Int> {
         val count = u8(g, partyCount).coerceAtMost(6)
         val species = g.read(partyCount + 1, 6)
         val out = LinkedHashMap<Long, Int>()
@@ -88,7 +104,7 @@ class GbTradeEvo(
         u8(g, queue) == 0
 
     /** Queues the evolution of party slot [slot], which must still hold the Pokémon [key] and still evolve by trade. */
-    fun start(g: GameCalls, slot: Int, key: Long): TradeEvoResult {
+    override fun start(g: GameCalls, slot: Int, key: Long): TradeEvoResult {
         if (!free(g)) return TradeEvoResult.NOT_NOW
         if (slot !in 0 until u8(g, partyCount).coerceAtMost(6)) return TradeEvoResult.MOVED
         val mon = g.read(partyMon1 + slot * MON_SIZE, MON_SIZE)
@@ -111,7 +127,7 @@ class GbTradeEvo(
     }
 
     /** True once the game took the queued script; one it didn't take is withdrawn ([GbField.taken]'s way). */
-    fun taken(g: GameCalls): Boolean {
+    override fun taken(g: GameCalls): Boolean {
         if (u8(g, queue) == 0) return true
         g.write(queue, byteArrayOf(0))
         return false

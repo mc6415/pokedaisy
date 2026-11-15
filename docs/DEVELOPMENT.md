@@ -3098,8 +3098,14 @@ field (RunMemScript, as GbField's PC / FLY) sits in wUnusedMapBuffer (24 bytes t
 and its music back: EvolveAfterBattle returns early in a link and skips RestartMapMusic), `end`; wCurPartyMon is written as
 it's queued. Who evolves comes from the cart's EvosAttacks, the held item and an Everstone counted as EvolvePokemon counts
 them. Checked headless in Crystal rev 1, Gold and Silver (KADABRA, ONIX + Metal Coat, an Everstone refused, walking after).
-Red / Blue / Yellow would need their own way (no script queue; their in-game trade's `.tradeEvo` sets wLinkState and calls
-TryEvolvingMon, then restores a screen it saved first): not done.
+Red / Blue / Yellow (`Gen1TradeEvo.kt`, English carts) have no script queue: a 57-byte routine goes into wEnemyMonOT (66
+bytes only a battle or a trade sets up) and is called from the overworld loop through Bankswitch (`gbCallAt`, as GbField's
+PC). It brackets TryEvolvingMon (wWhichPokemon = the slot, wLinkState = LINK_STATE_TRADING for its EVOLVE_TRADE check) as
+DisplayTextID brackets a field text: hLoadedROMBank pushed, DisplayTextIDInit with no text box, SaveScreenTilesToBuffer2;
+after, wLinkState 0, ReloadTilesetTilePatterns, RestoreScreenTilesAndReloadTilePatterns (sprites on: the evolution leaves
+wUpdateSpritesEnabled at $ff, the player stuck without it), PlayDefaultMusic (a link skips both), `jp CloseTextDisplay`
+(pops the bank, redraws the map and its people). Who evolves comes from the cart's EvosMovesPointerTable. Checked headless:
+KADABRA and HAUNTER in Blue, GRAVELER in Red, MACHOKE in a new Yellow game, the map, people and palette back, walking after.
 
 **Reads and tables.** Everything comes from pret's decomps, which build the retail ROMs byte for byte
 (`$DECOMPS/pokeplatinum`, `$DECOMPS/pokeheartgold`, built in Docker): addresses from their `.xMAP`, struct offsets from

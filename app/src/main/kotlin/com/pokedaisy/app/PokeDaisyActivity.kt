@@ -548,13 +548,18 @@ class PokeDaisyActivity : Activity() {
         return v
     }
 
-    /** TRADE EVOLUTIONS on Gold / Silver / Crystal ([com.pokedaisy.app.companion.data.GbTradeEvo]): the English carts, by
-     * the config their hash picked, their code checked in the cart once. */
-    @Volatile private var gbTradeEvoCache: Pair<Any, com.pokedaisy.app.companion.data.GbTradeEvo?>? = null
+    /** TRADE EVOLUTIONS on the Game Boy: Gold / Silver / Crystal ([com.pokedaisy.app.companion.data.GbTradeEvo], by the
+     * config their hash picked) and Red / Blue / Yellow ([com.pokedaisy.app.companion.data.Gen1TradeEvo]), English carts,
+     * their code checked in the cart once. */
+    @Volatile private var gbTradeEvoCache: Pair<Any, com.pokedaisy.app.companion.data.GbTradeEvolution?>? = null
 
-    private fun gbTradeEvo(): com.pokedaisy.app.companion.data.GbTradeEvo? {
-        if (!romIsGameBoy || !telemetry.snapshot.value.game.isGen2) return null
-        val evo = com.pokedaisy.app.companion.data.GbTradeEvo.forConfig(com.pokedaisy.app.companion.data.activeGen2) ?: return null
+    private fun gbTradeEvo(): com.pokedaisy.app.companion.data.GbTradeEvolution? {
+        if (!romIsGameBoy) return null
+        val game = telemetry.snapshot.value.game
+        val evo: com.pokedaisy.app.companion.data.GbTradeEvolution = when {
+            game.isGen2 -> com.pokedaisy.app.companion.data.GbTradeEvo.forConfig(com.pokedaisy.app.companion.data.activeGen2)
+            else -> com.pokedaisy.app.companion.data.Gen1TradeEvo.forGame(game, com.pokedaisy.app.companion.data.romLanguage)
+        } ?: return null
         gbTradeEvoCache?.let { (k, v) -> if (k === evo) return v }
         if (!::engine.isInitialized || !engine.running) return null
         val ok = runCatching { evo.codeMatches { off, len -> MgbaCore.pkRomRead(off, len) } }.getOrElse { return null }
@@ -855,7 +860,8 @@ class PokeDaisyActivity : Activity() {
             }
             gbTradeEvo()?.let { gb ->
                 if (!Prefs(this@PokeDaisyActivity).tradeEvolutions) return done(com.pokedaisy.app.companion.data.TradeEvoResult.FAILED)
-                // A map script queued from the free field (GbTradeEvo), then confirmed taken a step later, like PC / FLY.
+                // From the free field: a map script queued (GbTradeEvo) or a routine called from the loop (Gen1TradeEvo), then
+                // confirmed taken a step later, like PC / FLY.
                 return engine.requestFieldItemJob(telemetry.snapshot.value.inBattle) { calls, busy ->
                     val r = if (busy) com.pokedaisy.app.companion.data.TradeEvoResult.NOT_NOW
                     else runCatching { gb.start(calls, slot, personality) }.getOrElse {
