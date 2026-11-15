@@ -269,8 +269,9 @@ class RomRandomizeFlow(
         /** "Pokemon FireRed Randomized (seed 123456).gba". */
         fun outputName(b: Base, seed: Long) = RomUris.sanitizeFileName("Pokemon ${b.game} Randomized (seed $seed).gba")
 
-        /** FIELD ITEMS: the GBA games so far. */
-        fun takesFieldItems(b: Base) = !b.ds && !b.gb
+        /** FIELD ITEMS: every game (the DS games' item balls; the others' hidden items too). */
+        @Suppress("UNUSED_PARAMETER")
+        fun takesFieldItems(b: Base) = true
 
         /** HELD ITEMS: not Red / Blue / Yellow, whose trainers hold nothing. */
         fun takesHeldItems(b: Base) = !(b.gb && b.game in setOf("Red", "Blue", "Yellow"))

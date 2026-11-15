@@ -186,6 +186,37 @@ class DsRandomizerTest {
     }
 
     @Test
+    fun `item balls are shuffled among themselves`() = each { g, f ->
+        val a = tmp.root.resolve("${g.code}-field.nds").toOkioPath()
+        val o = RomRandomizer.Options(RomRandomizer.Starters.OFF, RomRandomizer.Wild.OFF, false, fieldItems = true)
+        assertTrue(DsRandomizer.randomize(f.toOkioPath(), a, o, 4L))
+        val b = g.balls!!
+        fun items(p: okio.Path) = FileSystem.SYSTEM.openReadOnly(p).use { h ->
+            val c = DsRandomizer.Cart(h)
+            val n = DsRandomizer.Narc(c.file(c.fileId(b.path)))
+            val m = n.member(b.member)
+            val out = ArrayList<Int>()
+            var k = 0
+            while (u16(m, 4 * k) != 0xFD13) {
+                val s = 4 * k + 4 + (u16(m, 4 * k) or (u16(m, 4 * k + 2) shl 16)) + b.at
+                if (u16(m, s) in 0x28..0x29 && u16(m, s + 6) == u16(m, s)) out += u16(m, s + 4)
+                k++
+            }
+            out
+        }
+        val was = items(f.toOkioPath())
+        val now = items(a)
+        // Platinum 327 balls, HeartGold 255, Black 306, Black 2 400 (scripts/gen_gen4_guide.py / gen_gen5_guide.py read them).
+        assertTrue("${g.title} ${was.size}", was.size > 250)
+        assertEquals(g.title, was.sorted(), now.sorted())
+        assertTrue(g.title, was.indices.count { was[it] != now[it] } > was.size / 2)
+        // HMs stay where they are.
+        for (i in was.indices) if (was[i] in 420..427) assertEquals(g.title, was[i], now[i])
+        assertSame(g, DsRandomizer.recognise(a))
+        assertEquals(g.madeSha1, DsRandomizer.hashes(a)!!.second)
+    }
+
+    @Test
     fun `the GUIDE reads a shuffled Black 2`() = each { g, f ->
         if (g.code != "IREO") return@each
         val a = tmp.root.resolve("${g.code}-a.nds").toOkioPath()

@@ -126,6 +126,21 @@ class GbRandomizerTest {
     }
 
     @Test
+    fun `field items are shuffled among their places`() = each { g, rom ->
+        val places = GbRandomizer.fieldSites(rom, g)
+        // pokered: 106 item balls (fewer the key items and the two empty ones) and 54 hidden items; pokecrystal: 263 places.
+        assertTrue("${g.title} ${places.size}", places.size > if (g.gen == 1) 140 else 210)
+        val a = GbRandomizer.randomize(rom, RomRandomizer.Options(RomRandomizer.Starters.OFF, RomRandomizer.Wild.OFF, false,
+            fieldItems = true), 3L)!!
+        assertSame(g, GbRandomizer.recognise(a))
+        assertEquals(g.title, places.map { rom[it] }.sorted(), places.map { a[it] }.sorted())
+        assertTrue(g.title, places.count { rom[it] != a[it] } > places.size / 2)
+        // Nothing but those places (and the checksum) changed: key items and HMs stay where they were.
+        val changed = rom.indices.filter { rom[it] != a[it] }.toSet() - setOf(0x14E, 0x14F)
+        assertTrue(g.title, places.toSet().containsAll(changed))
+    }
+
+    @Test
     fun `anything else is refused`() = each { g, rom ->
         val other = rom.copyOf().also { it[0x2000] = (it[0x2000] + 1).toByte() }
         assertNull(GbRandomizer.gameOf(other))

@@ -38,10 +38,29 @@ object GbRandomizer {
         val trainersEnd: Int = 0,
         /** Moves: move 1's record first, power the third byte (Gen 1's 6-byte records, Gen 2's 7). */
         val moves: Int = 0,
+        /** Where the maps' item balls and hidden items are found (null: none read). */
+        val field: Field? = null,
     ) {
         /** The untouched cart's CRC32 (EXPAND's tables go by it). */
         val retailCrc: Int get() = CRCS.getValue(title)
     }
+
+    /**
+     * The tables an item ball or hidden item is found through, as file offsets.
+     * Gen 1 (pokered / pokeyellow): MapHeaderPointers, MapHeaderBanks, HiddenEventMaps, HiddenEventPointers (0: Yellow's
+     * 3-byte map + pointer entries), HiddenItems (the hidden events' function for an item) and KeyItemFlags.
+     * Gen 2 (pokegold / pokecrystal): MapGroupPointers and ItemAttributes ([keyItems]); the rest unused.
+     */
+    class Field(
+        val maps: Int,
+        val keyItems: Int,
+        val mapBanks: Int = 0,
+        val hiddenMaps: Int = 0,
+        val hiddenPointers: Int = 0,
+        val hiddenItems: Int = 0,
+    )
+
+    private fun redField(hiddenItems: Int) = Field(0x01AE, 0xE799, 0xC23D, 0x46A40, 0x46A96, hiddenItems)
 
     private val CRCS = mapOf(
         "Red" to 0x9F7FDD53.toInt(), "Blue" to 0xD6DA8A1A.toInt(), "Yellow" to 0x7D527D62, "Gold" to 0x6BDE3C3E,
@@ -65,21 +84,24 @@ object GbRandomizer {
     }
 
     val GAMES = listOf(
-        Game("Red", "ea9bcae617fdf159b045185467ae58b2e4a48b9a", "e3762b26a29f677b111d5b4a332729a94b26f117", 1, listOf(0xCEEB), 0x39D3B, 47, 0x383DE, 0x3B05C,
-            dexOrder = 0x41024, mewStats = 0x425B, starters = red(blue = false), trainersEnd = 0x3A52E, moves = 0x38000),
-        Game("Blue", "d7037c83e1ae5b39bde3c30787637ba1d4c48ce2", "2cdaefbc7d31dc1e09af409249ce95961b437492", 1, listOf(0xCEEB), 0x39D3B, 47, 0x383DE, 0x3B05C,
-            dexOrder = 0x41024, mewStats = 0x425B, starters = red(blue = true), trainersEnd = 0x3A52E, moves = 0x38000),
-        Game("Yellow", "cc7d03262ebfaf2f06772c1a480c7d9d5f4a38e1", "1dd0d9c7bdab87534e4d06a711644bae3b7508e5", 1, listOf(0xCB95), 0x39DD1, 47, 0x383DE, 0x3B1E5,
-            dexOrder = 0x410B1, trainersEnd = 0x3A5B2, moves = 0x38000),
-        Game("Gold", "d8b8a3600a465308c9953dfa04f0081c05bdcb94", "f2891100d618224fc93c094302dfaf3af246ae09", 2,
+        Game("Red", "ea9bcae617fdf159b045185467ae58b2e4a48b9a", "98f1f3bd6b6b1898f48fe8d441705e1b08410f96", 1, listOf(0xCEEB), 0x39D3B, 47, 0x383DE, 0x3B05C,
+            dexOrder = 0x41024, mewStats = 0x425B, starters = red(blue = false), trainersEnd = 0x3A52E, moves = 0x38000,
+            field = redField(0x76688)),
+        Game("Blue", "d7037c83e1ae5b39bde3c30787637ba1d4c48ce2", "db44426d809af9f4f36f451d96780e0d2c42d5cd", 1, listOf(0xCEEB), 0x39D3B, 47, 0x383DE, 0x3B05C,
+            dexOrder = 0x41024, mewStats = 0x425B, starters = red(blue = true), trainersEnd = 0x3A52E, moves = 0x38000,
+            field = redField(0x76689)),
+        Game("Yellow", "cc7d03262ebfaf2f06772c1a480c7d9d5f4a38e1", "394c32e00e85b1a3904859dd3dc733e0dde126bd", 1, listOf(0xCB95), 0x39DD1, 47, 0x383DE, 0x3B1E5,
+            dexOrder = 0x410B1, trainersEnd = 0x3A5B2, moves = 0x38000,
+            field = Field(0xFC1F2, 0xE6DD, 0xFC3E4, 0xF268D, 0, 0x75F74)),
+        Game("Gold", "d8b8a3600a465308c9953dfa04f0081c05bdcb94", "9a5249c424e9244b334e91e4f40a29db32e6cc3c", 2,
             listOf(0x2AB35, 0x2B7C0, 0x2BE1C, -0x2B669, -0x2BD43, -0x2BED9), 0x3993E, 66, 0x51B0B, 0x427BD,
-            starters = elm(0x1800D2, 0x180114, 0x180150), moves = 0x41AFE),
-        Game("Silver", "49b163f7e57702bc939d642a18f591de55d92dae", "84813da96adc96f1b4cee4398d82c3caff6defae", 2,
+            starters = elm(0x1800D2, 0x180114, 0x180150), moves = 0x41AFE, field = Field(0x940ED, 0x68A0)),
+        Game("Silver", "49b163f7e57702bc939d642a18f591de55d92dae", "c2787613738b371b84eff1b780e7a6924d23bee1", 2,
             listOf(0x2AB35, 0x2B7C0, 0x2BE1C, -0x2B669, -0x2BD43, -0x2BED9), 0x3993E, 66, 0x51B0B, 0x427BD,
-            starters = elm(0x1800D2, 0x180114, 0x180150), moves = 0x41AFE),
-        Game("Crystal", "f2f52230b536214ef7c9924f483392993e226cfb", "f5be8c4b9dc0c51a06eb95bea18e4e02ebd35df6", 2,
+            starters = elm(0x1800D2, 0x180114, 0x180150), moves = 0x41AFE, field = Field(0x940ED, 0x68A0)),
+        Game("Crystal", "f2f52230b536214ef7c9924f483392993e226cfb", "ebabcd53561d02fb4369781e54474567f3d04d12", 2,
             listOf(0x2A5E9, 0x2B274, 0x2B8D0, -0x2B11D, -0x2B7F7, -0x2B92F), 0x39999, 67, 0x51424, 0x425B1,
-            starters = elm(0x78C7F, 0x78CC1, 0x78CFD), moves = 0x41AFB),
+            starters = elm(0x78C7F, 0x78CC1, 0x78CFD), moves = 0x41AFB, field = Field(0x94000, 0x67C1)),
     )
 
     /** Pokédex numbers of the legendaries and mythicals up to Gen 2. */
@@ -126,9 +148,13 @@ object GbRandomizer {
         r.trainerItems { out += it }
         r.statSites { at, n -> for (k in 0 until n) out += at + k }
         r.learnMoves { out += it }
+        r.fieldItems { out += it }
         require(out.all { it in rom.indices }) { "not this game's tables" }
         return out
     }
+
+    /** The item balls' and hidden items' item bytes, but the kept ones. */
+    internal fun fieldSites(rom: ByteArray, g: Game): List<Int> = ArrayList<Int>().also { l -> Reader(rom, g).fieldItems { l += it } }
 
     private open class Reader(val b: ByteArray, val g: Game) {
         fun u8(at: Int) = b[at].toInt() and 0xFF
@@ -201,6 +227,103 @@ object GbRandomizer {
         fun learnMoves(each: (at: Int) -> Unit) {
             val seen = HashSet<Int>()
             for (id in 1 until dex.size) if (species(id)) for (at in movePlaces(id)) if (seen.add(at)) each(at)
+        }
+
+        /** A pointer in [bank] as a file offset. */
+        fun far(bank: Int, p: Int) = if (p < 0x4000) p else bank * 0x4000 + (p - 0x4000)
+
+        /** An item the field keeps where it is: a key item, an HM, or no item at all. */
+        fun keeps(item: Int): Boolean {
+            val f = g.field ?: return true
+            // KeyItemFlags covers the items (to 0x53); the floors, HMs and TMs after them aren't in it.
+            return if (g.gen == 1) item == 0 || item in 0x54..0xC8 ||
+                item < 0x54 && (u8(f.keyItems + (item - 1) / 8) shr ((item - 1) % 8)) and 1 != 0
+            else item == 0 || item >= 0xF3 || u8(f.keyItems + (item - 1) * 7 + 5) == 2
+        }
+
+        /** Each item ball's and hidden item's item byte, once, but the ones [keeps] keeps. */
+        fun fieldItems(each: (at: Int) -> Unit) {
+            val f = g.field ?: return
+            val seen = HashSet<Int>()
+            fun put(at: Int) { if (at in b.indices && !keeps(u8(at)) && seen.add(at)) each(at) }
+            if (g.gen == 1) gen1Field(f, ::put) else gen2Field(f, ::put)
+        }
+
+        /** Gen 1: object events with the ITEM bit (an item byte follows the text id), and hidden events calling HiddenItems. */
+        private fun gen1Field(f: Field, put: (Int) -> Unit) {
+            val objects = HashSet<Int>()
+            for (m in 0 until 0xF8) {
+                val bank = u8(f.mapBanks + m)
+                val p = u16(f.maps + m * 2)
+                // Unused map slots point anywhere: a header has a real tileset and size.
+                if (bank == 0 || p !in 0x4000 until 0x8000) continue
+                val h = far(bank, p)
+                if (u8(h) >= 0x18 || u8(h + 1) == 0 || u8(h + 2) == 0) continue
+                val at = h + 10 + 11 * Integer.bitCount(u8(h + 9) and 0xF)
+                if (u16(at) !in 0x4000 until 0x8000) continue
+                val o = far(bank, u16(at))
+                if (!objects.add(o)) continue
+                var a = o + 1
+                a += 1 + u8(a) * 4
+                a += 1 + u8(a) * 3
+                val n = u8(a++)
+                repeat(n) {
+                    val text = u8(a + 5)
+                    a += 6
+                    when {
+                        text and 0x40 != 0 -> a += 2
+                        text and 0x80 != 0 -> put(a++)
+                    }
+                }
+            }
+            val bank = f.hiddenItems / 0x4000
+            val fn = f.hiddenItems % 0x4000 + 0x4000
+            val lists = LinkedHashSet<Int>()
+            var i = 0
+            while (u8(f.hiddenMaps + i * (if (f.hiddenPointers == 0) 3 else 1)) != 0xFF && i < 256) {
+                lists += if (f.hiddenPointers == 0) far(f.hiddenMaps / 0x4000, u16(f.hiddenMaps + i * 3 + 1))
+                else far(f.hiddenPointers / 0x4000, u16(f.hiddenPointers + i * 2))
+                i++
+            }
+            for (start in lists) {
+                var a = start
+                while (u8(a) != 0xFF) {
+                    if (u8(a + 3) == bank && u16(a + 4) == fn) put(a + 2)
+                    a += 6
+                }
+            }
+        }
+
+        /** Gen 2: every map's ITEMBALL objects (their script is item, amount) and BGEVENT_ITEM signs (flag, item). */
+        private fun gen2Field(f: Field, put: (Int) -> Unit) {
+            val groups = ArrayList<Int>()
+            val first = far(f.maps / 0x4000, u16(f.maps))
+            var g0 = f.maps
+            while (g0 < first) { groups += far(f.maps / 0x4000, u16(g0)); g0 += 2 }
+            val headers = ArrayList<Int>()
+            for ((k, start) in groups.withIndex()) {
+                var a = start
+                // The last group runs up to the first map's attributes, which follow it.
+                while (if (k + 1 < groups.size) a < groups[k + 1] else headers.none { far(f.maps / 0x4000, u16(it + 3)) <= a }) {
+                    headers += a
+                    a += 9
+                }
+            }
+            for (h in headers) {
+                val attr = far(f.maps / 0x4000, u16(h + 3))
+                val bank = u8(attr + 6)
+                var a = far(bank, u16(attr + 9)) + 2
+                a += 1 + u8(a) * 5
+                a += 1 + u8(a) * 8
+                repeat(u8(a++)) {
+                    if (u8(a + 2) == 7) put(far(bank, u16(a + 3)) + 2)
+                    a += 5
+                }
+                repeat(u8(a++)) {
+                    if (u8(a + 7) and 0xF == 1) put(far(bank, u16(a + 9)))
+                    a += 13
+                }
+            }
         }
 
         /** Gen 2: each trainer Pokémon's held item byte, where its party's type has one. */
@@ -343,6 +466,14 @@ object GbRandomizer {
             wild()
             if (o.trainers) trainers()
             if (o.trainerItems) trainerItems()
+            if (o.fieldItems) fieldItems()
+        }
+
+        /** The item balls' and hidden items' items, shuffled among the same places. */
+        fun fieldItems() {
+            val places = ArrayList<Int>().also { l -> fieldItems { l += it } }
+            val items = places.map { b[it] }.shuffled(rnd)
+            places.forEachIndexed { i, at -> b[at] = items[i] }
         }
 
         /** Each species' base stats in another order. */

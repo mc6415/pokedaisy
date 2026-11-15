@@ -53,7 +53,16 @@ object DsRandomizer {
         val sprites: SpritePatch? = null,
         /** The starter screen's "<category> Pokémon <NAME>! Will you take this Pokémon?" lines ([StarterText]). */
         val text: StarterText? = null,
+        /** The item balls' scripts ([Balls]), or null. */
+        val balls: Balls? = null,
     )
+
+    /**
+     * The item balls' scripts: member [member] of script archive [path], one script per ball (the balls run 7000 + n), each
+     * starting, [at] bytes in, with setvar <var> <item>, setvar <var + 1> <count> (opcode 0x28 or HeartGold's 0x29, then the
+     * var, then the value: u16s). Hidden items aren't read: their item is in a table in code, not a script.
+     */
+    class Balls(val path: String, val member: Int, val at: Int = 0)
 
     /**
      * Platinum's MakePokemonSprites builds each starter's species inline (sprite slot offset minus a constant: 0x204 - 0x81 =
@@ -117,7 +126,7 @@ object DsRandomizer {
 
     val GAMES = listOf(
         Game(
-            "CPUE", 1, "Platinum", "b5d70427170a061580b362a877ac4b011145e37d", "9d62c62f61f4f21804efabed7f23722dabfb2f0b",
+            "CPUE", 1, "Platinum", "55ac97b09ff4333d5a4aad24fb26ac1133f7dfc9", "fe3052c8381781ae9dfb8479988c4ce888ec7072",
             starterOverlay = 78, starterOffsets = listOf(0x1BC0, 0x1BC4, 0x1BC8),
             encounters = "/fielddata/encountdata/pl_enc_data.narc",
             trainers = "/poketool/trainer/trdata.narc", trainerParties = "/poketool/trainer/trpoke.narc",
@@ -127,10 +136,11 @@ object DsRandomizer {
             // GetSelectedSpecies 0x021D291C, MakePokemonSprite 0x021D1468; text bank 360 (unk_0360), species names 412.
             sprites = SpritePatch(at = 0x690, len = 42, getSpecies = 0x021D291C, makeSprite = 0x021D1468),
             text = StarterText("/msgdata/pl_msg.narc", bank = 360, lines = listOf(1, 2, 3), names = 412),
+            balls = Balls("/fielddata/script/scr_seq.narc", 404),
         ),
     ) + listOf(
-        Triple("IPKE", "HeartGold", "ddbca9a5ff101c0e6a56decf76f612fe5e47dbc5" to "08ebb57a18875b30211aeb747b49cb7c087fcf55"),
-        Triple("IPGE", "SoulSilver", "22f5f3234bb81fdbbe57d6281479a7a34b612a81" to "fae72e565e28d8a4c310f8832912e619ce9736b0"),
+        Triple("IPKE", "HeartGold", "900df66d390866f97f82e1ff2c2edc98870209ad" to "8db5a9281431ac690958d0af35c6be1ed2b9a7cf"),
+        Triple("IPGE", "SoulSilver", "4562c3ef0374f1e08591342f43075b0d3d44195b" to "7dc35b4283aa40cf3835bcf04cd973cafbfacb70"),
     ).map { (code, title, hashes) ->
         // pret/pokeheartgold: choose_starter.c's species (ARM9), choose_starter_app.c's sSpecies (overlay 61), msg_0190.
         Game(
@@ -138,10 +148,11 @@ object DsRandomizer {
             encounters = "/a/0/3/7", trainers = "/a/0/5/5", trainerParties = "/a/0/5/6",
             personal = "/a/0/0/2", evolutions = "/a/0/3/4", learnsets = "/a/0/3/3", moves = "/a/0/1/1", speciesCount = 493,
             text = StarterText("/a/0/2/7", bank = 190, lines = listOf(1, 2, 3), names = 237, inBall = listOf(4, 5, 6), hgss = true),
+            balls = Balls("/a/0/1/2", 141),
         )
     } + listOf(
-        Triple("IRBO", "Black", "0a92d35ef541f9c915fc9cb70d7b171267402ca0" to "9d0c6a716898a65392becf7c284cea47e67cde9c"),
-        Triple("IRAO", "White", "09e827becf04aa7577e617bb9906ef1fcbe1e65a" to "0d1644357fae88360db16b9a0267a4a88cf2d0c6"),
+        Triple("IRBO", "Black", "0a92d35ef541f9c915fc9cb70d7b171267402ca0" to "9740c7867149194aefef662a8d541907b8138719"),
+        Triple("IRAO", "White", "09e827becf04aa7577e617bb9906ef1fcbe1e65a" to "9d147da3567ee2151ad3310e207af65f42cf0438"),
     ).map { (code, title, hashes) ->
         // No decomp: the archives from the cart (scripts/gen_gen5_guide.py's FILES_BW), the choice screen overlay 223's list.
         Game(
@@ -149,10 +160,11 @@ object DsRandomizer {
             packedStarters = PackedStarters(null, 223, 0x3170, width = 2),
             encounters = "/a/1/2/6", trainers = "/a/0/9/2", trainerParties = "/a/0/9/3",
             personal = "/a/0/1/6", evolutions = "/a/0/1/9", learnsets = "/a/0/1/8", moves = "/a/0/2/1", speciesCount = 649,
+            balls = Balls("/a/0/5/7", 864, at = 2),
         )
     } + listOf(
-        Triple("IREO", "Black 2", "74ea944a90b5c067579a318c05b2e3385ad3f7c5" to "fc20953be91b987bc1fdd77e3014e9aebb001276"),
-        Triple("IRDO", "White 2", "d831b4f7e464b2acc51a6abfcb85c3132376cc66" to "ea6d9ea1c1e37c8bd8e7578b140c630b51ab384d"),
+        Triple("IREO", "Black 2", "74ea944a90b5c067579a318c05b2e3385ad3f7c5" to "c2f924bfaf632cc79d109b0164e4a8b069f844d3"),
+        Triple("IRDO", "White 2", "d831b4f7e464b2acc51a6abfcb85c3132376cc66" to "07bec8e18c99f35d841c29c85212ede640e3730e"),
     ).map { (code, title, hashes) ->
         // pret has no decomp of these: the archives from the cart (scripts/gen_gen5_guide.py reads the same ones).
         Game(
@@ -160,6 +172,7 @@ object DsRandomizer {
             packedStarters = PackedStarters(null, 316, 0x2C14, width = 2),
             encounters = "/a/1/2/7", trainers = "/a/0/9/1", trainerParties = "/a/0/9/2",
             personal = "/a/0/1/6", evolutions = "/a/0/1/9", learnsets = "/a/0/1/8", moves = "/a/0/2/1", speciesCount = 649,
+            balls = Balls("/a/0/5/6", 1240, at = 2),
         )
     }
 
@@ -343,6 +356,10 @@ object DsRandomizer {
         val personal = cart.file(personalId)
         val learn = cart.file(learnId)
         val trdata = Narc(cart.file(cart.fileId(g.trainers)))
+        // The item balls' script archive: Gen 5's is the starters' own ([scripts]), so it's the same array then.
+        val ballsId = g.balls?.let { cart.fileId(it.path) }
+        val ballsShared = ballsId != null && ballsId == scriptsId
+        val balls = if (ballsShared) scripts else ballsId?.let { cart.file(it) }
         // HeartGold / SoulSilver: the ARM9 binary and the starter app's overlay, as stored and decompressed.
         val arm9Blob = g.packedStarters?.takeIf { it.arm9Offset != null }?.let { cart.arm9() }
         val arm9 = arm9Blob?.let { Blz.decompress(it) }
@@ -355,6 +372,7 @@ object DsRandomizer {
             overlayId?.let { cart.span(it).first to overlay }, cart.span(encId).first to enc, cart.span(partiesId).first to parties,
             msgId?.let { cart.span(it).first to msg!! }, scriptsId?.let { cart.span(it).first to scripts!! },
             cart.span(personalId).first to personal, cart.span(learnId).first to learn,
+            ballsId?.takeIf { !ballsShared }?.let { cart.span(it).first to balls!! },
             arm9?.let { cart.arm9Place() to (Blz.compressTo(it, arm9Blob!!.size) ?: error("ARM9 doesn't fit")) },
             packedOverlay?.let { ov ->
                 cart.span(packedOverlayId!!).first to
@@ -374,6 +392,7 @@ object DsRandomizer {
             val a9 = arm9?.copyOf() ?: ByteArray(0)
             val po = packedOverlay?.copyOf() ?: ByteArray(0)
             val pe = personal.copyOf(); val le = learn.copyOf()
+            val bl = if (ballsShared) sc else balls?.copyOf() ?: ByteArray(0)
             if (zeroed) {
                 statSites(pe) { at -> for (i in 0 until 6) pe[at + i] = 0 }
                 learnSites(le) { at, len -> for (i in 0 until len) le[at + i] = 0 }
@@ -400,8 +419,29 @@ object DsRandomizer {
                     }
                 }
                 if (scripts != null) for ((at, _) in scriptSites(sc)) { sc[at] = 0; sc[at + 1] = 0 }
+                if (balls != null) ballSites(bl) { at -> bl[at] = 0; bl[at + 1] = 0 }
             }
-            return (o + e + p + m + sc + a9 + po + pe + le).toByteString().sha1().hex()
+            return (o + e + p + m + sc + a9 + po + pe + le + (if (ballsShared) ByteArray(0) else bl)).toByteString().sha1().hex()
+        }
+
+        /** An item an item ball keeps: HMs and key items (Gen 4: 420 on; Gen 5: 420-536 and 615-638, but its TM93-95). */
+        fun keepsItem(item: Int) = item == 0 || if (g.gen == 4) item >= 420 else item in 420..536 || item in 615..638 && item !in 618..620
+
+        /** Each item ball's item word in [d] (the script archive [Balls] names), but the ones [keepsItem] keeps. */
+        fun ballSites(d: ByteArray, each: (at: Int) -> Unit) {
+            val b = g.balls ?: return
+            val n = Narc(d)
+            val start = n.start(b.member)
+            val end = n.end(b.member)
+            var k = 0
+            while (start + 4 * k + 4 <= end && u16(d, start + 4 * k) != 0xFD13 && k < 4096) {
+                val s = start + 4 * k + 4 + u32(d, start + 4 * k) + b.at
+                k++
+                if (s + 12 > end) continue
+                val op = u16(d, s)
+                if ((op == 0x28 || op == 0x29) && u16(d, s + 6) == op && u16(d, s + 8) == u16(d, s + 2) + 1 &&
+                    !keepsItem(u16(d, s + 4))) each(s + 4)
+            }
         }
 
         /** Each species' base stats in [d] (the species records): their place (six bytes from it). */
@@ -628,6 +668,15 @@ object DsRandomizer {
             wild()
             if (o.trainers) trainers()
             if (o.trainerItems) trainerItems()
+            if (o.fieldItems) fieldItems()
+        }
+
+        /** The item balls' items, shuffled among the same balls (HMs and key items not among them). */
+        fun fieldItems() {
+            val d = f.balls ?: return
+            val places = ArrayList<Int>().also { l -> f.ballSites(d) { l += it } }
+            val items = places.map { u16(d, it) }.shuffled(rnd)
+            places.forEachIndexed { i, at -> put16(d, at, items[i]) }
         }
 
         /** Each species' six base stats in another order (SHEDINJA's 1 HP left as it is). */

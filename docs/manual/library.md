@@ -113,7 +113,7 @@ If the companion doesn't support the patched game, you're told so and it stays o
 A randomized run plays a game you know with everything shuffled: a different first partner, other Pokémon in the grass, new teams for every trainer. `RANDOMIZE` under `TOOLS` makes one from your own copy of an English game: Red, Blue, Yellow, Gold, Silver or Crystal (its second release, Rev 1) on the Game Boy, FireRed or LeafGreen (their second release, Rev 1), Ruby or Sapphire (their third, Rev 2), Emerald, or on the DS Platinum (its second release, Rev 1), HeartGold, SoulSilver, Black, White, Black 2 or White 2. A zipped DS game works too: it's unpacked into the new file as it's made.
 
 1. Tap `TOOLS`, then `RANDOMIZE`. PokeDaisy looks through your library for those games.
-2. Pick what to shuffle. `FIELD ITEMS` is there for FireRed, LeafGreen, Ruby, Sapphire and Emerald so far, and `HELD ITEMS` for every game but Red, Blue and Yellow, whose trainers' Pokémon hold nothing:
+2. Pick what to shuffle. `HELD ITEMS` is there for every game but Red, Blue and Yellow, whose trainers' Pokémon hold nothing:
 
 | Row | What it does |
 | --- | --- |
@@ -123,7 +123,7 @@ A randomized run plays a game you know with everything shuffled: a different fir
 | `TRAINERS` | Gives every trainer, the leaders and your rival too, a new team at the same levels. Trainers who had moves picked for them get the moves their new Pokémon know by then. |
 | `SIMILAR STRENGTH` | Keeps each swap close in strength to what it replaces (their base stats added up), so an early route doesn't fill with fully evolved Pokémon. |
 | `LEGENDARIES` | `NONE` keeps legendary Pokémon out of the grass and out of trainers' teams. |
-| `FIELD ITEMS` | `SHUFFLED` swaps the items lying around (item balls and hidden items) among themselves, so the same items are in the game, in other places. Key items and HMs stay where they are, so the story still works. Off (`AS THEY ARE`) by default. |
+| `FIELD ITEMS` | `SHUFFLED` swaps the items lying around (item balls and hidden items) among themselves, so the same items are in the game, in other places. Key items and HMs stay where they are, so the story still works. On the DS games it's the item balls only: hidden items stay as they are. Off (`AS THEY ARE`) by default. |
 | `HELD ITEMS` | `ON` gives every Pokémon of the trainers who use held items one of the items trainers hold somewhere in the game. |
 | `BASE STATS` | `SHUFFLED` gives each Pokémon its own six base stats in another order: the same total, spread another way, so a slow one might be fast now. The `DEX` and the stats on the summary show the new ones. |
 | `LEARNSETS` | `RANDOM` gives each Pokémon new moves at the levels it learned its own, never the same move twice, and its first move always does damage. In Red, Blue and Yellow the moves a Pokémon knows from the start change too. Trainers who had moves picked for them get moves from the new lists. |
