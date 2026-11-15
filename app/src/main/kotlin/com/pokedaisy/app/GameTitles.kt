@@ -302,8 +302,13 @@ object GameTitles {
     fun platform(context: Context, rom: File): RomCategory? =
         cache(context)[rom.absolutePath]?.takeIf { it.matches(rom) }?.platform
 
+    /** A 3DS cart image (NCSD header), never hashed: they're gigabytes. */
+    private fun is3ds(rom: File) =
+        rom.extension.lowercase() in com.pokedaisy.app.n3ds.N3dsCart.EXTENSIONS && com.pokedaisy.app.n3ds.N3dsCart.isCart(rom)
+
     /** [rom]'s console from its header: [categoryOf] without the hack check. */
     internal fun platformOf(rom: File, sha1: () -> String?): RomCategory = when {
+        is3ds(rom) -> RomCategory.N3DS
         RomIdentity.isNds(rom) -> RomCategory.NDS
         RomIdentity.isGameBoy(rom) -> gameBoyPlatform(rom, sha1)
         else -> RomCategory.GBA
@@ -340,6 +345,7 @@ object GameTitles {
     /** [rom]'s [RomCategory] (reads its header; [sha1] when [identify] hashed it). A Pokémon cart hashed but known as
      * neither retail nor a hack is a hack too (an unsupported one); a cart nobody hashes is its platform's. */
     internal fun categoryOf(rom: File, sha1: String?, hashed: Boolean, randomized: Boolean = false): RomCategory = when {
+        is3ds(rom) -> RomCategory.N3DS
         RomIdentity.isNds(rom) -> RomCategory.NDS
         sha1 != null && sha1 in HACKS -> RomCategory.HACK
         // A randomized retail cart is still the retail game, on its own console (a RANDOMIZE'd Red is a GB game).
@@ -433,10 +439,13 @@ object GameTitles {
     private val KNOWN = "#known\t" + Integer.toHexString(BY_SHA1.keys.sorted().hashCode()) + RANDOMIZED_KNOWN
 
     /** How [RomCategory] was decided when the cache was written: a cache from before asks every file again. */
-    private const val CATEGORIES = "#categories\t5"
+    private const val CATEGORIES = "#categories\t6"
     /** The ones before: only their GB games are asked again (Polished Crystal is GBC since 3, Gold / Silver since 4, a
-     * randomized Game Boy cart its console's since 5 - it was GBA). */
-    private val CATEGORIES_GB_STALE = setOf("#categories\t2", "#categories\t3", "#categories\t4")
+     * randomized Game Boy cart its console's since 6 - it was GBA). 5 came two ways (3DS carts, or randomized Game Boy
+     * carts), so its GB and 3DS games both go. */
+    private val CATEGORIES_GB_STALE = setOf("#categories\t2", "#categories\t3", "#categories\t4", "#categories\t5")
+    /** And 3DS carts (their own category since 5: before, read as GBA). */
+    private val CATEGORIES_3DS_STALE = setOf("#categories\t4", "#categories\t5")
 
     private fun load(context: Context): MutableMap<String, Entry> {
         val map = java.util.concurrent.ConcurrentHashMap<String, Entry>()
@@ -446,10 +455,12 @@ object GameTitles {
             var stale = true
             var categoriesStale = true
             var gbStale = false
+            var n3dsStale = false
             f.forEachLine { line ->
                 if (line == KNOWN) stale = false
                 if (line == CATEGORIES) categoriesStale = false
                 if (line in CATEGORIES_GB_STALE) { categoriesStale = false; gbStale = true }
+                if (line in CATEGORIES_3DS_STALE) { categoriesStale = false; n3dsStale = true }
                 val p = line.split('\t')
                 // A 4-column line is from before categories: no category, so identify() reads it again. A 5-column
                 // one from before platforms: a hack's is read again (the others' platform is their category).
@@ -467,6 +478,9 @@ object GameTitles {
             if (categoriesStale) map.replaceAll { _, e -> Entry(e.size, e.modified, e.title, null, null) }
             // A GB game from before these Color games were known: identify() reads it again (a retail one's category
             // is its platform, so both go).
+            else if (n3dsStale) map.replaceAll { path, e ->
+                if (path.substringAfterLast('.').lowercase() in com.pokedaisy.app.n3ds.N3dsCart.EXTENSIONS) Entry(e.size, e.modified, e.title, null, null) else e
+            }
             else if (gbStale) map.replaceAll { _, e ->
                 if (e.platform == RomCategory.GB) Entry(e.size, e.modified, e.title, e.category.takeIf { it == RomCategory.HACK }, null) else e
             }
@@ -487,4 +501,4 @@ object GameTitles {
 }
 
 /** What kind of game a ROM is, for the library's tag when it has no cover art: its platform, or a hack. */
-enum class RomCategory(val label: String) { GB("GB"), GBC("GBC"), GBA("GBA"), NDS("NDS"), HACK("HACK") }
+enum class RomCategory(val label: String) { GB("GB"), GBC("GBC"), GBA("GBA"), NDS("NDS"), N3DS("3DS"), HACK("HACK") }

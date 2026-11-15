@@ -327,12 +327,36 @@ internal object ToolIcons {
         mapOf('k' to OUTLINE, 'w' to WHITE, 's' to Color(0xFFC0C0D0), 'd' to Color(0xFF9090A8), 'r' to Color(0xFFE04040)),
     )
 
+    /** SPRITE PACK: a trainer's head, red cap and all (our own drawing). */
+    private val sprites = TabIcons.TabIcon(
+        listOf(
+            "....kkkkkkk.....",
+            "...krrrrrrrk....",
+            "..krrrwwrrrrk...",
+            "..krrrwwrrrrk...",
+            ".kkkkkkkkkkkkkk.",
+            ".kddkssssssskk..",
+            ".kdkssssssssk...",
+            ".kdksksssskssk..",
+            ".kdksksssskssk..",
+            ".kdkssssssssk...",
+            "..kkssskksssk...",
+            "...kkssssssk....",
+            "....kkkkkkk.....",
+            "...kbbbbbbbbk...",
+            "..kbbbwbbwbbbk..",
+            "..kkkkkkkkkkkk..",
+        ),
+        mapOf('k' to OUTLINE, 'r' to Color(0xFFE04040), 'w' to WHITE, 's' to Color(0xFFF8C8A0), 'd' to Color(0xFF603820), 'b' to Color(0xFF3878E0)),
+    )
+
     fun of(id: String): TabIcons.TabIcon? = when (id) {
         "RANDOM" -> random
         "PATCH" -> patch
         "LINK" -> link
         "EDIT" -> edit
         "TRADE" -> trade
+        "SPRITES" -> sprites
         else -> null
     }
 
