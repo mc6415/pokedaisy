@@ -460,7 +460,12 @@ class TelemetrySampler {
                     val hash = runCatching { romHash(reader, size) }.getOrNull()
                     // A cart the library's RANDOMIZE made from retail counts as retail: it changes data only, never code or RAM.
                     val made = if (size == 0x1000000L && hash !in ShinyOdds.RETAIL_SHA1S) runCatching {
-                        readRom(reader, size.toInt()).let { b -> RomRandomizer.recognise(b)?.let { RomRandomizer.guide(b, it) } }
+                        readRom(reader, size.toInt()).let { b ->
+                            RomRandomizer.recognise(b)?.let { g ->
+                                val id = when (g.code) { "BPGE" -> GuideId.LEAFGREEN; "AXVE" -> GuideId.RUBY; "AXPE" -> GuideId.SAPPHIRE; else -> null }
+                                id?.let { it to RomRandomizer.guide(b, g) }
+                            }
+                        }
                     }.getOrNull() else null
                     ownRandomizedGuide = made
                     val retail = hash in ShinyOdds.RETAIL_SHA1S || made != null

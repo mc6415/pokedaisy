@@ -77,6 +77,9 @@ class RandomizedGuide(
     /** Null: retail's (the library's RANDOMIZE leaves trades and gift Pokémon as they are). */
     val trades: Map<String, Pair<Int, Int>>?,
     val statics: Map<Int, Int>?,
+    /** An item ball or hidden item [items] doesn't name stays as retail has it (the library's RANDOMIZE, which reads every
+     * one it moves), rather than being left out. */
+    val keepUnknown: Boolean = false,
 )
 
 object RandomizedRetail {

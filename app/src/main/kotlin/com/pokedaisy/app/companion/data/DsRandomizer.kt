@@ -62,7 +62,7 @@ object DsRandomizer {
      * starting, [at] bytes in, with setvar <var> <item>, setvar <var + 1> <count> (opcode 0x28 or HeartGold's 0x29, then the
      * var, then the value: u16s). Hidden items aren't read: their item is in a table in code, not a script.
      */
-    class Balls(val path: String, val member: Int, val at: Int = 0)
+    class Balls(val path: String, val member: Int, val at: Int = 0, val events: String)
 
     /**
      * Platinum's MakePokemonSprites builds each starter's species inline (sprite slot offset minus a constant: 0x204 - 0x81 =
@@ -136,7 +136,7 @@ object DsRandomizer {
             // GetSelectedSpecies 0x021D291C, MakePokemonSprite 0x021D1468; text bank 360 (unk_0360), species names 412.
             sprites = SpritePatch(at = 0x690, len = 42, getSpecies = 0x021D291C, makeSprite = 0x021D1468),
             text = StarterText("/msgdata/pl_msg.narc", bank = 360, lines = listOf(1, 2, 3), names = 412),
-            balls = Balls("/fielddata/script/scr_seq.narc", 404),
+            balls = Balls("/fielddata/script/scr_seq.narc", 404, events = "/fielddata/eventdata/zone_event.narc"),
         ),
     ) + listOf(
         Triple("IPKE", "HeartGold", "900df66d390866f97f82e1ff2c2edc98870209ad" to "8db5a9281431ac690958d0af35c6be1ed2b9a7cf"),
@@ -148,7 +148,7 @@ object DsRandomizer {
             encounters = "/a/0/3/7", trainers = "/a/0/5/5", trainerParties = "/a/0/5/6",
             personal = "/a/0/0/2", evolutions = "/a/0/3/4", learnsets = "/a/0/3/3", moves = "/a/0/1/1", speciesCount = 493,
             text = StarterText("/a/0/2/7", bank = 190, lines = listOf(1, 2, 3), names = 237, inBall = listOf(4, 5, 6), hgss = true),
-            balls = Balls("/a/0/1/2", 141),
+            balls = Balls("/a/0/1/2", 141, events = "/a/0/3/2"),
         )
     } + listOf(
         Triple("IRBO", "Black", "0a92d35ef541f9c915fc9cb70d7b171267402ca0" to "9740c7867149194aefef662a8d541907b8138719"),
@@ -160,7 +160,7 @@ object DsRandomizer {
             packedStarters = PackedStarters(null, 223, 0x3170, width = 2),
             encounters = "/a/1/2/6", trainers = "/a/0/9/2", trainerParties = "/a/0/9/3",
             personal = "/a/0/1/6", evolutions = "/a/0/1/9", learnsets = "/a/0/1/8", moves = "/a/0/2/1", speciesCount = 649,
-            balls = Balls("/a/0/5/7", 864, at = 2),
+            balls = Balls("/a/0/5/7", 864, at = 2, events = "/a/1/2/5"),
         )
     } + listOf(
         Triple("IREO", "Black 2", "74ea944a90b5c067579a318c05b2e3385ad3f7c5" to "c2f924bfaf632cc79d109b0164e4a8b069f844d3"),
@@ -172,7 +172,7 @@ object DsRandomizer {
             packedStarters = PackedStarters(null, 316, 0x2C14, width = 2),
             encounters = "/a/1/2/7", trainers = "/a/0/9/1", trainerParties = "/a/0/9/2",
             personal = "/a/0/1/6", evolutions = "/a/0/1/9", learnsets = "/a/0/1/8", moves = "/a/0/2/1", speciesCount = 649,
-            balls = Balls("/a/0/5/6", 1240, at = 2),
+            balls = Balls("/a/0/5/6", 1240, at = 2, events = "/a/1/2/6"),
         )
     }
 
@@ -518,7 +518,15 @@ object DsRandomizer {
      * What a cart this tool made has instead of the original's, for the GUIDE (Platinum's [Gen4World]): each encounter set's
      * species words in struct order ([speciesAt], by byte offset) and each trainer's team.
      */
-    class Shuffle(val game: Game, private val sets: List<ByteArray>, private val teams: Map<Int, List<TrainerMon>>) {
+    class Shuffle(
+        val game: Game,
+        private val sets: List<ByteArray>,
+        private val teams: Map<Int, List<TrainerMon>>,
+        items: Map<Int, Int> = emptyMap(),
+    ) {
+        /** HERE's item balls as this cart has them, by their flags ([ballItems]); hidden items stay the game's. */
+        val guide = RandomizedGuide(items, trades = null, statics = null, keepUnknown = true)
+
         /** Encounter set [set]'s species at byte [offset] of its record, or null when it has none there. */
         fun speciesAt(set: Int, offset: Int): Int? = sets.getOrNull(set)?.let { m ->
             if (game.gen == 5) m.takeIf { offset + 2 <= it.size }?.let { u16(it, offset) and 0x7FF }
@@ -562,9 +570,46 @@ object DsRandomizer {
                     TrainerMon(u16(m, at + 4) and speciesMask(g.gen), m[at + 2].toInt() and 0xFF, item, moves)
                 }
             }
-            Shuffle(g, (0 until enc.size).map { enc.member(it) }, teams)
+            Shuffle(g, (0 until enc.size).map { enc.member(it) }, teams, ballItems(cart, g, f))
         }
     }.getOrNull()
+
+    /**
+     * Each item ball's item by its object's flag, as the GUIDE's area data names it: a person in the event archive
+     * ([Balls.events]) running ball script 7000 + n has its hide flag in the word before the script's, in every DS game's
+     * layout (Gen 4's 32-byte object events, Gen 5's 0x24-byte people), so every member is searched for that pair.
+     */
+    private fun ballItems(cart: Cart, g: Game, f: Files): Map<Int, Int> {
+        val b = g.balls ?: return emptyMap()
+        val d = f.balls ?: return emptyMap()
+        val n = Narc(d)
+        val start = n.start(b.member)
+        val items = ArrayList<Int>()
+        while (u16(d, start + 4 * items.size) != 0xFD13 && items.size < 4096) {
+            val k = items.size
+            items += u16(d, start + 4 * k + 4 + u32(d, start + 4 * k) + b.at + 4)
+        }
+        val events = Narc(cart.file(cart.fileId(b.events)))
+        val out = HashMap<Int, Int>()
+        for (m in 0 until events.size) {
+            val e = events.member(m)
+            var p = 0
+            while (p + 4 <= e.size) {
+                val sc = u16(e, p + 2) - 7000
+                val flag = u16(e, p)
+                if (sc in items.indices && flag != 0) out.putIfAbsent(flag, items[sc])
+                p += 2
+            }
+        }
+        return out
+    }
+
+    /** [path]'s item balls by flag ([ballItems]), any cart of a known game (the tests check retail's against the GUIDE). */
+    internal fun ballItems(path: Path): Map<Int, Int>? = FileSystem.SYSTEM.openReadOnly(path).use { h ->
+        val cart = Cart(h)
+        val g = gameOfHeader(cart) ?: return@use null
+        ballItems(cart, g, Files(cart, g))
+    }
 
     /** Platinum's [Gen4World] places: a grass slot's, the day / night pair's, a water slot's species word in the record. */
     internal fun grassOffset(slot: Int) = GRASS[slot]

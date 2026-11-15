@@ -116,9 +116,31 @@ fun areaThings(guide: GuideId?, mapsec: Int): List<AreaThing> =
 /** Every area of [guide]'s game: region map section -> what's in it. On a randomized game ([runningRandomized]) the
  * randomizer's items, trades and gift Pokémon ([randomizedAreas]). */
 fun allAreaThings(guide: GuideId): Map<Int, List<AreaThing>> {
-    val r = runningRandomized?.randomizedGuide ?: ownRandomizedGuide ?: return retailAreaThings(guide)
+    val r = runningRandomized?.randomizedGuide ?: ownGuide(guide) ?: return retailAreaThings(guide)
     randomizedCache?.let { (g, id, m) -> if (g === r && id == guide) return m }
     return randomizedAreas(retailAreaThings(guide), r).also { randomizedCache = Triple(r, guide, it) }
+}
+
+/** A cart the library's RANDOMIZE made, while it runs: its own items for [guide]'s game (GBA LeafGreen / Ruby / Sapphire
+ * from the Poller, the Game Boy and DS games from their shuffles). */
+private fun ownGuide(guide: GuideId): RandomizedGuide? =
+    ownRandomizedGuide?.takeIf { it.first == guide }?.second
+        ?: GbRandomizer.shuffle?.takeIf { guideOfTitle(it.game.title) == guide }?.guide
+        ?: DsRandomizer.shuffle?.takeIf { guideOfTitle(it.game.title) == guide }?.guide
+
+private fun guideOfTitle(title: String): GuideId? = when (title) {
+    "Red" -> GuideId.RED
+    "Blue" -> GuideId.BLUE
+    "Yellow" -> GuideId.YELLOW
+    "Crystal" -> GuideId.CRYSTAL
+    "Platinum" -> GuideId.PLATINUM
+    "HeartGold" -> GuideId.HEARTGOLD
+    "SoulSilver" -> GuideId.SOULSILVER
+    "Black" -> GuideId.BLACK
+    "White" -> GuideId.WHITE
+    "Black 2" -> GuideId.BLACK2
+    "White 2" -> GuideId.WHITE2
+    else -> null
 }
 
 @Volatile private var randomizedCache: Triple<RandomizedGuide, GuideId, Map<Int, List<AreaThing>>>? = null
@@ -132,7 +154,7 @@ internal fun randomizedAreas(areas: Map<Int, List<AreaThing>>, r: RandomizedGuid
     areas.mapValues { (_, things) ->
         things.mapNotNull { t ->
             when (t.kind) {
-                AreaKind.ITEM, AreaKind.HIDDEN -> r.items[t.flag]?.let { t.copy(id = it) }
+                AreaKind.ITEM, AreaKind.HIDDEN -> r.items[t.flag]?.let { t.copy(id = it) } ?: t.takeIf { r.keepUnknown }
                 AreaKind.TRADE -> if (r.trades == null) t else r.trades["${t.id}/${t.wants}"]?.let { (given, wanted) -> t.copy(id = given, wants = wanted) }
                 AreaKind.MON, AreaKind.EGG -> if (r.statics == null) t else r.statics[t.id]?.let { t.copy(id = it) }
                 AreaKind.GIFT, AreaKind.KEY -> t

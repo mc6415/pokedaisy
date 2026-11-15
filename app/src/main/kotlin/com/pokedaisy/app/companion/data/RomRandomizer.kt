@@ -175,7 +175,7 @@ object RomRandomizer {
             }
             group++
         }
-        return RandomizedGuide(items, trades = null, statics = null)
+        return RandomizedGuide(items, trades = null, statics = null, keepUnknown = true)
     }
 
     /** [rom] is one this tool made (not the untouched cart): its game, else null. For the Poller and the library. */

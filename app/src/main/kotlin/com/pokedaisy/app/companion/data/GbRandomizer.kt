@@ -58,9 +58,13 @@ object GbRandomizer {
         val hiddenMaps: Int = 0,
         val hiddenPointers: Int = 0,
         val hiddenItems: Int = 0,
+        /** Gen 1: ToggleableObjectStates (map, object, state: an item ball's flag is its place there) and HiddenItemCoords
+         * (map, y, x: a hidden item's). */
+        val toggles: Int = 0,
+        val hiddenCoords: Int = 0,
     )
 
-    private fun redField(hiddenItems: Int) = Field(0x01AE, 0xE799, 0xC23D, 0x46A40, 0x46A96, hiddenItems)
+    private fun redField(hiddenItems: Int) = Field(0x01AE, 0xE799, 0xC23D, 0x46A40, 0x46A96, hiddenItems, 0xCAEA, hiddenItems + 0x30)
 
     private val CRCS = mapOf(
         "Red" to 0x9F7FDD53.toInt(), "Blue" to 0xD6DA8A1A.toInt(), "Yellow" to 0x7D527D62, "Gold" to 0x6BDE3C3E,
@@ -92,7 +96,7 @@ object GbRandomizer {
             field = redField(0x76689)),
         Game("Yellow", "cc7d03262ebfaf2f06772c1a480c7d9d5f4a38e1", "394c32e00e85b1a3904859dd3dc733e0dde126bd", 1, listOf(0xCB95), 0x39DD1, 47, 0x383DE, 0x3B1E5,
             dexOrder = 0x410B1, trainersEnd = 0x3A5B2, moves = 0x38000,
-            field = Field(0xFC1F2, 0xE6DD, 0xFC3E4, 0xF268D, 0, 0x75F74)),
+            field = Field(0xFC1F2, 0xE6DD, 0xFC3E4, 0xF268D, 0, 0x75F74, 0xC892, 0x75FAA)),
         Game("Gold", "d8b8a3600a465308c9953dfa04f0081c05bdcb94", "9a5249c424e9244b334e91e4f40a29db32e6cc3c", 2,
             listOf(0x2AB35, 0x2B7C0, 0x2BE1C, -0x2B669, -0x2BD43, -0x2BED9), 0x3993E, 66, 0x51B0B, 0x427BD,
             starters = elm(0x1800D2, 0x180114, 0x180150), moves = 0x41AFE, field = Field(0x940ED, 0x68A0)),
@@ -187,6 +191,9 @@ object GbRandomizer {
                 }
             }
         }
+
+        /** HERE's item balls and hidden items as this cart has them: by their flags, trades and gifts as the game's. */
+        val guide: RandomizedGuide by lazy { RandomizedGuide(r.itemsByFlag(), trades = null, statics = null, keepUnknown = true) }
 
         /** Trainer class [cls]'s [no]th party (both from 1), or null when it doesn't read as one. */
         fun party(cls: Int, no: Int): List<TrainerMon>? = runCatching { r.party(cls, no) }.getOrNull()
@@ -292,12 +299,43 @@ object GbRandomizer {
         fun fieldItems(each: (at: Int) -> Unit) {
             val f = g.field ?: return
             val seen = HashSet<Int>()
-            fun put(at: Int) { if (at in b.indices && !keeps(u8(at)) && seen.add(at)) each(at) }
+            fun put(at: Int, @Suppress("UNUSED_PARAMETER") flag: Int) { if (at in b.indices && !keeps(u8(at)) && seen.add(at)) each(at) }
             if (g.gen == 1) gen1Field(f, ::put) else gen2Field(f, ::put)
         }
 
+        /** Every item ball's and hidden item's item, by the flag the GUIDE's area data gives it (Gen 1: 0x10000 + its
+         * toggleable object, 0x20000 + its HiddenItemCoords entry; Gen 2: its event flag). */
+        fun itemsByFlag(): Map<Int, Int> {
+            val f = g.field ?: return emptyMap()
+            val out = HashMap<Int, Int>()
+            fun put(at: Int, flag: Int) { if (at in b.indices && flag >= 0) out.putIfAbsent(flag, u8(at)) }
+            if (g.gen == 1) gen1Field(f, ::put) else gen2Field(f, ::put)
+            return out
+        }
+
+        /** Gen 1: object [obj] (from 1) of map [map]'s toggleable object number, or -1. */
+        private fun toggle(f: Field, map: Int, obj: Int): Int {
+            var i = 0
+            while (u8(f.toggles + i * 3) != 0xFF && i < 512) {
+                if (u8(f.toggles + i * 3) == map && u8(f.toggles + i * 3 + 1) == obj) return i
+                i++
+            }
+            return -1
+        }
+
+        /** Gen 1: the hidden item at [y], [x] on [map]'s HiddenItemCoords number, or -1. */
+        private fun hiddenCoord(f: Field, map: Int, y: Int, x: Int): Int {
+            var i = 0
+            while (u8(f.hiddenCoords + i * 3) != 0xFF && i < 256) {
+                val a = f.hiddenCoords + i * 3
+                if (u8(a) == map && u8(a + 1) == y && u8(a + 2) == x) return i
+                i++
+            }
+            return -1
+        }
+
         /** Gen 1: object events with the ITEM bit (an item byte follows the text id), and hidden events calling HiddenItems. */
-        private fun gen1Field(f: Field, put: (Int) -> Unit) {
+        private fun gen1Field(f: Field, put: (at: Int, flag: Int) -> Unit) {
             val objects = HashSet<Int>()
             for (m in 0 until 0xF8) {
                 val bank = u8(f.mapBanks + m)
@@ -314,35 +352,39 @@ object GbRandomizer {
                 a += 1 + u8(a) * 4
                 a += 1 + u8(a) * 3
                 val n = u8(a++)
-                repeat(n) {
+                for (k in 1..n) {
                     val text = u8(a + 5)
                     a += 6
                     when {
                         text and 0x40 != 0 -> a += 2
-                        text and 0x80 != 0 -> put(a++)
+                        text and 0x80 != 0 -> put(a++, toggle(f, m, k).let { if (it < 0) -1 else G1_MISSABLE_FLAG + it })
                     }
                 }
             }
             val bank = f.hiddenItems / 0x4000
             val fn = f.hiddenItems % 0x4000 + 0x4000
-            val lists = LinkedHashSet<Int>()
+            // Each map's hidden events (the first map naming a list).
+            val lists = LinkedHashMap<Int, Int>()
             var i = 0
-            while (u8(f.hiddenMaps + i * (if (f.hiddenPointers == 0) 3 else 1)) != 0xFF && i < 256) {
-                lists += if (f.hiddenPointers == 0) far(f.hiddenMaps / 0x4000, u16(f.hiddenMaps + i * 3 + 1))
-                else far(f.hiddenPointers / 0x4000, u16(f.hiddenPointers + i * 2))
+            val step = if (f.hiddenPointers == 0) 3 else 1
+            while (u8(f.hiddenMaps + i * step) != 0xFF && i < 256) {
+                val start = if (f.hiddenPointers == 0) far(f.hiddenMaps / 0x4000, u16(f.hiddenMaps + i * 3 + 1))
+                    else far(f.hiddenPointers / 0x4000, u16(f.hiddenPointers + i * 2))
+                lists.putIfAbsent(start, u8(f.hiddenMaps + i * step))
                 i++
             }
-            for (start in lists) {
+            for ((start, map) in lists) {
                 var a = start
                 while (u8(a) != 0xFF) {
-                    if (u8(a + 3) == bank && u16(a + 4) == fn) put(a + 2)
+                    if (u8(a + 3) == bank && u16(a + 4) == fn)
+                        put(a + 2, hiddenCoord(f, map, u8(a), u8(a + 1)).let { if (it < 0) -1 else G1_HIDDEN_ITEM_FLAG + it })
                     a += 6
                 }
             }
         }
 
         /** Gen 2: every map's ITEMBALL objects (their script is item, amount) and BGEVENT_ITEM signs (flag, item). */
-        private fun gen2Field(f: Field, put: (Int) -> Unit) {
+        private fun gen2Field(f: Field, put: (at: Int, flag: Int) -> Unit) {
             val groups = ArrayList<Int>()
             val first = far(f.maps / 0x4000, u16(f.maps))
             var g0 = f.maps
@@ -363,11 +405,13 @@ object GbRandomizer {
                 a += 1 + u8(a) * 5
                 a += 1 + u8(a) * 8
                 repeat(u8(a++)) {
-                    if (u8(a + 2) == 7) put(far(bank, u16(a + 3)) + 2)
+                    // hiddenitem: dw flag, db item.
+                    if (u8(a + 2) == 7) far(bank, u16(a + 3)).let { sc -> put(sc + 2, u16(sc)) }
                     a += 5
                 }
                 repeat(u8(a++)) {
-                    if (u8(a + 7) and 0xF == 1) put(far(bank, u16(a + 9)))
+                    // The object's event flag (its last word) marks the ball picked up.
+                    if (u8(a + 7) and 0xF == 1) put(far(bank, u16(a + 9)), u16(a + 11))
                     a += 13
                 }
             }

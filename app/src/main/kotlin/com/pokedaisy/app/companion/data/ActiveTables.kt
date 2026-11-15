@@ -244,7 +244,7 @@ var randomizedRetail: HackText? = null
 
 /** A cart the library's RANDOMIZE made from LeafGreen, Ruby or Sapphire (read as retail): its item balls' and hidden items'
  * items for HERE ([RomRandomizer.guide]); null for any other game. FireRed / Emerald's come through [randomizedRetail]. */
-@Volatile var ownRandomizedGuide: RandomizedGuide? = null
+@Volatile var ownRandomizedGuide: Pair<GuideId, RandomizedGuide>? = null
 
 /** The running game is a randomized retail FireRed / Emerald ([randomizedRetail]). */
 val runningRandomized: HackText? get() = randomizedRetail?.takeIf { activeGame == GameKind.FIRERED || activeGame == GameKind.EMERALD }

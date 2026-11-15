@@ -217,6 +217,32 @@ class DsRandomizerTest {
     }
 
     @Test
+    fun `HERE lists a randomized cart's own item balls`() = each { g, f ->
+        val id = when (g.code) {
+            "CPUE" -> GuideId.PLATINUM; "IPKE" -> GuideId.HEARTGOLD; "IPGE" -> GuideId.SOULSILVER; "IRBO" -> GuideId.BLACK
+            "IRAO" -> GuideId.WHITE; "IREO" -> GuideId.BLACK2; else -> GuideId.WHITE2
+        }
+        fun balls() = allAreaThings(id).values.flatten().filter { it.kind == AreaKind.ITEM }
+        try {
+            DsRandomizer.shuffle = null
+            val retail = allAreaThings(id)
+            val before = balls()
+            val mine = DsRandomizer.ballItems(f.toOkioPath())!!
+            for (t in before) assertEquals("${g.title} flag ${t.flag}", t.id, mine[t.flag])
+            DsRandomizer.shuffle = DsRandomizer.Shuffle(g, emptyList(), emptyMap(), mine)
+            assertEquals(g.title, retail, allAreaThings(id))
+            val a = tmp.root.resolve("${g.code}-here.nds").toOkioPath()
+            assertTrue(DsRandomizer.randomize(f.toOkioPath(), a, RomRandomizer.Options(fieldItems = true), 2L))
+            DsRandomizer.shuffle = DsRandomizer.readShuffle(a)!!
+            val after = balls()
+            assertEquals(g.title, before.size, after.size)
+            assertTrue("${g.title} ${before.size}", before.indices.count { before[it].id != after[it].id } > before.size / 3)
+        } finally {
+            DsRandomizer.shuffle = null
+        }
+    }
+
+    @Test
     fun `the GUIDE reads a shuffled Black 2`() = each { g, f ->
         if (g.code != "IREO") return@each
         val a = tmp.root.resolve("${g.code}-a.nds").toOkioPath()

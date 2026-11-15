@@ -179,6 +179,29 @@ class GbRandomizerTest {
     }
 
     @Test
+    fun `HERE lists a randomized cart's own items`() = each { g, rom ->
+        val id = when (g.title) { "Red" -> GuideId.RED; "Blue" -> GuideId.BLUE; "Yellow" -> GuideId.YELLOW; "Crystal" -> GuideId.CRYSTAL; else -> return@each }
+        fun items() = allAreaThings(id).values.flatten().filter { it.kind == AreaKind.ITEM || it.kind == AreaKind.HIDDEN }
+        try {
+            GbRandomizer.shuffle = null
+            val retail = allAreaThings(id)
+            val before = items()
+            // Read off the retail cart, every item where the guide has it: the overlay names each one.
+            val sh = GbRandomizer.Shuffle(g, rom)
+            for (t in before) if (t.flag != 0) assertEquals("${g.title} flag ${t.flag}", t.id, sh.guide.items[t.flag])
+            GbRandomizer.shuffle = sh
+            assertEquals(g.title, retail, allAreaThings(id))
+            val a = GbRandomizer.randomize(rom, RomRandomizer.Options(fieldItems = true), 6L)!!
+            GbRandomizer.shuffle = GbRandomizer.readShuffle(a)
+            val after = items()
+            assertEquals(g.title, before.size, after.size)
+            assertTrue("${g.title} ${before.size}", before.indices.count { before[it].id != after[it].id } > before.size / 3)
+        } finally {
+            GbRandomizer.shuffle = null
+        }
+    }
+
+    @Test
     fun `anything else is refused`() = each { g, rom ->
         val other = rom.copyOf().also { it[0x2000] = (it[0x2000] + 1).toByte() }
         assertNull(GbRandomizer.gameOf(other))
