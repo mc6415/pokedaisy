@@ -117,7 +117,7 @@ A randomized run plays a game you know with everything shuffled: a different fir
 
 | Row | What it does |
 | --- | --- |
-| `GAME` | Which of your games to start from, when you have more than one. |
+| `GAME` | Which of your games to start from, when you have more than one: pick the system first (`NINTENDO DS`, `GBA` or `GAME BOY`), then the game. With games for only one system, the games show at once. |
 | `STARTERS` | The three Pokémon you choose your partner from. `EVOLVE TWICE` (the default) picks Pokémon that evolve two times, like the real ones; `ANY POKéMON` can be anything but a legendary; `AS THEY ARE` keeps them. In FireRed and LeafGreen the professor names the new ones when you choose; in Platinum the briefcase and in HeartGold and SoulSilver Professor Elm's machine show them, each with its name, and in Red, Blue, Black 2 and White 2 every scene that names your starter (your rival's pick too) names the new ones. In Yellow your partner and your rival's stay as they are, since the story is built around them. |
 | `WILD POKéMON` | What you meet in the grass, caves, water and with a rod. `PER AREA` (the default) swaps each kind of Pokémon for another on each route, so a route still has its common and rare ones. `EVERY ENCOUNTER` picks anew for every slot, `SWAPPED EVERYWHERE` swaps each kind for one other kind across the whole game, and `AS THEY ARE` keeps them. |
 | `TRAINERS` | Gives every trainer, the leaders and your rival too, a new team at the same levels. Trainers who had moves picked for them get the moves their new Pokémon know by then. |

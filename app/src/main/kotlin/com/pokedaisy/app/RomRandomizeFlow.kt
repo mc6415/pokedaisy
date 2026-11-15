@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -44,7 +45,12 @@ class RomRandomizeFlow(
     private val onAdded: (File) -> Unit,
 ) {
     /** A ROM the tool can take: [label] is the library's name for it. */
-    class Base(val file: File, val label: String, val game: String, val ds: Boolean = false, val gb: Boolean = false)
+    class Base(val file: File, val label: String, val game: String, val ds: Boolean = false, val gb: Boolean = false) {
+        val platform get() = when { ds -> Platform.DS; gb -> Platform.GB; else -> Platform.GBA }
+    }
+
+    /** GAME's first pick (the games of one, its second), newest first like [ORDER]. */
+    enum class Platform(val label: String) { DS(tk("NINTENDO DS")), GBA(tk("GBA")), GB(tk("GAME BOY")) }
 
     sealed class Step {
         class Looking(val progress: Float) : Step()
@@ -280,6 +286,7 @@ class RomRandomizeFlow(
 fun RandomizeWindow(flow: RomRandomizeFlow, m: GbaTextMetrics, small: GbaTextMetrics, onPlay: ((File) -> Unit)?) {
     val step = flow.step ?: return
     var choosing by remember { mutableStateOf<String?>(null) }
+    var platform by remember { mutableStateOf<RomRandomizeFlow.Platform?>(null) }
     OptionOverlay(onDismiss = { flow.dismiss() }, modifier = Modifier.widthIn(max = 900.dp)) {
         Column {
             OptionTitleWindow(tr("RANDOMIZE"), m, onBack = { flow.dismiss() }.takeIf { step !is RomRandomizeFlow.Step.Making })
@@ -346,10 +353,29 @@ fun RandomizeWindow(flow: RomRandomizeFlow, m: GbaTextMetrics, small: GbaTextMet
     }
     val ready = step as? RomRandomizeFlow.Step.Ready
     when (choosing.takeIf { ready != null }) {
-        "GAME" -> OptionSelector(
-            tr("GAME"), ready!!.bases.indices.toList(), flow.base, { ready.bases[it].label }, m,
-            onPick = { flow.base = it; choosing = null }, onDismiss = { choosing = null },
-        )
+        // Two steps: the platform, then its games (BACK from the games goes back to the platforms). One platform: its games.
+        "GAME" -> {
+            val platforms = ready!!.bases.map { it.platform }.distinct().sorted()
+            val current = ready.bases.getOrElse(flow.base) { ready.bases[0] }.platform
+            if (platforms.size == 1) {
+                LaunchedEffect(Unit) { platform = platforms[0]; choosing = "GAME_LIST" }
+            } else {
+                OptionSelector(
+                    tr("GAME"), platforms, platform ?: current, { tr(it.label) }, m,
+                    onPick = { platform = it; choosing = "GAME_LIST" }, onDismiss = { choosing = null; platform = null },
+                )
+            }
+        }
+        "GAME_LIST" -> {
+            val p = platform ?: ready!!.bases[0].platform
+            val games = ready!!.bases.indices.filter { ready.bases[it].platform == p }
+            val many = ready.bases.map { it.platform }.distinct().size > 1
+            OptionSelector(
+                tr(p.label), games, flow.base.takeIf { it in games } ?: games[0], { ready.bases[it].label }, m,
+                onPick = { flow.base = it; choosing = null; platform = null },
+                onDismiss = { if (many) choosing = "GAME" else { choosing = null; platform = null } },
+            )
+        }
         "STARTERS" -> OptionSelector(
             tr("STARTERS"), RomRandomizer.Starters.entries, flow.options.starters, { tr(RomRandomizeFlow.startersLabel(it)) }, m,
             onPick = { flow.options = flow.options.copy(starters = it); choosing = null }, onDismiss = { choosing = null },

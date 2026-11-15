@@ -2612,6 +2612,15 @@ fun main(args: Array<String>) {
         Shot("library-randomize-wild", tw, th, td, activity { LibraryActivity().apply { randomizer.step = fakeRandomize("ready") } }) {
             onNodeWithText("WILD POKéMON").performClick()
         },
+        // GAME over all three platforms: the platform first, then its games.
+        Shot("library-randomize-platforms", tw, th, td, activity { LibraryActivity().apply { randomizer.step = fakeRandomize("platforms") } }) {
+            onNodeWithText("GAME").performClick()
+        },
+        Shot("library-randomize-platform-games", tw, th, td, activity { LibraryActivity().apply { randomizer.step = fakeRandomize("platforms") } }) {
+            onNodeWithText("GAME").performClick()
+            waitForIdle()
+            onAllNodesWithText("GBA").onLast().performSemanticsAction(SemanticsActions.OnClick)
+        },
         Shot("library-randomize-making", tw, th, td, activity { LibraryActivity().apply { randomizer.step = fakeRandomize("making") } }),
         Shot("library-randomize-done", tw, th, td, activity { LibraryActivity().apply { randomizer.step = fakeRandomize("done") } }),
         Shot("library-randomize-not-found", tw, th, td, activity { LibraryActivity().apply { randomizer.step = fakeRandomize("notfound") } }),
@@ -3213,6 +3222,14 @@ private fun fakeRandomize(state: String): com.pokedaisy.app.RomRandomizeFlow.Ste
     )
     return when (state) {
         "ready" -> com.pokedaisy.app.RomRandomizeFlow.Step.Ready(bases)
+        "platforms" -> com.pokedaisy.app.RomRandomizeFlow.Step.Ready(listOf(
+            com.pokedaisy.app.RomRandomizeFlow.Base(File("/storage/emulated/0/ROMs/nds/Platinum.nds"), "Pokémon Platinum", "Platinum", ds = true),
+            com.pokedaisy.app.RomRandomizeFlow.Base(File("/storage/emulated/0/ROMs/nds/HeartGold.nds"), "Pokémon HeartGold", "HeartGold", ds = true),
+        ) + bases + listOf(
+            com.pokedaisy.app.RomRandomizeFlow.Base(File("$dir/Pokemon - LeafGreen Version (USA, Europe) (Rev 1).gba"), "Pokémon LeafGreen", "LeafGreen"),
+            com.pokedaisy.app.RomRandomizeFlow.Base(File("$dir/Pokemon - Ruby Version (USA, Europe) (Rev 2).gba"), "Pokémon Ruby", "Ruby"),
+            com.pokedaisy.app.RomRandomizeFlow.Base(File("/storage/emulated/0/ROMs/gbc/Crystal.gbc"), "Pokémon Crystal", "Crystal", gb = true),
+        ))
         "making" -> com.pokedaisy.app.RomRandomizeFlow.Step.Making(bases[0])
         "done" -> com.pokedaisy.app.RomRandomizeFlow.Step.Done(File("$dir/Pokemon FireRed Randomized (seed 482913).gba"), "Pokémon FireRed (Randomized)")
         else -> com.pokedaisy.app.RomRandomizeFlow.Step.NotFound
