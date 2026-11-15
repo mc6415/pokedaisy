@@ -9,7 +9,8 @@ import kotlin.random.Random
  * same file.
  *
  * It writes only [sites]: the starters' species words (and FireRed / LeafGreen's Oak lines naming them), every wild slot's
- * species, every trainer Pokémon's species and its own moves. Those are found through pointers it never changes, so the
+ * species, every trainer Pokémon's species, its own moves and its held item, each species' base stats and level-up moves,
+ * and the item of every item ball and hidden item but the key items and HMs. Those are found through pointers it never changes, so the
  * same list comes out of the retail cart and of any file made from it, and a file is this tool's output when its bytes with
  * [sites] zeroed hash to the game's [Game.madeSha1] ([recognise]): the companion then treats it as the retail cart (the
  * Poller's `retailRom`, for the battle cursors, SHINY ODDS, BOXES). FireRed and Emerald's sites are also all inside
@@ -27,8 +28,17 @@ object RomRandomizer {
         val similarStrength: Boolean = true,
         /** No legendary Pokémon in the grass or in trainers' teams (starters never are). */
         val noLegendaries: Boolean = true,
+        /** Item balls and hidden items swapped among themselves (key items and HMs stay where they are). */
+        val fieldItems: Boolean = false,
+        /** Every trainer Pokémon that can hold an item holds one of the items trainers hold in the game. */
+        val trainerItems: Boolean = false,
+        /** Each Pokémon's six base stats shuffled among themselves: the same total, spread another way. */
+        val baseStats: Boolean = false,
+        /** Each Pokémon learns random moves at its own levels, the first always one that does damage. */
+        val learnsets: Boolean = false,
     ) {
-        val changesSomething get() = starters != Starters.OFF || wild != Wild.OFF || trainers
+        val changesSomething get() = starters != Starters.OFF || wild != Wild.OFF || trainers || fieldItems || trainerItems ||
+            baseStats || learnsets
     }
 
     /** Where one retail game keeps what the tool changes (ROM offsets). */
@@ -52,6 +62,12 @@ object RomRandomizer {
         val starterLines: List<Int> = emptyList(),
         /** gSpeciesNames (Oak's lines take the names from it). */
         val speciesNames: Int = 0,
+        /** gItems (44-byte struct Item, its pocket at +26), gBattleMoves (12 bytes a move, power at +1), gMapGroups. */
+        val items: Int,
+        val battleMoves: Int,
+        val mapGroups: Int,
+        /** The key items' pocket: FireRed / LeafGreen's 2, Ruby / Sapphire / Emerald's 5. */
+        val keyPocket: Int,
     )
 
     /** Oak's lab: each ball's script names its Pokémon twice, at these offsets from the first. */
@@ -61,31 +77,34 @@ object RomRandomizer {
 
     val GAMES = listOf(
         Game(
-            "BPRE", 1, "FireRed", "dd5945db9b930750cb39d00c84da8571feebf417", "d6e82f31d54fb00d8679da8fbc1091c9e1d57d83",
+            "BPRE", 1, "FireRed", "dd5945db9b930750cb39d00c84da8571feebf417", "d8ba71405fbb1662b1904c1e10955f58690da82e",
             trainers = 0x23EB38, trainerCount = 743, learnsets = 0x25D824, evolutions = 0x2597C4, baseStats = 0x2547F4,
             wildHeaders = 0x3C9D28, starterSites = oaksLab(0x169C2D), starterLines = listOf(0x18E2F1, 0x18E210, 0x18E283),
-            speciesNames = 0x245F50,
+            speciesNames = 0x245F50, items = 0x3DB098, battleMoves = 0x250C74, mapGroups = 0x352718, keyPocket = 2,
         ),
         Game(
-            "BPGE", 1, "LeafGreen", "7862c67bdecbe21d1d69ce082ce34327e1c6ed5e", "177fe07b98b53ac0bb340d4270f20cbbde5043f0",
+            "BPGE", 1, "LeafGreen", "7862c67bdecbe21d1d69ce082ce34327e1c6ed5e", "0d7f2a3b96a56d4161ed0006e5baebab19cbb15b",
             trainers = 0x23EB14, trainerCount = 743, learnsets = 0x25D804, evolutions = 0x2597A4, baseStats = 0x2547D0,
             wildHeaders = 0x3C9B64, starterSites = oaksLab(0x169C09), starterLines = listOf(0x18E2CD, 0x18E1EC, 0x18E25F),
-            speciesNames = 0x245F2C,
+            speciesNames = 0x245F2C, items = 0x3DAED4, battleMoves = 0x250C50, mapGroups = 0x3526F8, keyPocket = 2,
         ),
         Game(
-            "AXVE", 2, "Ruby", "5b64eacf892920518db4ec664e62a086dd5f5bc8", "aab48d17cd004decde01a8470dd75e42daf614be",
+            "AXVE", 2, "Ruby", "5b64eacf892920518db4ec664e62a086dd5f5bc8", "1d312fe2af5c615f9c71fec9e25aecdf79b43e2a",
             trainers = 0x1F0514, trainerCount = 694, learnsets = 0x207BE0, evolutions = 0x203B80, baseStats = 0x1FEC30,
             wildHeaders = 0x39D46C, starterSites = starterMon(0x3F76E0),
+            items = 0x3C5580, battleMoves = 0x1FB144, mapGroups = 0x3085A0, keyPocket = 5,
         ),
         Game(
-            "AXPE", 2, "Sapphire", "89b45fb172e6b55d51fc0e61989775187f6fe63c", "c1cecb442be82d9ffcbdd236993f4c336bb87a00",
+            "AXPE", 2, "Sapphire", "89b45fb172e6b55d51fc0e61989775187f6fe63c", "eeb2f5de95626d24bb6c4ac28c5b9729cb436712",
             trainers = 0x1F04A4, trainerCount = 694, learnsets = 0x207B70, evolutions = 0x203B10, baseStats = 0x1FEBC0,
             wildHeaders = 0x39D2B4, starterSites = starterMon(0x3F773C),
+            items = 0x3C55DC, battleMoves = 0x1FB0D4, mapGroups = 0x308530, keyPocket = 5,
         ),
         Game(
-            "BPEE", 0, "Emerald", "f3ae088181bf583e55daf962a92bb46f4f1d07b7", "07da11e6dfb4a3f0a2b2ba1b4dd3f313a31d793d",
+            "BPEE", 0, "Emerald", "f3ae088181bf583e55daf962a92bb46f4f1d07b7", "b7116212d1470cd75dd0358a14f061ff9a847e1c",
             trainers = 0x310030, trainerCount = 855, learnsets = 0x32937C, evolutions = 0x32531C, baseStats = 0x3203CC,
             wildHeaders = 0x552D48, starterSites = starterMon(0x5B1DF8),
+            items = 0x5839A0, battleMoves = 0x31C898, mapGroups = 0x486578, keyPocket = 5,
         ),
     )
 
@@ -94,6 +113,14 @@ object RomRandomizer {
     private const val TRAINER_STRIDE = 40
     private const val EVO_STRIDE = 40
     private const val NAME_LEN = 11
+    private const val ITEM_STRIDE = 44
+    private const val MOVE_STRIDE = 12
+    /** Moves 1..354, but STRUGGLE (165). */
+    private val MOVES = (1..354).filter { it != 165 }
+    /** Item ids past the last (Emerald's 376): a hidden-item event holding one isn't an item. */
+    private const val ITEM_COUNT = 377
+    /** HM01-08's items. */
+    private val HM_ITEMS = 339..346
     private const val SIZE = 0x1000000
     /** Internal ids: 1..251, then Gen 3's from 277 (252..276 are the unused slots between them). */
     private val ALL = (1..251) + (277..SPECIES)
@@ -161,6 +188,10 @@ object RomRandomizer {
             out += mon + 4..mon + 5
             if (moves >= 0) out += moves until moves + 8
         }
+        r.trainerItems(g) { item -> out += item..item + 1 }
+        for (s in ALL) out += g.baseStats + s * BASE_STRIDE until g.baseStats + s * BASE_STRIDE + 6
+        r.learnsetEntries(g) { at -> out += at..at + 1 }
+        r.fieldItems(g) { at -> out += at..at + 1 }
         require(out.all { it.first >= 0 && it.last < rom.size && it.last - it.first < 0x200 }) { "not this game's tables" }
         return out
     }
@@ -183,6 +214,75 @@ object RomRandomizer {
                     for (i in 0 until slots) each(at + i * 4, at)
                 }
                 h += 20
+            }
+        }
+
+        /** Each trainer Pokémon's held item (u16) where its record has one (flag bit 1: at +6). */
+        fun trainerItems(g: Game, each: (item: Int) -> Unit) {
+            for (t in 1 until g.trainerCount) {
+                val at = g.trainers + t * TRAINER_STRIDE
+                val flags = u8(at)
+                if (flags and 2 == 0) continue
+                val party = ptr(at + 36)
+                val stride = if (flags and 1 != 0) 16 else 8
+                for (i in 0 until u8(at + 32)) each(party + i * stride + 6)
+            }
+        }
+
+        /** Every level-up move entry (u16: level << 9 | move) of every species, the 0xFFFF end left out. */
+        fun learnsetEntries(g: Game, each: (at: Int) -> Unit) {
+            val seen = HashSet<Int>()
+            for (s in ALL) {
+                var at = ptr(g.learnsets + s * 4)
+                if (!seen.add(at)) continue
+                var n = 0
+                while (u16(at) != 0xFFFF && n++ < 64) { each(at); at += 2 }
+            }
+        }
+
+        /** An item's pocket in gItems. */
+        fun pocket(g: Game, item: Int) = u8(g.items + item * ITEM_STRIDE + 26)
+
+        /** An item the field keeps where it is: a key item or an HM. */
+        fun keeps(g: Game, item: Int) = item !in 1 until ITEM_COUNT || item in HM_ITEMS || pocket(g, item) == g.keyPocket
+
+        /**
+         * Each item ball's and hidden item's item word (u16), once, but the key items', HMs' and anything not an item id: an item ball is an object
+         * event whose script starts with the game's find-item lines (setorcopyvar 0x8000 item, setorcopyvar 0x8001 amount,
+         * callstd 1); a hidden item a background event of kind 7, its item the data's low half. Every map by gMapGroups.
+         */
+        fun fieldItems(g: Game, each: (at: Int) -> Unit) {
+            val seen = HashSet<Int>()
+            fun rom(p: Int) = p - 0x08000000
+            fun isPtr(v: Int) = v in 0x08000000 until 0x08000000 + b.size
+            fun u32(at: Int) = u16(at) or (u16(at + 2) shl 16)
+            var group = 0
+            while (group < 64 && isPtr(u32(g.mapGroups + group * 4))) {
+                val maps = rom(u32(g.mapGroups + group * 4))
+                var m = 0
+                while (m < 256 && isPtr(u32(maps + m * 4))) {
+                    val header = rom(u32(maps + m * 4))
+                    val ev = u32(header + 4)
+                    if (isPtr(ev)) {
+                        val e = rom(ev)
+                        val objects = u32(e + 4)
+                        if (isPtr(objects)) for (k in 0 until u8(e)) {
+                            val sc = u32(rom(objects) + k * 24 + 16)
+                            if (!isPtr(sc)) continue
+                            val at = rom(sc)
+                            if (at + 12 > b.size) continue
+                            if (u8(at) == 0x1A && u16(at + 1) == 0x8000 && u8(at + 5) == 0x1A && u16(at + 6) == 0x8001 &&
+                                u8(at + 10) == 0x09 && u8(at + 11) == 0x01 && !keeps(g, u16(at + 3)) && seen.add(at + 3)) each(at + 3)
+                        }
+                        val bgs = u32(e + 16)
+                        if (isPtr(bgs)) for (k in 0 until u8(e + 3)) {
+                            val at = rom(bgs) + k * 12
+                            if (u8(at + 5) == 7 && !keeps(g, u16(at + 8)) && seen.add(at + 8)) each(at + 8)
+                        }
+                    }
+                    m++
+                }
+                group++
             }
         }
 
@@ -232,9 +332,60 @@ object RomRandomizer {
         }
 
         fun all() {
+            // Stats and learnsets first: the strength match keeps working (the totals stay) and trainers' moves follow.
+            if (o.baseStats) baseStats()
+            if (o.learnsets) learnsets()
             starters()
             wild()
             if (o.trainers) trainers()
+            if (o.trainerItems) trainerItems()
+            if (o.fieldItems) fieldItems()
+        }
+
+        /** Each Pokémon's six base stats in another order (SHEDINJA's 1 HP left as it is). */
+        fun baseStats() {
+            for (s in ALL) {
+                val at = g.baseStats + s * BASE_STRIDE
+                if (u8(at) == 1) continue
+                val six = (0 until 6).map { u8(at + it) }.shuffled(rnd)
+                six.forEachIndexed { i, v -> b[at + i] = v.toByte() }
+            }
+        }
+
+        fun power(move: Int) = u8(g.battleMoves + move * MOVE_STRIDE + 1)
+
+        /** Random moves at each species' own levels: none twice, the first one with power. */
+        fun learnsets() {
+            val damaging = MOVES.filter { power(it) > 0 }
+            val seen = HashSet<Int>()
+            for (s in ALL) {
+                var at = ptr(g.learnsets + s * 4)
+                if (!seen.add(at)) continue
+                val used = HashSet<Int>()
+                var first = true
+                while (u16(at) != 0xFFFF) {
+                    val level = u16(at) shr 9
+                    var move: Int
+                    do { move = (if (first) damaging else MOVES).random(rnd) } while (!used.add(move))
+                    first = false
+                    put16(at, (level shl 9) or move)
+                    at += 2
+                }
+            }
+        }
+
+        /** Every held item slot a trainer has: one of the items trainers hold anywhere in the game. */
+        fun trainerItems() {
+            val held = ArrayList<Int>().also { l -> trainerItems(g) { at -> if (u16(at) != 0) l += u16(at) } }.distinct()
+            if (held.isEmpty()) return
+            trainerItems(g) { at -> put16(at, held.random(rnd)) }
+        }
+
+        /** The item balls' and hidden items' items, shuffled among the same places (key items and HMs not among them). */
+        fun fieldItems() {
+            val places = ArrayList<Int>().also { l -> fieldItems(g) { l += it } }
+            val items = places.map { u16(it) }.shuffled(rnd)
+            places.forEachIndexed { i, at -> put16(at, items[i]) }
         }
 
         fun starters() {

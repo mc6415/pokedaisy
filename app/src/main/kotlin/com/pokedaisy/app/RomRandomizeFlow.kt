@@ -139,11 +139,15 @@ class RomRandomizeFlow(
         }, "pokedaisy-randomize-look").apply { isDaemon = true; start() }
     }
 
+    /** The options as [b]'s game takes them: field items, held items, base stats and learnsets are the GBA games' only. */
+    fun optionsFor(b: Base) = if (b.ds || b.gb) options.copy(fieldItems = false, trainerItems = false, baseStats = false, learnsets = false)
+        else options
+
     /** RANDOMIZE. */
     fun make() {
         val ready = step as? Step.Ready ?: return
         val b = ready.bases.getOrNull(base) ?: return
-        val opts = options
+        val opts = optionsFor(b)
         val s = seed
         step = Step.Making(b)
         val token = run
@@ -334,7 +338,7 @@ fun RandomizeWindow(flow: RomRandomizeFlow, m: GbaTextMetrics, small: GbaTextMet
                         when (step) {
                             is RomRandomizeFlow.Step.Ready -> {
                                 OptionButton(tr("CANCEL"), m, modifier = Modifier.weight(1f), onClick = { flow.dismiss() })
-                                OptionButton(tr("RANDOMIZE"), m, emphasis = true, enabled = flow.options.changesSomething, modifier = Modifier.weight(1f), onClick = { flow.make() })
+                                OptionButton(tr("RANDOMIZE"), m, emphasis = true, enabled = (step as RomRandomizeFlow.Step.Ready).let { r -> flow.optionsFor(r.bases.getOrElse(flow.base) { r.bases[0] }).changesSomething }, modifier = Modifier.weight(1f), onClick = { flow.make() })
                             }
                             is RomRandomizeFlow.Step.Making ->
                                 OptionButton(tr("RANDOMIZE"), m, emphasis = true, enabled = false, modifier = Modifier.weight(1f), onClick = {})
@@ -405,6 +409,16 @@ private fun ReadyRows(
     }
     OptionLine(tr("LEGENDARIES"), tr(if (o.noLegendaries) "NONE" else "ALLOWED"), false, m, divider = true) {
         flow.options = o.copy(noLegendaries = !o.noLegendaries)
+    }
+    // The GBA games' own (RomRandomizer): the DS and Game Boy ones don't shuffle these yet.
+    if (!base.ds && !base.gb) {
+        fun shuffled(b: Boolean) = tr(if (b) "SHUFFLED" else "AS THEY ARE")
+        OptionLine(tr("FIELD ITEMS"), shuffled(o.fieldItems), false, m, divider = true) { flow.options = o.copy(fieldItems = !o.fieldItems) }
+        OptionLine(tr("HELD ITEMS"), onOff(o.trainerItems), false, m, divider = true) { flow.options = o.copy(trainerItems = !o.trainerItems) }
+        OptionLine(tr("BASE STATS"), shuffled(o.baseStats), false, m, divider = true) { flow.options = o.copy(baseStats = !o.baseStats) }
+        OptionLine(tr("LEARNSETS"), tr(if (o.learnsets) "RANDOM" else "AS THEY ARE"), false, m, divider = true) {
+            flow.options = o.copy(learnsets = !o.learnsets)
+        }
     }
     OptionLine(tr("SEED"), flow.seed.toString(), false, m) { flow.newSeed() }
     Spacer(Modifier.height(m.u * 4))

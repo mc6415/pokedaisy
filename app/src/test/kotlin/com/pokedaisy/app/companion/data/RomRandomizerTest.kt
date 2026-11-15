@@ -49,6 +49,7 @@ class RomRandomizerTest {
             RomRandomizer.Options(),
             RomRandomizer.Options(RomRandomizer.Starters.RANDOM, RomRandomizer.Wild.RANDOM, true, similarStrength = false, noLegendaries = false),
             RomRandomizer.Options(RomRandomizer.Starters.OFF, RomRandomizer.Wild.GLOBAL, false),
+            RomRandomizer.Options(fieldItems = true, trainerItems = true, baseStats = true, learnsets = true),
         )) {
             val a = RomRandomizer.randomize(rom, opts, 1234L)!!
             assertTrue(name, rom.indices.all { rom[it] == a[it] || sites[it] })
@@ -99,6 +100,41 @@ class RomRandomizerTest {
             }
         }
         assertTrue(name, custom > 50)
+    }
+
+    @Test
+    fun `field items, trainers' items, base stats and learnsets are what was asked`() = each { g, rom ->
+        val name = g.title
+        val o = RomRandomizer.Options(RomRandomizer.Starters.OFF, RomRandomizer.Wild.OFF, false,
+            fieldItems = true, trainerItems = true, baseStats = true, learnsets = true)
+        val out = RomRandomizer.randomize(rom, o, 11L)!!
+        // Base stats: each species' six in another order, the same total.
+        var moved = 0
+        for (s in (1..251) + (277..411)) {
+            val at = g.baseStats + s * 28
+            val was = (0 until 6).map { rom[at + it].toInt() and 0xFF }
+            val now = (0 until 6).map { out[at + it].toInt() and 0xFF }
+            assertEquals("$name $s", was.sorted(), now.sorted())
+            if (was != now) moved++
+        }
+        assertTrue(name, moved > 300)
+        // Learnsets: the same levels, no move twice, the first one with power.
+        fun ptr(b: ByteArray, at: Int) = (u16(b, at) or (u16(b, at + 2) shl 16)) - 0x08000000
+        for (s in (1..251) + (277..411)) {
+            var at = ptr(out, g.learnsets + s * 4)
+            val moves = ArrayList<Int>()
+            while (u16(out, at) != 0xFFFF) {
+                assertEquals(name, u16(rom, at) shr 9, u16(out, at) shr 9)
+                moves += u16(out, at) and 0x1FF
+                at += 2
+            }
+            assertEquals("$name $s", moves.size, moves.toSet().size)
+            assertTrue("$name $s", moves.isEmpty() || out[g.battleMoves + moves[0] * 12 + 1].toInt() != 0)
+        }
+        // Everything else stays as it was: the only changes are the tool's sites (field items, held items among them).
+        val sites = RomRandomizer.sites(rom, g).map { it.first }.toSet()
+        val diff = rom.indices.filter { rom[it] != out[it] }
+        assertTrue(name, diff.all { i -> sites.any { i in it..it + 1 } || RomRandomizer.sites(rom, g).any { i in it } })
     }
 
     @Test
