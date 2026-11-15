@@ -1,6 +1,7 @@
 package com.pokedaisy.app
 
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -13,5 +14,30 @@ class RomRandomizeFlowTest {
         assertFalse(RomRandomizeFlow.namedByTool("Pokemon - FireRed Version (USA, Europe) (Rev 1).gba"))
         assertFalse(RomRandomizeFlow.namedByTool("FireRed randomized seed 42.gba"))
         assertFalse(RomRandomizeFlow.namedByTool("Pokemon FireRed Randomized (seed 874812).zip"))
+    }
+
+    @Test
+    fun `LAST TIME keeps every setting`() {
+        val o = RomRandomizeFlow.optionsOf(RomRandomizeFlow.Style.CHAOS).copy(similarStrength = true, learnsets = false)
+        assertEquals(o, RomRandomizeFlow.decode(RomRandomizeFlow.encode(o)))
+        assertEquals(null, RomRandomizeFlow.decode(null))
+        assertEquals(null, RomRandomizeFlow.decode("NOT,A,SETTING"))
+    }
+
+    @Test
+    fun `each style changes something, and READY says what`() {
+        val red = RomRandomizeFlow.Base(java.io.File("red.gb"), "Pokémon Red", "Red", gb = true)
+        for (s in listOf(RomRandomizeFlow.Style.CLASSIC, RomRandomizeFlow.Style.WILD_ONLY, RomRandomizeFlow.Style.CHAOS)) {
+            val o = RomRandomizeFlow.optionsOf(s)
+            assertTrue(s.name, o.changesSomething)
+            assertTrue(s.name, RomRandomizeFlow.summary(o, red).isNotEmpty())
+        }
+        assertEquals(false, RomRandomizeFlow.optionsOf(RomRandomizeFlow.Style.WILD_ONLY).trainers)
+        // Red's trainers hold nothing: CHAOS's held items aren't promised there.
+        assertEquals(7, RomRandomizeFlow.summary(RomRandomizeFlow.optionsOf(RomRandomizeFlow.Style.CHAOS), red).size)
+        val nothing = com.pokedaisy.app.companion.data.RomRandomizer.Options(
+            com.pokedaisy.app.companion.data.RomRandomizer.Starters.OFF, com.pokedaisy.app.companion.data.RomRandomizer.Wild.OFF, false,
+        )
+        assertTrue(RomRandomizeFlow.summary(nothing, red).isEmpty())
     }
 }

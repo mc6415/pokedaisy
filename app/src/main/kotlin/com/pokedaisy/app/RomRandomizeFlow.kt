@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -62,8 +63,27 @@ class RomRandomizeFlow(
         class Failed(val message: String) : Step()
     }
 
+    /** The wizard's pages, in order: which game (its console first when there are several), a [Style], then READY; CUSTOM
+     * puts its three short pages of settings between STYLE and READY. */
+    enum class Page { GAME, GAME_LIST, STYLE, POKEMON, TRAINERS, EXTRAS, READY }
+
+    /** STYLE's choices: a ready-made set of [RomRandomizer.Options], the last run's, or CUSTOM's pages. */
+    enum class Style(val label: String, val blurb: String) {
+        CLASSIC(tk("CLASSIC"), tk("New starters, wild Pokémon by area and shuffled trainers.")),
+        WILD_ONLY(tk("WILD ONLY"), tk("New starters and wild Pokémon. Trainers keep their teams.")),
+        CHAOS(tk("CHAOS"), tk("Everything shuffled: every encounter, items, base stats and moves.")),
+        LAST_TIME(tk("LAST TIME"), tk("The settings you used last time.")),
+        CUSTOM(tk("CUSTOM"), tk("Pick each setting yourself.")),
+    }
+
     /** The window shows while non-null. */
     var step by mutableStateOf<Step?>(null)
+    var page by mutableStateOf(Page.GAME)
+    /** GAME_LIST's console. */
+    var listPlatform by mutableStateOf<Platform?>(null)
+    /** The STYLE picked (null until one is). */
+    var style by mutableStateOf<Style?>(null)
+    private val history = ArrayList<Page>()
     var base by mutableStateOf(0)
     var options by mutableStateOf(RomRandomizer.Options())
     var seed by mutableStateOf(kotlin.random.Random.nextLong(100_000, 1_000_000))
@@ -134,10 +154,58 @@ class RomRandomizeFlow(
             val sorted = found.sortedWith(compareBy<Base>({ ORDER.indexOf(it.game).let { i -> if (i < 0) ORDER.size else i } }, { it.label }))
             postFor(token) {
                 base = 0
+                style = null
+                history.clear()
                 step = if (sorted.isEmpty()) Step.NotFound else Step.Ready(sorted)
+                page = firstPage(sorted)
             }
         }, "pokedaisy-randomize-look").apply { isDaemon = true; start() }
     }
+
+    /** The wizard's first page: GAME, its one console's games, or STYLE when there's one game. */
+    fun firstPage(bases: List<Base>): Page {
+        val platforms = bases.map { it.platform }.distinct()
+        listPlatform = platforms.singleOrNull()
+        return when {
+            bases.size == 1 -> Page.STYLE
+            platforms.size == 1 -> Page.GAME_LIST
+            else -> Page.GAME
+        }
+    }
+
+    /** On to [p]; back to it when it's already behind (READY after a change made from it). */
+    fun forward(p: Page) {
+        val at = history.lastIndexOf(p)
+        if (at >= 0) {
+            while (history.size > at) history.removeAt(history.size - 1)
+        } else history += page
+        page = p
+    }
+
+    /** BACK: the page before, or close on the first. */
+    fun back() {
+        if (step !is Step.Ready || history.isEmpty()) { dismiss(); return }
+        page = history.removeAt(history.size - 1)
+    }
+
+    /** GAME_LIST's pick: STYLE, or READY when a style is already picked (the game changed from READY). */
+    fun pickGame(index: Int) {
+        base = index
+        forward(if (style != null && Page.READY in history) Page.READY else Page.STYLE)
+    }
+
+    /** STYLE's pick: its options and READY, or CUSTOM's pages. */
+    fun pickStyle(s: Style) {
+        style = s
+        when (s) {
+            Style.CUSTOM -> forward(Page.POKEMON)
+            Style.LAST_TIME -> { options = decode(prefs.randomizeLast) ?: RomRandomizer.Options(); forward(Page.READY) }
+            else -> { options = optionsOf(s); forward(Page.READY) }
+        }
+    }
+
+    /** The styles STYLE offers: LAST TIME once a game has been made. */
+    fun styles(): List<Style> = Style.entries.filter { it != Style.LAST_TIME || decode(prefs.randomizeLast) != null }
 
     /** The options as [b]'s game takes them ([takesFieldItems], [takesHeldItems]). */
     fun optionsFor(b: Base) = options.copy(fieldItems = options.fieldItems && takesFieldItems(b), trainerItems = options.trainerItems && takesHeldItems(b))
@@ -148,6 +216,7 @@ class RomRandomizeFlow(
         val b = ready.bases.getOrNull(base) ?: return
         val opts = optionsFor(b)
         val s = seed
+        prefs.randomizeLast = encode(options)
         step = Step.Making(b)
         val token = run
         Thread({
@@ -276,6 +345,53 @@ class RomRandomizeFlow(
         /** HELD ITEMS: not Red / Blue / Yellow, whose trainers hold nothing. */
         fun takesHeldItems(b: Base) = !(b.gb && b.game in setOf("Red", "Blue", "Yellow"))
 
+        /** A ready-made [Style]'s options (LAST TIME and CUSTOM aren't). */
+        fun optionsOf(s: Style): RomRandomizer.Options = when (s) {
+            Style.WILD_ONLY -> RomRandomizer.Options(trainers = false)
+            Style.CHAOS -> RomRandomizer.Options(
+                starters = RomRandomizer.Starters.RANDOM, wild = RomRandomizer.Wild.RANDOM, trainers = true,
+                similarStrength = false, noLegendaries = false, fieldItems = true, trainerItems = true, baseStats = true, learnsets = true,
+            )
+            else -> RomRandomizer.Options()
+        }
+
+        /** [o] as [Prefs.randomizeLast] keeps it: its settings in order, `,`-separated. */
+        fun encode(o: RomRandomizer.Options): String = listOf(
+            o.starters.name, o.wild.name, o.trainers, o.similarStrength, o.noLegendaries, o.fieldItems, o.trainerItems, o.baseStats, o.learnsets,
+        ).joinToString(",")
+
+        fun decode(s: String?): RomRandomizer.Options? = runCatching {
+            val f = s!!.split(',')
+            RomRandomizer.Options(
+                RomRandomizer.Starters.valueOf(f[0]), RomRandomizer.Wild.valueOf(f[1]), f[2].toBooleanStrict(),
+                similarStrength = f[3].toBooleanStrict(), noLegendaries = f[4].toBooleanStrict(), fieldItems = f[5].toBooleanStrict(),
+                trainerItems = f[6].toBooleanStrict(), baseStats = f[7].toBooleanStrict(), learnsets = f[8].toBooleanStrict(),
+            )
+        }.getOrNull()
+
+        /** READY's plain words: one line per thing [o] changes in [b]'s game (English keys, translated here). */
+        fun summary(o: RomRandomizer.Options, b: Base): List<String> = buildList {
+            when (o.starters) {
+                RomRandomizer.Starters.THREE_STAGE -> add(tr("New starters that evolve twice"))
+                RomRandomizer.Starters.RANDOM -> add(tr("Any Pokémon as a starter"))
+                RomRandomizer.Starters.OFF -> Unit
+            }
+            when (o.wild) {
+                RomRandomizer.Wild.PER_AREA -> add(tr("Wild Pokémon shuffled area by area"))
+                RomRandomizer.Wild.RANDOM -> add(tr("A random wild Pokémon in every encounter"))
+                RomRandomizer.Wild.GLOBAL -> add(tr("Each wild Pokémon swapped for another everywhere"))
+                RomRandomizer.Wild.OFF -> Unit
+            }
+            if (o.trainers) add(tr("Trainers' teams shuffled"))
+            val swaps = o.starters != RomRandomizer.Starters.OFF || o.wild != RomRandomizer.Wild.OFF || o.trainers
+            if (swaps && o.similarStrength) add(tr("Swaps keep to Pokémon of similar strength"))
+            if (swaps && !o.noLegendaries) add(tr("Legendaries can turn up"))
+            if (o.fieldItems && takesFieldItems(b)) add(tr("Items lying around shuffled"))
+            if (o.trainerItems && takesHeldItems(b)) add(tr("Trainers hold random items"))
+            if (o.baseStats) add(tr("Base stats shuffled"))
+            if (o.learnsets) add(tr("Random moves learned by level"))
+        }
+
         fun startersLabel(s: RomRandomizer.Starters) = when (s) {
             RomRandomizer.Starters.OFF -> tk("AS THEY ARE")
             RomRandomizer.Starters.RANDOM -> tk("ANY POKéMON")
@@ -291,19 +407,32 @@ class RomRandomizeFlow(
     }
 }
 
-/** [flow]'s window: which game, the options and the seed, then RANDOMIZE. */
+/**
+ * [flow]'s window, a wizard: GAME (its console, then the game), STYLE (cards: CLASSIC, WILD ONLY, CHAOS, LAST TIME, CUSTOM -
+ * CUSTOM's settings on three short pages), READY (what will change in plain words, the seed, RANDOMIZE). BACK, the title's
+ * arrow and a tap outside step back a page; the first page's close the window.
+ */
 @Composable
 fun RandomizeWindow(flow: RomRandomizeFlow, m: GbaTextMetrics, small: GbaTextMetrics, onPlay: ((File) -> Unit)?) {
     val step = flow.step ?: return
     var choosing by remember { mutableStateOf<String?>(null) }
-    var platform by remember { mutableStateOf<RomRandomizeFlow.Platform?>(null) }
-    OptionOverlay(onDismiss = { flow.dismiss() }, modifier = Modifier.widthIn(max = 900.dp)) {
+    val ready = step as? RomRandomizeFlow.Step.Ready
+    val page = flow.page.takeIf { ready != null }
+    OptionOverlay(onDismiss = { flow.back() }, modifier = Modifier.widthIn(max = 900.dp)) {
         Column {
-            OptionTitleWindow(tr("RANDOMIZE"), m, onBack = { flow.dismiss() }.takeIf { step !is RomRandomizeFlow.Step.Making })
+            OptionTitleWindow(tr("RANDOMIZE"), m, onBack = { flow.back() }.takeIf { step !is RomRandomizeFlow.Step.Making })
             Spacer(Modifier.height(m.u * 4))
             OptionListWindow(m, Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(vertical = m.u * 2)) {
-                    Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
+                    if (page == RomRandomizeFlow.Page.STYLE) {
+                        // The cards scroll by themselves (the TOOLS page's): never inside another scroll.
+                        Padded(m) { Message(tr("How random should it be?"), m, value = true) }
+                        com.pokedaisy.app.companion.ui.ToolsPage(
+                            flow.styles().map { s -> com.pokedaisy.app.companion.ui.LibraryTool("STYLE_${s.name}", s.label, s.blurb, null) { flow.pickStyle(s) } },
+                            m, small, androidx.compose.foundation.layout.PaddingValues(horizontal = m.u * 6, vertical = m.u * 2),
+                            Modifier.weight(1f, fill = false),
+                        )
+                    } else Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
                         when (step) {
                             is RomRandomizeFlow.Step.Looking -> Padded(m) {
                                 Message(tr("Looking for your games… {0}%", (step.progress * 100).toInt()), m)
@@ -315,7 +444,7 @@ fun RandomizeWindow(flow: RomRandomizeFlow, m: GbaTextMetrics, small: GbaTextMet
                                 Spacer(Modifier.height(m.u * 2))
                                 Message(tr("RANDOMIZE works on the English Red, Blue, Yellow, Gold, Silver, Crystal (Rev 1), FireRed and LeafGreen (Rev 1), Ruby and Sapphire (Rev 2), Emerald, Platinum (Rev 1), HeartGold, SoulSilver, Black, White, Black 2 and White 2. Add one to your library or a ROMs folder, then try again."), small)
                             }
-                            is RomRandomizeFlow.Step.Ready -> ReadyRows(flow, step, m, small) { choosing = it }
+                            is RomRandomizeFlow.Step.Ready -> WizardPage(flow, step, m, small) { choosing = it }
                             is RomRandomizeFlow.Step.Making -> Padded(m) {
                                 Message(tr("Randomizing {0}…", step.base.label), m)
                                 if (step.progress >= 0f) {
@@ -342,9 +471,22 @@ fun RandomizeWindow(flow: RomRandomizeFlow, m: GbaTextMetrics, small: GbaTextMet
                         horizontalArrangement = Arrangement.spacedBy(m.u * 4),
                     ) {
                         when (step) {
-                            is RomRandomizeFlow.Step.Ready -> {
-                                OptionButton(tr("CANCEL"), m, modifier = Modifier.weight(1f), onClick = { flow.dismiss() })
-                                OptionButton(tr("RANDOMIZE"), m, emphasis = true, enabled = (step as RomRandomizeFlow.Step.Ready).let { r -> flow.optionsFor(r.bases.getOrElse(flow.base) { r.bases[0] }).changesSomething }, modifier = Modifier.weight(1f), onClick = { flow.make() })
+                            is RomRandomizeFlow.Step.Ready -> when (page) {
+                                RomRandomizeFlow.Page.POKEMON, RomRandomizeFlow.Page.TRAINERS, RomRandomizeFlow.Page.EXTRAS -> {
+                                    OptionButton(tr("BACK"), m, modifier = Modifier.weight(1f), onClick = { flow.back() })
+                                    OptionButton(tr("NEXT"), m, emphasis = true, modifier = Modifier.weight(1f), onClick = {
+                                        flow.forward(when (page) {
+                                            RomRandomizeFlow.Page.POKEMON -> RomRandomizeFlow.Page.TRAINERS
+                                            RomRandomizeFlow.Page.TRAINERS -> RomRandomizeFlow.Page.EXTRAS
+                                            else -> RomRandomizeFlow.Page.READY
+                                        })
+                                    })
+                                }
+                                RomRandomizeFlow.Page.READY -> {
+                                    OptionButton(tr("BACK"), m, modifier = Modifier.weight(1f), onClick = { flow.back() })
+                                    OptionButton(tr("RANDOMIZE"), m, emphasis = true, enabled = flow.optionsFor(step.bases.getOrElse(flow.base) { step.bases[0] }).changesSomething, modifier = Modifier.weight(1f), onClick = { flow.make() })
+                                }
+                                else -> OptionButton(tr("CANCEL"), m, modifier = Modifier.weight(1f), onClick = { flow.dismiss() })
                             }
                             is RomRandomizeFlow.Step.Making ->
                                 OptionButton(tr("RANDOMIZE"), m, emphasis = true, enabled = false, modifier = Modifier.weight(1f), onClick = {})
@@ -361,31 +503,7 @@ fun RandomizeWindow(flow: RomRandomizeFlow, m: GbaTextMetrics, small: GbaTextMet
             }
         }
     }
-    val ready = step as? RomRandomizeFlow.Step.Ready
     when (choosing.takeIf { ready != null }) {
-        // Two steps: the platform, then its games (BACK from the games goes back to the platforms). One platform: its games.
-        "GAME" -> {
-            val platforms = ready!!.bases.map { it.platform }.distinct().sorted()
-            val current = ready.bases.getOrElse(flow.base) { ready.bases[0] }.platform
-            if (platforms.size == 1) {
-                LaunchedEffect(Unit) { platform = platforms[0]; choosing = "GAME_LIST" }
-            } else {
-                OptionSelector(
-                    tr("GAME"), platforms, platform ?: current, { tr(it.label) }, m,
-                    onPick = { platform = it; choosing = "GAME_LIST" }, onDismiss = { choosing = null; platform = null },
-                )
-            }
-        }
-        "GAME_LIST" -> {
-            val p = platform ?: ready!!.bases[0].platform
-            val games = ready!!.bases.indices.filter { ready.bases[it].platform == p }
-            val many = ready.bases.map { it.platform }.distinct().size > 1
-            OptionSelector(
-                tr(p.label), games, flow.base.takeIf { it in games } ?: games[0], { ready.bases[it].label }, m,
-                onPick = { flow.base = it; choosing = null; platform = null },
-                onDismiss = { if (many) choosing = "GAME" else { choosing = null; platform = null } },
-            )
-        }
         "STARTERS" -> OptionSelector(
             tr("STARTERS"), RomRandomizer.Starters.entries, flow.options.starters, { tr(RomRandomizeFlow.startersLabel(it)) }, m,
             onPick = { flow.options = flow.options.copy(starters = it); choosing = null }, onDismiss = { choosing = null },
@@ -397,40 +515,100 @@ fun RandomizeWindow(flow: RomRandomizeFlow, m: GbaTextMetrics, small: GbaTextMet
     }
 }
 
+/** The wizard's page ([RomRandomizeFlow.page]) but STYLE's cards: a heading, then its rows. */
 @Composable
-private fun ReadyRows(
+private fun WizardPage(
     flow: RomRandomizeFlow, step: RomRandomizeFlow.Step.Ready, m: GbaTextMetrics, small: GbaTextMetrics, choose: (String) -> Unit,
 ) {
     val o = flow.options
     fun onOff(b: Boolean) = tr(if (b) "ON" else "OFF")
-    val base = step.bases.getOrElse(flow.base) { step.bases[0] }
-    OptionLine(tr("GAME"), base.label, false, m, divider = true, enabled = step.bases.size > 1) { choose("GAME") }
-    OptionLine(tr("STARTERS"), tr(RomRandomizeFlow.startersLabel(o.starters)), false, m, divider = true) { choose("STARTERS") }
-    OptionLine(tr("WILD POKéMON"), tr(RomRandomizeFlow.wildLabel(o.wild)), false, m, divider = true) { choose("WILD") }
-    OptionLine(tr("TRAINERS"), onOff(o.trainers), false, m, divider = true) {
-        flow.options = o.copy(trainers = !o.trainers)
-    }
-    OptionLine(tr("SIMILAR STRENGTH"), onOff(o.similarStrength), false, m, divider = true) {
-        flow.options = o.copy(similarStrength = !o.similarStrength)
-    }
-    OptionLine(tr("LEGENDARIES"), tr(if (o.noLegendaries) "NONE" else "ALLOWED"), false, m, divider = true) {
-        flow.options = o.copy(noLegendaries = !o.noLegendaries)
-    }
     fun shuffled(b: Boolean) = tr(if (b) "SHUFFLED" else "AS THEY ARE")
-    // Only where the picked game takes them (RomRandomizeFlow.takesFieldItems / takesHeldItems).
-    if (RomRandomizeFlow.takesFieldItems(base)) {
-        OptionLine(tr("FIELD ITEMS"), shuffled(o.fieldItems), false, m, divider = true) { flow.options = o.copy(fieldItems = !o.fieldItems) }
+    val base = step.bases.getOrElse(flow.base) { step.bases[0] }
+    @Composable fun heading(text: String) { Padded(m) { Message(text, m, value = true) } }
+    when (flow.page) {
+        RomRandomizeFlow.Page.GAME -> {
+            heading(tr("Which game?"))
+            val platforms = step.bases.map { it.platform }.distinct().sorted()
+            platforms.forEachIndexed { i, p ->
+                OptionLine(tr(p.label), step.bases.count { it.platform == p }.toString(), false, m, divider = i < platforms.size - 1) {
+                    flow.listPlatform = p
+                    flow.forward(RomRandomizeFlow.Page.GAME_LIST)
+                }
+            }
+        }
+        RomRandomizeFlow.Page.GAME_LIST -> {
+            val p = flow.listPlatform ?: step.bases[0].platform
+            heading(if (step.bases.map { it.platform }.distinct().size > 1) tr(p.label) else tr("Which game?"))
+            val games = step.bases.indices.filter { step.bases[it].platform == p }
+            games.forEachIndexed { i, g ->
+                OptionLine(step.bases[g].label, null, g == flow.base, m, divider = i < games.size - 1) { flow.pickGame(g) }
+            }
+        }
+        RomRandomizeFlow.Page.STYLE -> Unit
+        RomRandomizeFlow.Page.POKEMON -> {
+            heading(tr("POKéMON"))
+            OptionLine(tr("STARTERS"), tr(RomRandomizeFlow.startersLabel(o.starters)), false, m, divider = true) { choose("STARTERS") }
+            OptionLine(tr("WILD POKéMON"), tr(RomRandomizeFlow.wildLabel(o.wild)), false, m, divider = true) { choose("WILD") }
+            OptionLine(tr("SIMILAR STRENGTH"), onOff(o.similarStrength), false, m, divider = true) {
+                flow.options = o.copy(similarStrength = !o.similarStrength)
+            }
+            OptionLine(tr("LEGENDARIES"), tr(if (o.noLegendaries) "NONE" else "ALLOWED"), false, m) {
+                flow.options = o.copy(noLegendaries = !o.noLegendaries)
+            }
+        }
+        RomRandomizeFlow.Page.TRAINERS -> {
+            heading(tr("TRAINERS"))
+            OptionLine(tr("TEAMS"), shuffled(o.trainers), false, m, divider = RomRandomizeFlow.takesHeldItems(base)) {
+                flow.options = o.copy(trainers = !o.trainers)
+            }
+            // Only where the picked game takes them: Red / Blue / Yellow's trainers hold nothing.
+            if (RomRandomizeFlow.takesHeldItems(base)) {
+                OptionLine(tr("HELD ITEMS"), onOff(o.trainerItems), false, m) { flow.options = o.copy(trainerItems = !o.trainerItems) }
+            }
+        }
+        RomRandomizeFlow.Page.EXTRAS -> {
+            heading(tr("EXTRAS"))
+            OptionLine(tr("FIELD ITEMS"), shuffled(o.fieldItems), false, m, divider = true) { flow.options = o.copy(fieldItems = !o.fieldItems) }
+            OptionLine(tr("BASE STATS"), shuffled(o.baseStats), false, m, divider = true) { flow.options = o.copy(baseStats = !o.baseStats) }
+            OptionLine(tr("LEARNSETS"), tr(if (o.learnsets) "RANDOM" else "AS THEY ARE"), false, m) {
+                flow.options = o.copy(learnsets = !o.learnsets)
+            }
+        }
+        RomRandomizeFlow.Page.READY -> {
+            OptionLine(tr("GAME"), base.label, false, m, divider = true, enabled = step.bases.size > 1) {
+                flow.forward(flow.firstPage(step.bases).takeIf { it != RomRandomizeFlow.Page.STYLE } ?: RomRandomizeFlow.Page.GAME)
+            }
+            OptionLine(tr("STYLE"), flow.style?.let { tr(it.label) } ?: tr("CUSTOM"), false, m, divider = true) {
+                flow.forward(RomRandomizeFlow.Page.STYLE)
+            }
+            OptionLine(tr("SEED"), flow.seed.toString(), false, m) { flow.newSeed() }
+            Spacer(Modifier.height(m.u * 4))
+            Padded(m) {
+                val lines = RomRandomizeFlow.summary(flow.optionsFor(base), base)
+                if (lines.isEmpty()) Message(tr("Nothing would change: pick a style that shuffles something."), small)
+                @Composable fun bullets(part: List<String>, modifier: Modifier) = Column(modifier) {
+                    part.forEach { line ->
+                        Row {
+                            Message("•", small)
+                            Spacer(Modifier.width(m.u * 3))
+                            Message(line, small)
+                        }
+                    }
+                }
+                // A long list (CHAOS's eight) in two columns, so the page doesn't scroll on a wide screen.
+                androidx.compose.foundation.layout.BoxWithConstraints {
+                    if (lines.size > 4 && maxWidth > 560.dp) Row {
+                        val half = (lines.size + 1) / 2
+                        bullets(lines.take(half), Modifier.weight(1f))
+                        Spacer(Modifier.width(m.u * 6))
+                        bullets(lines.drop(half), Modifier.weight(1f))
+                    } else bullets(lines, Modifier)
+                }
+                Spacer(Modifier.height(m.u * 4))
+                Message(tr("Tap SEED for another. Your ROM stays as it is: this makes a new file."), small)
+            }
+        }
     }
-    if (RomRandomizeFlow.takesHeldItems(base)) {
-        OptionLine(tr("HELD ITEMS"), onOff(o.trainerItems), false, m, divider = true) { flow.options = o.copy(trainerItems = !o.trainerItems) }
-    }
-    OptionLine(tr("BASE STATS"), shuffled(o.baseStats), false, m, divider = true) { flow.options = o.copy(baseStats = !o.baseStats) }
-    OptionLine(tr("LEARNSETS"), tr(if (o.learnsets) "RANDOM" else "AS THEY ARE"), false, m, divider = true) {
-        flow.options = o.copy(learnsets = !o.learnsets)
-    }
-    OptionLine(tr("SEED"), flow.seed.toString(), false, m) { flow.newSeed() }
-    Spacer(Modifier.height(m.u * 4))
-    Padded(m) { Message(tr("Tap SEED for another: the same seed always makes the same game. Your ROM stays as it is, the randomized game is saved as a new file."), small) }
 }
 
 @Composable

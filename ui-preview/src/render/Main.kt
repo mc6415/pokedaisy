@@ -2611,21 +2611,24 @@ fun main(args: Array<String>) {
         Shot("library-patch-not-found-unknown", tw, th, td, activity { LibraryActivity().apply { patcher.step = fakePatch("unknown") } }),
         Shot("library-patch-looking", tw, th, td, activity { LibraryActivity().apply { patcher.step = fakePatch("looking") } }),
         Shot("library-patch-failed", tw, th, td, activity { LibraryActivity().apply { patcher.step = fakePatch("failed") } }),
-        // RANDOMIZE: the options over two games, randomizing, done, and no game to take.
-        Shot("library-randomize-ready", tw, th, td, activity { LibraryActivity().apply { randomizer.step = fakeRandomize("ready") } }),
-        Shot("library-randomize-ready-phone", 1080, 2400, 2.625f, activity { LibraryActivity().apply { randomizer.step = fakeRandomize("ready") } }),
-        Shot("library-randomize-wild", tw, th, td, activity { LibraryActivity().apply { randomizer.step = fakeRandomize("ready") } }) {
-            onNodeWithText("WILD POKéMON").performClick()
-        },
-        // GAME over all three platforms: the platform first, then its games.
-        Shot("library-randomize-platforms", tw, th, td, activity { LibraryActivity().apply { randomizer.step = fakeRandomize("platforms") } }) {
-            onNodeWithText("GAME").performClick()
-        },
-        Shot("library-randomize-platform-games", tw, th, td, activity { LibraryActivity().apply { randomizer.step = fakeRandomize("platforms") } }) {
-            onNodeWithText("GAME").performClick()
-            waitForIdle()
+        // RANDOMIZE's wizard: GAME (all three platforms: the platform, then its games), STYLE, CUSTOM's three pages, READY;
+        // then randomizing, done, and no game to take.
+        Shot("library-randomize-platforms", tw, th, td, activity { LibraryActivity().apply { randomizer.wizard("platforms", null) } }),
+        Shot("library-randomize-platform-games", tw, th, td, activity { LibraryActivity().apply { randomizer.wizard("platforms", null) } }) {
             onAllNodesWithText("GBA").onLast().performSemanticsAction(SemanticsActions.OnClick)
         },
+        Shot("library-randomize-games", tw, th, td, activity { LibraryActivity().apply { randomizer.wizard("ready", null) } }),
+        Shot("library-randomize-style", tw, th, td, activity { LibraryActivity().apply { randomizer.wizard("ready", com.pokedaisy.app.RomRandomizeFlow.Page.STYLE) } }),
+        Shot("library-randomize-style-phone", 1080, 2400, 2.625f, activity { LibraryActivity().apply { randomizer.wizard("ready", com.pokedaisy.app.RomRandomizeFlow.Page.STYLE) } }),
+        Shot("library-randomize-pokemon", tw, th, td, activity { LibraryActivity().apply { randomizer.wizard("ready", com.pokedaisy.app.RomRandomizeFlow.Page.POKEMON) } }),
+        Shot("library-randomize-wild", tw, th, td, activity { LibraryActivity().apply { randomizer.wizard("ready", com.pokedaisy.app.RomRandomizeFlow.Page.POKEMON) } }) {
+            onNodeWithText("WILD POKéMON").performClick()
+        },
+        Shot("library-randomize-trainers", tw, th, td, activity { LibraryActivity().apply { randomizer.wizard("ready", com.pokedaisy.app.RomRandomizeFlow.Page.TRAINERS) } }),
+        Shot("library-randomize-extras", tw, th, td, activity { LibraryActivity().apply { randomizer.wizard("ready", com.pokedaisy.app.RomRandomizeFlow.Page.EXTRAS) } }),
+        Shot("library-randomize-ready", tw, th, td, activity { LibraryActivity().apply { randomizer.wizard("ready", com.pokedaisy.app.RomRandomizeFlow.Page.READY) } }),
+        Shot("library-randomize-ready-phone", 1080, 2400, 2.625f, activity { LibraryActivity().apply { randomizer.wizard("ready", com.pokedaisy.app.RomRandomizeFlow.Page.READY) } }),
+        Shot("library-randomize-ready-chaos", tw, th, td, activity { LibraryActivity().apply { randomizer.wizard("ready", com.pokedaisy.app.RomRandomizeFlow.Page.READY, com.pokedaisy.app.RomRandomizeFlow.Style.CHAOS) } }),
         Shot("library-randomize-making", tw, th, td, activity { LibraryActivity().apply { randomizer.step = fakeRandomize("making") } }),
         Shot("library-randomize-done", tw, th, td, activity { LibraryActivity().apply { randomizer.step = fakeRandomize("done") } }),
         Shot("library-randomize-not-found", tw, th, td, activity { LibraryActivity().apply { randomizer.step = fakeRandomize("notfound") } }),
@@ -3238,6 +3241,16 @@ private fun fakeRandomize(state: String): com.pokedaisy.app.RomRandomizeFlow.Ste
         "making" -> com.pokedaisy.app.RomRandomizeFlow.Step.Making(bases[0])
         "done" -> com.pokedaisy.app.RomRandomizeFlow.Step.Done(File("$dir/Pokemon FireRed Randomized (seed 482913).gba"), "Pokémon FireRed (Randomized)")
         else -> com.pokedaisy.app.RomRandomizeFlow.Step.NotFound
+    }
+}
+
+/** RANDOMIZE's wizard on [page] (null: its first) over [fakeRandomize]'s [state], the [style] picked for READY. */
+private fun com.pokedaisy.app.RomRandomizeFlow.wizard(state: String, page: com.pokedaisy.app.RomRandomizeFlow.Page?, style: com.pokedaisy.app.RomRandomizeFlow.Style = com.pokedaisy.app.RomRandomizeFlow.Style.CLASSIC) {
+    val ready = fakeRandomize(state) as com.pokedaisy.app.RomRandomizeFlow.Step.Ready
+    step = ready
+    this.page = firstPage(ready.bases)
+    if (page != null) {
+        if (page == com.pokedaisy.app.RomRandomizeFlow.Page.READY) { forward(com.pokedaisy.app.RomRandomizeFlow.Page.STYLE); pickStyle(style) } else forward(page)
     }
 }
 

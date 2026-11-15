@@ -834,6 +834,11 @@ class Prefs(context: Context) {
         get() = p.getString("hidden_roms", null)?.split("\n")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
         set(v) = p.edit().putString("hidden_roms", v.joinToString("\n")).apply()
 
+    /** RANDOMIZE's options the last time a game was made (RomRandomizeFlow.encode): its LAST TIME style. */
+    var randomizeLast: String?
+        get() = p.getString("randomize_last", null)
+        set(v) = p.edit().putString("randomize_last", v).apply()
+
     /** Games the app made itself (by path: RANDOMIZE's output), which the library can DELETE even in a linked folder. */
     var madeRoms: Set<String>
         get() = p.getString("made_roms", null)?.split("\n")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
