@@ -191,15 +191,21 @@ object NdsArt {
             platinum -> "nds/platinum-built"
             else -> "nds/heartgold-built"
         }
-        // A cart's species records and learnsets can differ under one code and revision (the Redux builds: Classic, EVless;
-        // a cart RANDOMIZE made with BASE STATS / LEARNSETS): the DEX's stats and moves are theirs, so the marker keeps a CRC of each.
+        // A cart's species records, learnsets and evolutions can differ under one code and revision (the Redux builds: Classic,
+        // EVless; a cart RANDOMIZE made with BASE STATS / ABILITIES / LEARNSETS / EVOLUTIONS): the DEX's stats, abilities, moves and
+        // evolutions are theirs, so the marker keeps a CRC of each file.
         val (personalPath, learnPath) = when {
             platinum -> "/poketool/personal/pl_personal.narc" to "/poketool/personal/wotbl.narc"
             black || black2 -> "/a/0/1/6" to "/a/0/1/8"
             else -> "/a/0/0/2" to "/a/0/3/3"
         }
+        val evoPath = when {
+            platinum -> "/poketool/personal/evo.narc"
+            black || black2 -> "/a/0/1/9"
+            else -> "/a/0/3/4"
+        }
         val stamp = "v$VERSION $code $rev " + (file(f, header, personalPath)?.let { crc32(it) } ?: 0L) + " " +
-            (file(f, header, learnPath)?.let { crc32(it) } ?: 0L)
+            (file(f, header, learnPath)?.let { crc32(it) } ?: 0L) + " " + (file(f, header, evoPath)?.let { crc32(it) } ?: 0L)
         if (marker.isFile && runCatching { marker.readText() }.getOrNull() == stamp) return false
         if (origin) {
             if (!extractOrigin(f, header, dir)) return false

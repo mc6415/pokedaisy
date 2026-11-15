@@ -3,7 +3,7 @@ title: Your game library
 summary: Add games, sort and favorite them, set covers, and use each game's menu for saves, info, cheats and more.
 section: start
 order: 4
-keywords: [shortcut, home screen, launcher icon, search, find a game, filter, support, donate, donation, tip, patreon, ko-fi, kofi, buy me a coffee, games list, add rom, import, folder, folders, multiple folders, several folders, add folder, zip, 7z, archive, cover, box art, artwork, icon, steamgriddb, rename, delete, hide, favourite, star, sort, grid, list view, frontend, es-de, esde, iisu, cocoon, launcher, filter, tabs, recently played, history, hacks, game boy, gbc, gba, console, platform, patch, patching, bps, apply patch, base rom, checksum, crc32, rom hack patch, tools, toolbox, rail, bottom bar, where is settings, randomize, randomizer, randomise, randomiser, randomized run, random starters, random wild, random trainers, shuffle, seed, sprite pack]
+keywords: [shortcut, home screen, launcher icon, search, find a game, filter, support, donate, donation, tip, patreon, ko-fi, kofi, buy me a coffee, games list, add rom, import, folder, folders, multiple folders, several folders, add folder, zip, 7z, archive, cover, box art, artwork, icon, steamgriddb, rename, delete, hide, favourite, star, sort, grid, list view, frontend, es-de, esde, iisu, cocoon, launcher, filter, tabs, recently played, history, hacks, game boy, gbc, gba, console, platform, patch, patching, bps, apply patch, base rom, checksum, crc32, rom hack patch, tools, toolbox, rail, bottom bar, where is settings, randomize, randomizer, randomise, randomiser, randomized run, random starters, random wild, random trainers, shuffle, seed, random evolutions, random abilities, sprite pack]
 ---
 
 The library is the first thing you see when you open PokeDaisy: every game you've added, in the order you pick. Tap a game to play it.
@@ -124,9 +124,9 @@ RANDOMIZE asks three things, a page each. `BACK` (or the arrow at the top) goes 
 | --- | --- |
 | `CLASSIC` | New starters that evolve twice, wild Pokémon area by area, gift Pokémon and trainers' teams, each swap close in strength, no legendaries. |
 | `WILD ONLY` | The same starters, wild and gift Pokémon, but trainers keep their teams. |
-| `CHAOS` | Everything: any Pokémon as a starter, a random one in every encounter, gift Pokémon, trainers' teams and held items, the items lying around, base stats and the moves Pokémon learn, legendaries allowed. |
+| `CHAOS` | Everything: any Pokémon as a starter, a random one in every encounter, gift Pokémon, trainers' teams and held items, the items lying around, base stats, abilities, the moves Pokémon learn and what they evolve into, legendaries allowed. |
 | `LAST TIME` | The settings you used the last time you made a game. It shows once you've made one. |
-| `CUSTOM` | Pick every setting yourself, on four short pages: `POKéMON`, `RULES`, `TRAINERS` and `EXTRAS` (below). |
+| `CUSTOM` | Pick every setting yourself, on five short pages: `POKéMON`, `RULES`, `TRAINERS`, `ITEMS` and `EXTRAS` (below). |
 
 4. **Ready.** The last page says in plain words what will change. `GAME` and `STYLE` take you back to change them, and `SEED` is the number the shuffle is made from: the same game, settings and seed always make the same game, so a friend can play the same run. Tap it for another number. Then tap `RANDOMIZE`. When it's done, the new game is in your library as, for example, "Pokémon Ruby (Randomized, seed 123456)", so two runs of one game are easy to tell apart, and `PLAY` starts it.
 
@@ -148,22 +148,29 @@ The `RULES` page, for run rules like a Nuzlocke's:
 | `EVERY POKéMON` | `ON` spreads the wild swaps over Pokémon that haven't turned up yet first, so as many kinds as possible can be caught somewhere. |
 | `ONE TYPE` | Picks one type, and only Pokémon of that type turn up: in the grass, as starters and in trainers' teams. Red, Blue and Yellow have no `DARK` or `STEEL` Pokémon to pick. |
 
-The `TRAINERS` page (`HELD ITEMS` is there for every game but Red, Blue and Yellow, whose trainers' Pokémon hold nothing):
+The `TRAINERS` page:
 
 | Row | What it does |
 | --- | --- |
 | `TEAMS` | `SHUFFLED` gives every trainer, the leaders and your rival too, a new team at the same levels. Trainers who had moves picked for them get the moves their new Pokémon know by then. |
 | `KEEP TYPES` | `ON` gives each trainer's new Pokémon a type the old one had, so a leader keeps their theme (a water gym stays water). |
 | `LEVELS` | Raises every trainer's Pokémon by `+10%`, `+25%` or `+50%` (never past level 100), for a harder run. |
-| `HELD ITEMS` | `ON` gives every Pokémon of the trainers who use held items one of the items trainers hold somewhere in the game. |
 
-The `EXTRAS` page:
+The `ITEMS` page (`HELD ITEMS` is there for every game but Red, Blue and Yellow, whose trainers' Pokémon hold nothing):
 
 | Row | What it does |
 | --- | --- |
 | `FIELD ITEMS` | `SHUFFLED` swaps the items lying around (item balls and hidden items) among themselves, so the same items are in the game, in other places. Key items and HMs stay where they are, so the story still works. On the DS games it's the item balls only: hidden items stay as they are. Off (`AS THEY ARE`) by default. |
+| `HELD ITEMS` | `ON` gives every Pokémon of the trainers who use held items one of the items trainers hold somewhere in the game. |
+
+The `EXTRAS` page, for the Pokémon themselves (`ABILITIES` is there for the GBA and DS games: the Game Boy games' Pokémon have none):
+
+| Row | What it does |
+| --- | --- |
 | `BASE STATS` | `SHUFFLED` gives each Pokémon its own six base stats in another order: the same total, spread another way, so a slow one might be fast now. The `DEX` and the stats on the summary show the new ones. |
 | `LEARNSETS` | `RANDOM` gives each Pokémon new moves at the levels it learned its own, never the same move twice, and its first move always does damage. In Red, Blue and Yellow the moves a Pokémon knows from the start change too. Trainers who had moves picked for them get moves from the new lists. |
+| `ABILITIES` | `RANDOM` gives each Pokémon abilities picked at random, two different ones where it had two (in Black, White, Black 2 and White 2 its hidden one too). A few are never handed out: the one that lets only super effective moves hit, the ones that hold their own Pokémon back, and the ones that only work with one Pokémon's forms. A Pokémon built around one of those keeps it. The `DEX` shows the new ones. |
+| `EVOLUTIONS` | `RANDOM` makes each evolution lead to another Pokémon, the same way as before: at the same level, with the same stone, by trading. With `SIMILAR STRENGTH` the new one is about as strong as the one it replaces, and `ONE TYPE` and `LEGENDARIES` count too. A Pokémon never evolves into itself, and nothing evolves back into what it came from. The starters are picked after, so `EVOLVE TWICE` still gives you three that evolve twice. On the GBA and DS games the `DEX` shows the new evolutions. |
 
 Your own game is never changed: the randomized one is a new file, named with its seed (`Pokemon FireRed Randomized (seed 123456).gba`), saved where a [patched game](#patch-a-rom-hack) would go. A DS game is the size of the whole cart (128 MB for Platinum, HeartGold and SoulSilver, 256 MB for Black and White, 512 MB for Black 2 and White 2), so it takes a few seconds, and it needs that much free space. It has its own save, so start a new game in it. When you're done with a run, its menu's `DELETE` removes it, even from a linked folder. The companion treats it as the game it came from, with every feature that game has, and reads the shuffled Pokémon from it: the [guide](guide.md)'s wild Pokémon and leaders' teams follow the shuffle on every game, and so do the items lying around and the gift Pokémon it lists for each area.
 

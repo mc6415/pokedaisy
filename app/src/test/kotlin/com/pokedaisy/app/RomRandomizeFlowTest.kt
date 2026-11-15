@@ -26,7 +26,11 @@ class RomRandomizeFlowTest {
         val modes = o.copy(levelScale = 25, noDuplicates = true, allCatchable = true, trainersKeepType = true,
             monotype = com.pokedaisy.app.companion.data.PokeType.DRAGON, gifts = true)
         assertEquals(modes, RomRandomizeFlow.decode(RomRandomizeFlow.encode(modes)))
-        assertEquals(o.copy(levelScale = 0, gifts = false), RomRandomizeFlow.decode(RomRandomizeFlow.encode(o).split(',').take(9).joinToString(",")))
+        assertEquals(o.copy(levelScale = 0, gifts = false, evolutions = false, abilities = false),
+            RomRandomizeFlow.decode(RomRandomizeFlow.encode(o).split(',').take(9).joinToString(",")))
+        // EVOLUTIONS and ABILITIES (CHAOS has both): a setup saved before them (fifteen fields) reads with them off.
+        assertTrue(o.evolutions && o.abilities)
+        assertEquals(o.copy(evolutions = false, abilities = false), RomRandomizeFlow.decode(RomRandomizeFlow.encode(o).split(',').take(15).joinToString(",")))
     }
 
     @Test
@@ -38,8 +42,11 @@ class RomRandomizeFlowTest {
             assertTrue(s.name, RomRandomizeFlow.summary(o, red).isNotEmpty())
         }
         assertEquals(false, RomRandomizeFlow.optionsOf(RomRandomizeFlow.Style.WILD_ONLY).trainers)
-        // Red's trainers hold nothing: CHAOS's held items aren't promised there.
-        assertEquals(8, RomRandomizeFlow.summary(RomRandomizeFlow.optionsOf(RomRandomizeFlow.Style.CHAOS), red).size)
+        // Red's trainers hold nothing and its Pokémon have no abilities: CHAOS's held items and abilities aren't promised there.
+        val redChaos = RomRandomizeFlow.summary(RomRandomizeFlow.optionsOf(RomRandomizeFlow.Style.CHAOS), red)
+        assertEquals(9, redChaos.size)
+        assertTrue(redChaos.contains(com.pokedaisy.app.companion.i18n.tr("Random evolutions")))
+        assertTrue(!redChaos.contains(com.pokedaisy.app.companion.i18n.tr("Random abilities")))
         val nothing = com.pokedaisy.app.companion.data.RomRandomizer.Options(
             com.pokedaisy.app.companion.data.RomRandomizer.Starters.OFF, com.pokedaisy.app.companion.data.RomRandomizer.Wild.OFF, false,
         )

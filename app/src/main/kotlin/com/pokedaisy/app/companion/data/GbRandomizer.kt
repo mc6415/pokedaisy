@@ -88,22 +88,22 @@ object GbRandomizer {
     }
 
     val GAMES = listOf(
-        Game("Red", "ea9bcae617fdf159b045185467ae58b2e4a48b9a", "15a977e1c1e44a780a466ca580336a792f6f0e42", 1, listOf(0xCEEB), 0x39D3B, 47, 0x383DE, 0x3B05C,
+        Game("Red", "ea9bcae617fdf159b045185467ae58b2e4a48b9a", "8f822b56992eafb8790eb145ce2515bd1dfb66b2", 1, listOf(0xCEEB), 0x39D3B, 47, 0x383DE, 0x3B05C,
             dexOrder = 0x41024, mewStats = 0x425B, starters = red(blue = false), trainersEnd = 0x3A52E, moves = 0x38000,
             field = redField(0x76688)),
-        Game("Blue", "d7037c83e1ae5b39bde3c30787637ba1d4c48ce2", "2f3689906adb354cf30909919b9284db28548032", 1, listOf(0xCEEB), 0x39D3B, 47, 0x383DE, 0x3B05C,
+        Game("Blue", "d7037c83e1ae5b39bde3c30787637ba1d4c48ce2", "43b05b9a5be2250ac478df7a21ad470b87db6129", 1, listOf(0xCEEB), 0x39D3B, 47, 0x383DE, 0x3B05C,
             dexOrder = 0x41024, mewStats = 0x425B, starters = red(blue = true), trainersEnd = 0x3A52E, moves = 0x38000,
             field = redField(0x76689)),
-        Game("Yellow", "cc7d03262ebfaf2f06772c1a480c7d9d5f4a38e1", "1faef8f63c3a0a03b2a8269acc46ada6ba092362", 1, listOf(0xCB95), 0x39DD1, 47, 0x383DE, 0x3B1E5,
+        Game("Yellow", "cc7d03262ebfaf2f06772c1a480c7d9d5f4a38e1", "8d0655abf7ac34eeef3ad23a76ea7bed87665b5a", 1, listOf(0xCB95), 0x39DD1, 47, 0x383DE, 0x3B1E5,
             dexOrder = 0x410B1, trainersEnd = 0x3A5B2, moves = 0x38000,
             field = Field(0xFC1F2, 0xE6DD, 0xFC3E4, 0xF268D, 0, 0x75F74, 0xC892, 0x75FAA)),
-        Game("Gold", "d8b8a3600a465308c9953dfa04f0081c05bdcb94", "3238128bec1b637fa88e609680aa4b5e24e9ac9a", 2,
+        Game("Gold", "d8b8a3600a465308c9953dfa04f0081c05bdcb94", "b6c74ce9a1d50ade378bebcc2a6cbea6f300edfa", 2,
             listOf(0x2AB35, 0x2B7C0, 0x2BE1C, -0x2B669, -0x2BD43, -0x2BED9), 0x3993E, 66, 0x51B0B, 0x427BD,
             starters = elm(0x1800D2, 0x180114, 0x180150), moves = 0x41AFE, field = Field(0x940ED, 0x68A0)),
-        Game("Silver", "49b163f7e57702bc939d642a18f591de55d92dae", "cfede4443d19f7d0b605e66e5a61692105061aa1", 2,
+        Game("Silver", "49b163f7e57702bc939d642a18f591de55d92dae", "7164165d08bf869a681225bbc9a20bf0f2587508", 2,
             listOf(0x2AB35, 0x2B7C0, 0x2BE1C, -0x2B669, -0x2BD43, -0x2BED9), 0x3993E, 66, 0x51B0B, 0x427BD,
             starters = elm(0x1800D2, 0x180114, 0x180150), moves = 0x41AFE, field = Field(0x940ED, 0x68A0)),
-        Game("Crystal", "f2f52230b536214ef7c9924f483392993e226cfb", "36b732226e982f9d26246f6079558d476a4c4492", 2,
+        Game("Crystal", "f2f52230b536214ef7c9924f483392993e226cfb", "78bbb66e64c0fd0391962b1528bfc4da2230e355", 2,
             listOf(0x2A5E9, 0x2B274, 0x2B8D0, -0x2B11D, -0x2B7F7, -0x2B92F), 0x39999, 67, 0x51424, 0x425B1,
             starters = elm(0x78C7F, 0x78CC1, 0x78CFD), moves = 0x41AFB, field = Field(0x94000, 0x67C1)),
     )
@@ -179,7 +179,8 @@ object GbRandomizer {
             val lv = levels.filter { it < at }.maxOrNull() ?: return@trainerMons
             trainers += r.u8(at) to r.u8(lv)
         }
-        return CartView(wild, trainers) { s -> if (r.species(s)) r.types(s) else emptySet() }
+        val evolutions = ArrayList<Triple<Int, Int, Int>>().also { l -> r.evolutionTargets { id, at, method -> l += Triple(id, method, r.u8(at)) } }
+        return CartView(wild, trainers, { s -> if (r.species(s)) r.types(s) else emptySet() }, evolutions)
     }
 
     internal fun sites(rom: ByteArray, g: Game): List<Int> {
@@ -193,6 +194,7 @@ object GbRandomizer {
         r.trainerItems { out += it }
         r.statSites { at, n -> for (k in 0 until n) out += at + k }
         r.learnMoves { out += it }
+        r.evolutionTargets { _, at, _ -> out += at }
         r.fieldItems { out += it }
         require(out.all { it in rom.indices }) { "not this game's tables" }
         return out
@@ -552,6 +554,26 @@ object GbRandomizer {
         }
 
         /** [id]'s evolution records' targets and where its level-up moves start (EvosAttacks / EvosMoves). */
+        /** Each evolution's target byte (its entry's last; the method and its level / item are never written), with the
+         * species it's on, once. */
+        fun evolutionTargets(each: (species: Int, at: Int, method: Int) -> Unit) {
+            val seen = HashSet<Int>()
+            for (id in (1 until dex.size).filter { species(it) }) {
+                var a = ptr(g.evolutions + (id - 1) * 2)
+                var n = 0
+                while (a in b.indices && u8(a) != 0 && n++ < 8) {
+                    val method = u8(a)
+                    val len = when {
+                        g.gen == 1 -> if (method == 2) 4 else 3
+                        method == 5 -> 4
+                        else -> 3
+                    }
+                    if (seen.add(a + len - 1)) each(id, a + len - 1, method)
+                    a += len
+                }
+            }
+        }
+
         fun evolutions(id: Int): Pair<List<Int>, Int> {
             var a = ptr(g.evolutions + (id - 1) * 2)
             val out = ArrayList<Int>()
@@ -657,8 +679,9 @@ object GbRandomizer {
 
     private class Run(g: Game, b: ByteArray, val o: RomRandomizer.Options, val rnd: Random) : Reader(b, g) {
         val all = (1 until dex.size).filter { species(it) }
-        val evolvesTo = all.associateWith { evolutions(it).first.filter { t -> species(t) } }
-        val evolvedFrom = evolvesTo.values.flatten().toSet()
+        /** Read again after EVOLUTIONS, so the starters' "evolve twice" follows the new ones. */
+        var evolvesTo = all.associateWith { evolutions(it).first.filter { t -> species(t) } }
+        val evolvedFrom get() = evolvesTo.values.flatten().toSet()
         val picker = SpeciesPicker(
             all.filter { !o.noLegendaries || dex[it] !in LEGENDARY }, o, rnd,
             bst = { if (species(it)) bst(it) else 0 }, types = { if (species(it)) types(it) else emptySet() }, monotype = o.monotype?.id(g.gen),
@@ -669,6 +692,8 @@ object GbRandomizer {
             // Stats and learnsets first: the strength match keeps working (the totals stay) and trainers' moves follow.
             if (o.baseStats) baseStats()
             if (o.learnsets) learnsets()
+            // Before the starters: "evolve twice" goes by the new evolutions.
+            if (o.evolutions) evolutions()
             starters()
             wild()
             if (o.gifts) gifts()
@@ -676,6 +701,14 @@ object GbRandomizer {
             if (o.trainers) trainers()
             if (o.trainerItems) trainerItems()
             if (o.fieldItems) fieldItems()
+        }
+
+        /** EVOLUTIONS: every evolution's target ([SpeciesPicker.evolutions]); how it evolves stays. */
+        fun evolutions() {
+            val sites = ArrayList<Pair<Int, Int>>().also { l -> evolutionTargets { id, at, _ -> if (species(u8(at))) l += id to at } }
+            val now = picker.evolutions(sites.map { (id, at) -> id to u8(at) })
+            sites.forEachIndexed { i, (_, at) -> b[at] = now[i].toByte() }
+            evolvesTo = all.associateWith { evolutions(it).first.filter { t -> species(t) } }
         }
 
         /** The item balls' and hidden items' items, shuffled among the same places. */

@@ -48,9 +48,13 @@ object RomRandomizer {
         val monotype: PokeType? = null,
         /** Gift and static Pokémon (handed over, sitting on the map, prizes) swapped too ([RANDOMIZER_STATICS]). */
         val gifts: Boolean = false,
+        /** Each evolution leads to another Pokémon, the same way (level, stone, trade) ([SpeciesPicker.evolutions]). */
+        val evolutions: Boolean = false,
+        /** Each Pokémon's abilities picked at random (GBA and DS: the Game Boy games have none) ([SpeciesPicker.abilities]). */
+        val abilities: Boolean = false,
     ) {
         val changesSomething get() = starters != Starters.OFF || wild != Wild.OFF || trainers || fieldItems || trainerItems ||
-            baseStats || learnsets || levelScale > 0 || gifts
+            baseStats || learnsets || levelScale > 0 || gifts || evolutions || abilities
     }
 
     /** Where one retail game keeps what the tool changes (ROM offsets). */
@@ -89,31 +93,31 @@ object RomRandomizer {
 
     val GAMES = listOf(
         Game(
-            "BPRE", 1, "FireRed", "dd5945db9b930750cb39d00c84da8571feebf417", "c7c13834d4f1089cdfc2f77d2ee77d84d86789c6",
+            "BPRE", 1, "FireRed", "dd5945db9b930750cb39d00c84da8571feebf417", "401bdb2da7a0b1aed56ef9ea1e175ef67766fd31",
             trainers = 0x23EB38, trainerCount = 743, learnsets = 0x25D824, evolutions = 0x2597C4, baseStats = 0x2547F4,
             wildHeaders = 0x3C9D28, starterSites = oaksLab(0x169C2D), starterLines = listOf(0x18E2F1, 0x18E210, 0x18E283),
             speciesNames = 0x245F50, items = 0x3DB098, battleMoves = 0x250C74, mapGroups = 0x352718, keyPocket = 2,
         ),
         Game(
-            "BPGE", 1, "LeafGreen", "7862c67bdecbe21d1d69ce082ce34327e1c6ed5e", "bca1a3293b20a99069fc6ef98d61cdf164b7a6eb",
+            "BPGE", 1, "LeafGreen", "7862c67bdecbe21d1d69ce082ce34327e1c6ed5e", "8a31c28d3ef3da5e6173a010d609ad17fd5d94d0",
             trainers = 0x23EB14, trainerCount = 743, learnsets = 0x25D804, evolutions = 0x2597A4, baseStats = 0x2547D0,
             wildHeaders = 0x3C9B64, starterSites = oaksLab(0x169C09), starterLines = listOf(0x18E2CD, 0x18E1EC, 0x18E25F),
             speciesNames = 0x245F2C, items = 0x3DAED4, battleMoves = 0x250C50, mapGroups = 0x3526F8, keyPocket = 2,
         ),
         Game(
-            "AXVE", 2, "Ruby", "5b64eacf892920518db4ec664e62a086dd5f5bc8", "e138691fda22da481cb7b1215cea8f6bdbedc7d7",
+            "AXVE", 2, "Ruby", "5b64eacf892920518db4ec664e62a086dd5f5bc8", "9e844226a104e5ce20c22bb77c26fffe31f91a27",
             trainers = 0x1F0514, trainerCount = 694, learnsets = 0x207BE0, evolutions = 0x203B80, baseStats = 0x1FEC30,
             wildHeaders = 0x39D46C, starterSites = starterMon(0x3F76E0),
             items = 0x3C5580, battleMoves = 0x1FB144, mapGroups = 0x3085A0, keyPocket = 5,
         ),
         Game(
-            "AXPE", 2, "Sapphire", "89b45fb172e6b55d51fc0e61989775187f6fe63c", "2d0c6b5f6d9da77e520ed85dee6864f71cf70b24",
+            "AXPE", 2, "Sapphire", "89b45fb172e6b55d51fc0e61989775187f6fe63c", "0070106c84ac64268270f333e30df23142451876",
             trainers = 0x1F04A4, trainerCount = 694, learnsets = 0x207B70, evolutions = 0x203B10, baseStats = 0x1FEBC0,
             wildHeaders = 0x39D2B4, starterSites = starterMon(0x3F773C),
             items = 0x3C55DC, battleMoves = 0x1FB0D4, mapGroups = 0x308530, keyPocket = 5,
         ),
         Game(
-            "BPEE", 0, "Emerald", "f3ae088181bf583e55daf962a92bb46f4f1d07b7", "f32126c0d46bbe5c71252a9cde7721a2091c85a3",
+            "BPEE", 0, "Emerald", "f3ae088181bf583e55daf962a92bb46f4f1d07b7", "54f7a900724685db844fd3d57b7e94b664d96c74",
             trainers = 0x310030, trainerCount = 855, learnsets = 0x32937C, evolutions = 0x32531C, baseStats = 0x3203CC,
             wildHeaders = 0x552D48, starterSites = starterMon(0x5B1DF8),
             items = 0x5839A0, battleMoves = 0x31C898, mapGroups = 0x486578, keyPocket = 5,
@@ -237,7 +241,10 @@ object RomRandomizer {
         r.wildSlots(g.wildHeaders) { slot, table -> wild.getOrPut(table) { ArrayList() } += r.u16(slot + 2) }
         val trainers = ArrayList<Pair<Int, Int>>()
         r.trainerMons(g) { m, _ -> trainers += r.u16(m + 4) to r.u16(m + 2) }
-        return CartView(wild.values.toList(), trainers) { s -> setOf(r.u8(g.baseStats + s * BASE_STRIDE + 6), r.u8(g.baseStats + s * BASE_STRIDE + 7)) }
+        val evolutions = ArrayList<Triple<Int, Int, Int>>().also { l -> r.evolutionTargets(g) { s, at -> l += Triple(s, r.u16(at - 4), r.u16(at)) } }
+        val abilities = ALL.associateWith { s -> (22..23).map { r.u8(g.baseStats + s * BASE_STRIDE + it) } }
+        return CartView(wild.values.toList(), trainers, { s -> setOf(r.u8(g.baseStats + s * BASE_STRIDE + 6), r.u8(g.baseStats + s * BASE_STRIDE + 7)) },
+            evolutions, abilities)
     }
 
     /** [g]'s gift and static Pokémon: each one's species places ([RANDOMIZER_STATICS]). */
@@ -265,6 +272,9 @@ object RomRandomizer {
         }
         r.trainerItems(g) { item -> out += item..item + 1 }
         for (s in ALL) out += g.baseStats + s * BASE_STRIDE until g.baseStats + s * BASE_STRIDE + 6
+        // ABILITIES: both slots (+22, +23).
+        for (s in ALL) out += g.baseStats + s * BASE_STRIDE + 22..g.baseStats + s * BASE_STRIDE + 23
+        r.evolutionTargets(g) { _, at -> out += at..at + 1 }
         r.learnsetEntries(g) { at -> out += at..at + 1 }
         r.fieldItems(g) { at -> out += at..at + 1 }
         for (one in statics(g)) for (at in one) out += at..at + 1
@@ -313,6 +323,15 @@ object RomRandomizer {
                 if (!seen.add(at)) continue
                 var n = 0
                 while (u16(at) != 0xFFFF && n++ < 64) { each(at); at += 2 }
+            }
+        }
+
+        /** Each evolution's target word (+4 of its 8-byte entry; the method at +0 is never written, so this finds the same
+         * entries on a made cart), with the species it's on. */
+        fun evolutionTargets(g: Game, each: (species: Int, at: Int) -> Unit) {
+            for (s in ALL) for (k in 0 until 5) {
+                val at = g.evolutions + s * EVO_STRIDE + k * 8
+                if (u16(at) != 0) each(s, at + 4)
             }
         }
 
@@ -385,14 +404,15 @@ object RomRandomizer {
 
         fun bst(s: Int) = (0 until 6).sumOf { u8(g.baseStats + s * BASE_STRIDE + it) }
 
-        /** Evolution targets of each species. */
-        val evolvesTo: Map<Int, List<Int>> = ALL.associateWith { s ->
+        /** Evolution targets of each species (read again after EVOLUTIONS, so the starters' "evolve twice" follows them). */
+        fun readEvolvesTo(): Map<Int, List<Int>> = ALL.associateWith { s ->
             (0 until 5).mapNotNull { k ->
                 val at = g.evolutions + s * EVO_STRIDE + k * 8
                 if (u16(at) == 0) null else u16(at + 4).takeIf { it in 1..SPECIES }
             }
         }
-        val evolvedFrom: Set<Int> = evolvesTo.values.flatten().toSet()
+        var evolvesTo: Map<Int, List<Int>> = readEvolvesTo()
+        val evolvedFrom: Set<Int> get() = evolvesTo.values.flatten().toSet()
 
         /** Base stats' two type bytes (+6, +7). */
         fun types(s: Int) = setOf(u8(g.baseStats + s * BASE_STRIDE + 6), u8(g.baseStats + s * BASE_STRIDE + 7))
@@ -404,6 +424,9 @@ object RomRandomizer {
             // Stats and learnsets first: the strength match keeps working (the totals stay) and trainers' moves follow.
             if (o.baseStats) baseStats()
             if (o.learnsets) learnsets()
+            if (o.abilities) abilities()
+            // Before the starters: "evolve twice" goes by the new evolutions.
+            if (o.evolutions) evolutions()
             starters()
             wild()
             if (o.gifts) gifts()
@@ -421,6 +444,23 @@ object RomRandomizer {
                 val six = (0 until 6).map { u8(at + it) }.shuffled(rnd)
                 six.forEachIndexed { i, v -> b[at + i] = v.toByte() }
             }
+        }
+
+        /** ABILITIES: both slots of every species (+22, +23; an empty second slot stays empty). */
+        fun abilities() {
+            val choices = SpeciesPicker.abilityChoices(3)
+            for (s in ALL) {
+                val at = g.baseStats + s * BASE_STRIDE + 22
+                SpeciesPicker.abilities(listOf(u8(at), u8(at + 1)), choices, rnd).forEachIndexed { i, a -> b[at + i] = a.toByte() }
+            }
+        }
+
+        /** EVOLUTIONS: every evolution's target ([SpeciesPicker.evolutions]); its method and level / item stay. */
+        fun evolutions() {
+            val sites = ArrayList<Pair<Int, Int>>().also { l -> evolutionTargets(g) { s, at -> if (u16(at) in ALL) l += s to at } }
+            val now = picker.evolutions(sites.map { (s, at) -> s to u16(at) })
+            sites.forEachIndexed { i, (_, at) -> put16(at, now[i]) }
+            evolvesTo = readEvolvesTo()
         }
 
         fun power(move: Int) = u8(g.battleMoves + move * MOVE_STRIDE + 1)

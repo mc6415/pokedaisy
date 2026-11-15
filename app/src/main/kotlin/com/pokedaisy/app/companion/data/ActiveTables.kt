@@ -259,6 +259,11 @@ val runningRandomized: HackText? get() = randomizedRetail?.takeIf { activeGame =
  * may not hold, and checks against retail's data (BULBASAUR's TMs, its evolution) don't apply. */
 val gameRandomized: Boolean get() = runningRandomized != null
 
+/** Whether the running game's species tables (evolutions) may not be retail's: a randomized game ([gameRandomized]) or a
+ * LeafGreen / Ruby / Sapphire the library's RANDOMIZE made ([ownRandomizedGuide]; its EVOLUTIONS move the targets), so the
+ * retail probes (BULBASAUR evolving at 16) don't hold. */
+val speciesTablesRandomized: Boolean get() = gameRandomized || ownRandomizedGuide != null
+
 /** The Emerald hack [cfg] is, or null. */
 fun emeraldHackFor(cfg: NativeConfig?): HackText? = when {
     cfg === NATIVE_RECHARGED_EMERALD_V2_2_5 || cfg === NATIVE_RECHARGED_EMERALD_V2_2_8 -> hackTextRechargedEmerald

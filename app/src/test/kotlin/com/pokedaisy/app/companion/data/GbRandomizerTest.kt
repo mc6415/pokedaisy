@@ -232,6 +232,14 @@ class GbRandomizerTest {
         RunModesCheck.spread(g.title, retail, GbRandomizer.view(spread, g), GbRandomizer.view(without, g))
     }
 
+    @Test
+    fun `EVOLUTIONS moves every evolution's target and the starters still evolve twice`() = each { g, rom ->
+        val made = GbRandomizer.randomize(rom, EVOLVE_ABILITIES, 31L)!!
+        assertSame(g, GbRandomizer.recognise(made))
+        val starters = g.starters.map { (_, at) -> made[at].toInt() and 0xFF }.distinct()
+        checkEvolveAbilities(g.title, g.gen, GbRandomizer.view(rom, g), GbRandomizer.view(made, g), starters)
+    }
+
 
     @Test
     fun `GIFTS swaps the gift and static Pokemon`() = each { g, rom ->

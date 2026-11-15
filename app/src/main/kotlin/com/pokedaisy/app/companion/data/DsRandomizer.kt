@@ -126,7 +126,7 @@ object DsRandomizer {
 
     val GAMES = listOf(
         Game(
-            "CPUE", 1, "Platinum", "55ac97b09ff4333d5a4aad24fb26ac1133f7dfc9", "44e7ab9d704d6572bf9ac010fd3ad1e9b0c16d63",
+            "CPUE", 1, "Platinum", "5d5cabda01a05c31d9fa94864ddecc82d254d8f3", "7f22ca5f3cd545efc6b5218d6fdc6169ba2ec0fd",
             starterOverlay = 78, starterOffsets = listOf(0x1BC0, 0x1BC4, 0x1BC8),
             encounters = "/fielddata/encountdata/pl_enc_data.narc",
             trainers = "/poketool/trainer/trdata.narc", trainerParties = "/poketool/trainer/trpoke.narc",
@@ -139,8 +139,8 @@ object DsRandomizer {
             balls = Balls("/fielddata/script/scr_seq.narc", 404, events = "/fielddata/eventdata/zone_event.narc"),
         ),
     ) + listOf(
-        Triple("IPKE", "HeartGold", "900df66d390866f97f82e1ff2c2edc98870209ad" to "d405617566c164b7af51e022af8da0edf5999d45"),
-        Triple("IPGE", "SoulSilver", "4562c3ef0374f1e08591342f43075b0d3d44195b" to "86480488f3054eb9ad3b199f87be782fbb54601c"),
+        Triple("IPKE", "HeartGold", "eae1ff0c304d5649a415f6cab09ae525b2a9dd46" to "96bf66f401859ad91bcf864914b5fb3f7df0fb68"),
+        Triple("IPGE", "SoulSilver", "c952be7a10f9b8d4ffd299ccc6d0fada08ab5402" to "69c1b999e7026407daa3e9fd1be73ed30c706b9d"),
     ).map { (code, title, hashes) ->
         // pret/pokeheartgold: choose_starter.c's species (ARM9), choose_starter_app.c's sSpecies (overlay 61), msg_0190.
         Game(
@@ -151,8 +151,8 @@ object DsRandomizer {
             balls = Balls("/a/0/1/2", 141, events = "/a/0/3/2"),
         )
     } + listOf(
-        Triple("IRBO", "Black", "0a92d35ef541f9c915fc9cb70d7b171267402ca0" to "c0a583e2f633c1e612066704a9f52bef25b7b2d0"),
-        Triple("IRAO", "White", "09e827becf04aa7577e617bb9906ef1fcbe1e65a" to "5685566fb6dc6e3b51dd6fbe4a0efd994226dfea"),
+        Triple("IRBO", "Black", "0755b5db26c5b4ba029c3490b46e16681a667526" to "e98e7187b41e1a5e17c1f8d95853822c179a15a6"),
+        Triple("IRAO", "White", "d374a4cd16883bba0bbed6858a2110b88f9a45e0" to "1b5f78c58d4a6e1da627b14e8b19085831a8ed37"),
     ).map { (code, title, hashes) ->
         // No decomp: the archives from the cart (scripts/gen_gen5_guide.py's FILES_BW), the choice screen overlay 223's list.
         Game(
@@ -163,8 +163,8 @@ object DsRandomizer {
             balls = Balls("/a/0/5/7", 864, at = 2, events = "/a/1/2/5"),
         )
     } + listOf(
-        Triple("IREO", "Black 2", "74ea944a90b5c067579a318c05b2e3385ad3f7c5" to "5296dca7a0a02b41defea41975fe47be55c4c15d"),
-        Triple("IRDO", "White 2", "d831b4f7e464b2acc51a6abfcb85c3132376cc66" to "795654ba1b2826ed7a3073e3274ebadd376360e3"),
+        Triple("IREO", "Black 2", "88ce3290c2ef6b921388ffea79166a14905e5488" to "660454df848c25979ae55e256f79c63095162264"),
+        Triple("IRDO", "White 2", "219c256de4c963766639d41436fffdfa5f01851d" to "accda40c58fe5b86a2b095ae8e60903d740fad2c"),
     ).map { (code, title, hashes) ->
         // pret has no decomp of these: the archives from the cart (scripts/gen_gen5_guide.py reads the same ones).
         Game(
@@ -355,6 +355,9 @@ object DsRandomizer {
         val learnId = cart.fileId(g.learnsets)
         val personal = cart.file(personalId)
         val learn = cart.file(learnId)
+        // Evolutions: EVOLUTIONS writes their targets.
+        val evoId = cart.fileId(g.evolutions)
+        val evo = cart.file(evoId)
         val trdata = Narc(cart.file(cart.fileId(g.trainers)))
         // The item balls' script archive: Gen 5's is the starters' own ([scripts]), so it's the same array then.
         val ballsId = g.balls?.let { cart.fileId(it.path) }
@@ -371,7 +374,7 @@ object DsRandomizer {
         fun written(): List<Pair<Long, ByteArray>> = listOfNotNull(
             overlayId?.let { cart.span(it).first to overlay }, cart.span(encId).first to enc, cart.span(partiesId).first to parties,
             msgId?.let { cart.span(it).first to msg!! }, scriptsId?.let { cart.span(it).first to scripts!! },
-            cart.span(personalId).first to personal, cart.span(learnId).first to learn,
+            cart.span(personalId).first to personal, cart.span(learnId).first to learn, cart.span(evoId).first to evo,
             ballsId?.takeIf { !ballsShared }?.let { cart.span(it).first to balls!! },
             arm9?.let { cart.arm9Place() to (Blz.compressTo(it, arm9Blob!!.size) ?: error("ARM9 doesn't fit")) },
             packedOverlay?.let { ov ->
@@ -391,10 +394,12 @@ object DsRandomizer {
             val sc = scripts?.copyOf() ?: ByteArray(0)
             val a9 = arm9?.copyOf() ?: ByteArray(0)
             val po = packedOverlay?.copyOf() ?: ByteArray(0)
-            val pe = personal.copyOf(); val le = learn.copyOf()
+            val pe = personal.copyOf(); val le = learn.copyOf(); val ev = evo.copyOf()
             val bl = if (ballsShared) sc else balls?.copyOf() ?: ByteArray(0)
             if (zeroed) {
                 statSites(pe) { at -> for (i in 0 until 6) pe[at + i] = 0 }
+                abilitySites(pe) { at -> pe[at] = 0 }
+                evolutionTargets(ev) { _, at -> ev[at] = 0; ev[at + 1] = 0 }
                 learnSites(le) { at, len -> for (i in 0 until len) le[at + i] = 0 }
                 g.packedStarters?.let { ps ->
                     for (k in 0 until 3 * ps.width) { ps.arm9Offset?.let { a9[it + k] = 0 }; po[ps.overlayOffset + k] = 0 }
@@ -423,7 +428,7 @@ object DsRandomizer {
                 if (balls != null) ballSites(bl) { at -> bl[at] = 0; bl[at + 1] = 0 }
                 if (balls != null) staticSites(bl) { at -> bl[at] = 0; bl[at + 1] = 0 }
             }
-            return (o + e + p + m + sc + a9 + po + pe + le + (if (ballsShared) ByteArray(0) else bl)).toByteString().sha1().hex()
+            return (o + e + p + m + sc + a9 + po + pe + le + (if (ballsShared) ByteArray(0) else bl) + ev).toByteString().sha1().hex()
         }
 
         /** An item an item ball keeps: HMs and key items (Gen 4: 420 on; Gen 5: 420-536 and 615-638, but its TM93-95). */
@@ -460,6 +465,28 @@ object DsRandomizer {
         fun statSites(d: ByteArray, each: (at: Int) -> Unit) {
             val n = Narc(d)
             for (s in 1..minOf(g.speciesCount, n.size - 1)) if (n.end(s) - n.start(s) >= 6) each(n.start(s))
+        }
+
+        /** Each species' ability bytes in [d] (the species records): Gen 4's two at 0x16 / 0x17, Gen 5's three at 0x18-0x1A
+         * (the third the hidden one). */
+        fun abilitySites(d: ByteArray, each: (at: Int) -> Unit) {
+            val n = Narc(d)
+            val slots = if (g.gen == 5) 0x18..0x1A else 0x16..0x17
+            for (s in 1..minOf(g.speciesCount, n.size - 1)) if (n.end(s) - n.start(s) > slots.last) for (o in slots) each(n.start(s) + o)
+        }
+
+        /** Each evolution's target word in [d] (the evolutions: per species up to 7 entries of method, parameter, target,
+         * u16 each; the method is never written, so a made cart's entries are found the same), with the species it's on. */
+        fun evolutionTargets(d: ByteArray, each: (species: Int, at: Int) -> Unit) {
+            val n = Narc(d)
+            for (s in 1..minOf(g.speciesCount, n.size - 1)) {
+                val start = n.start(s)
+                var k = 0
+                while (k < 7 && start + k * 6 + 6 <= n.end(s)) {
+                    if (u16(d, start + k * 6) != 0) each(s, start + k * 6 + 4)
+                    k++
+                }
+            }
         }
 
         /** Each level-up entry in [d] (the learnsets): its place and size (Gen 4's move | level << 9, Gen 5's move, level). */
@@ -636,9 +663,15 @@ object DsRandomizer {
         val trainers = ArrayList<Pair<Int, Int>>()
         f.trainerMons(Narc(f.parties)) { at, _ -> trainers += (u16(f.parties, at + 4) and speciesMask(g.gen)) to (f.parties[at + 2].toInt() and 0xFF) }
         val personal = Narc(f.personal)
-        CartView(wild.values.toList(), trainers) { s ->
-            if (s !in 1..g.speciesCount) emptySet() else personal.member(s).let { m -> setOf(m[6].toInt() and 0xFF, m[7].toInt() and 0xFF) }
+        val evolutions = ArrayList<Triple<Int, Int, Int>>().also { l -> f.evolutionTargets(f.evo) { s, at -> l += Triple(s, u16(f.evo, at - 4), u16(f.evo, at)) } }
+        val abilities = LinkedHashMap<Int, MutableList<Int>>()
+        val slots = if (g.gen == 5) 3 else 2
+        ArrayList<Int>().also { l -> f.abilitySites(f.personal) { l += it } }.chunked(slots).forEachIndexed { i, one ->
+            abilities[i + 1] = one.map { f.personal[it].toInt() and 0xFF }.toMutableList()
         }
+        CartView(wild.values.toList(), trainers, { s ->
+            if (s !in 1..g.speciesCount) emptySet() else personal.member(s).let { m -> setOf(m[6].toInt() and 0xFF, m[7].toInt() and 0xFF) }
+        }, evolutions, abilities)
     }
 
     /** [path]'s gift / static Pokémon: the species at each of each one's places (tests). */
@@ -726,18 +759,23 @@ object DsRandomizer {
     private class Run(val cart: Cart, val g: Game, val f: Files, val o: RomRandomizer.Options, val rnd: Random) {
         // The species records and learnsets as written (BASE STATS / LEARNSETS change them in place).
         val personal get() = Narc(f.personal)
-        val evo = Narc(cart.file(cart.fileId(g.evolutions)))
+        val evo get() = Narc(f.evo)
         val learn get() = Narc(f.learn)
         val moveData = Narc(cart.file(cart.fileId(g.moves)))
         val all = (1..g.speciesCount).toList()
 
         fun bst(s: Int) = personal.member(s).let { m -> (0 until 6).sumOf { m[it].toInt() and 0xFF } }
 
-        val evolvesTo: Map<Int, List<Int>> = all.associateWith { s ->
-            val m = evo.member(s)
-            (0 until m.size / 6).mapNotNull { k -> if (u16(m, k * 6) == 0) null else u16(m, k * 6 + 4).takeIf { it in 1..g.speciesCount } }
+        /** Evolution targets of each species (read again after EVOLUTIONS, so the starters' "evolve twice" follows them). */
+        fun readEvolvesTo(): Map<Int, List<Int>> {
+            val n = evo
+            return all.associateWith { s ->
+                val m = n.member(s)
+                (0 until m.size / 6).mapNotNull { k -> if (u16(m, k * 6) == 0) null else u16(m, k * 6 + 4).takeIf { it in 1..g.speciesCount } }
+            }
         }
-        val evolvedFrom = evolvesTo.values.flatten().toSet()
+        var evolvesTo: Map<Int, List<Int>> = readEvolvesTo()
+        val evolvedFrom get() = evolvesTo.values.flatten().toSet()
         /** Each species record's two type bytes (+6, +7), read once (BASE STATS shuffles only the six stats before them). */
         private val typeOf: Map<Int, Set<Int>> by lazy {
             val n = personal
@@ -756,6 +794,9 @@ object DsRandomizer {
             // Stats and learnsets first: the strength match keeps working (the totals stay) and trainers' moves follow.
             if (o.baseStats) baseStats()
             if (o.learnsets) learnsets()
+            if (o.abilities) abilities()
+            // Before the starters: "evolve twice" goes by the new evolutions.
+            if (o.evolutions) evolutions()
             starters()
             wild()
             if (o.gifts) gifts()
@@ -763,6 +804,26 @@ object DsRandomizer {
             if (o.trainers) trainers()
             if (o.trainerItems) trainerItems()
             if (o.fieldItems) fieldItems()
+        }
+
+        /** ABILITIES: each species' slots (Gen 5's hidden one too; an empty slot stays empty). */
+        fun abilities() {
+            val choices = SpeciesPicker.abilityChoices(g.gen)
+            val sites = ArrayList<Int>().also { l -> f.abilitySites(f.personal) { l += it } }
+            val per = if (g.gen == 5) 3 else 2
+            for (one in sites.chunked(per)) {
+                SpeciesPicker.abilities(one.map { f.personal[it].toInt() and 0xFF }, choices, rnd)
+                    .forEachIndexed { i, a -> f.personal[one[i]] = a.toByte() }
+            }
+        }
+
+        /** EVOLUTIONS: every evolution's target ([SpeciesPicker.evolutions]); how it evolves stays. */
+        fun evolutions() {
+            val d = f.evo
+            val sites = ArrayList<Pair<Int, Int>>().also { l -> f.evolutionTargets(d) { s, at -> if (u16(d, at) in 1..g.speciesCount) l += s to at } }
+            val now = picker.evolutions(sites.map { (s, at) -> s to u16(d, at) })
+            sites.forEachIndexed { i, (_, at) -> put16(d, at, now[i]) }
+            evolvesTo = readEvolvesTo()
         }
 
         /** GIFTS: each gift / static Pokémon swapped (every script word naming it), none twice. */

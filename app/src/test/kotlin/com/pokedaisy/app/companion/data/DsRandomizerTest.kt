@@ -255,6 +255,15 @@ class DsRandomizerTest {
         RunModesCheck.spread(g.title, retail, made(RunModesCheck.SPREAD, 22L, "spread"), made(RunModesCheck.SPREAD.copy(allCatchable = false), 22L, "without"))
     }
 
+    @Test
+    fun `EVOLUTIONS and ABILITIES do what they say`() = each { g, f ->
+        val a = tmp.root.resolve("${g.code}-evolve.nds").toOkioPath()
+        assertTrue(DsRandomizer.randomize(f.toOkioPath(), a, EVOLVE_ABILITIES, 31L))
+        assertEquals(g.title, g, DsRandomizer.recognise(a))
+        checkEvolveAbilities(g.title, g.gen, DsRandomizer.view(f.toOkioPath())!!, DsRandomizer.view(a)!!)
+        java.io.File(a.toString()).delete()
+    }
+
 
     @Test
     fun `GIFTS swaps the gift and static Pokemon`() = each { g, f ->

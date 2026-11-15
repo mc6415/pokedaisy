@@ -65,13 +65,13 @@ class RomRandomizeFlow(
 
     /** The wizard's pages, in order: which game (its console first when there are several), a [Style], then READY; CUSTOM
      * puts its four short pages of settings between STYLE and READY. */
-    enum class Page { GAME, GAME_LIST, STYLE, POKEMON, RULES, TRAINERS, EXTRAS, READY }
+    enum class Page { GAME, GAME_LIST, STYLE, POKEMON, RULES, TRAINERS, ITEMS, EXTRAS, READY }
 
     /** STYLE's choices: a ready-made set of [RomRandomizer.Options], the last run's, or CUSTOM's pages. */
     enum class Style(val label: String, val blurb: String) {
         CLASSIC(tk("CLASSIC"), tk("New starters, wild Pokémon by area and shuffled trainers.")),
         WILD_ONLY(tk("WILD ONLY"), tk("New starters and wild Pokémon. Trainers keep their teams.")),
-        CHAOS(tk("CHAOS"), tk("Everything shuffled: every encounter, items, base stats and moves.")),
+        CHAOS(tk("CHAOS"), tk("Everything shuffled: encounters, items, stats, abilities, moves and evolutions.")),
         LAST_TIME(tk("LAST TIME"), tk("The settings you used last time.")),
         CUSTOM(tk("CUSTOM"), tk("Pick each setting yourself.")),
     }
@@ -366,7 +366,7 @@ class RomRandomizeFlow(
             Style.CHAOS -> RomRandomizer.Options(
                 starters = RomRandomizer.Starters.RANDOM, wild = RomRandomizer.Wild.RANDOM, trainers = true,
                 similarStrength = false, noLegendaries = false, fieldItems = true, trainerItems = true, baseStats = true, learnsets = true,
-                gifts = true,
+                gifts = true, evolutions = true, abilities = true,
             )
             else -> RomRandomizer.Options(gifts = true)
         }
@@ -374,7 +374,7 @@ class RomRandomizeFlow(
         /** [o] as [Prefs.randomizeLast] keeps it: its settings in order, `,`-separated. */
         fun encode(o: RomRandomizer.Options): String = listOf(
             o.starters.name, o.wild.name, o.trainers, o.similarStrength, o.noLegendaries, o.fieldItems, o.trainerItems, o.baseStats, o.learnsets,
-            o.levelScale, o.noDuplicates, o.allCatchable, o.trainersKeepType, o.monotype?.name ?: "", o.gifts,
+            o.levelScale, o.noDuplicates, o.allCatchable, o.trainersKeepType, o.monotype?.name ?: "", o.gifts, o.evolutions, o.abilities,
         ).joinToString(",")
 
         fun decode(s: String?): RomRandomizer.Options? = runCatching {
@@ -388,6 +388,8 @@ class RomRandomizeFlow(
                 allCatchable = f.getOrNull(11)?.toBooleanStrict() ?: false, trainersKeepType = f.getOrNull(12)?.toBooleanStrict() ?: false,
                 monotype = f.getOrNull(13)?.takeIf { it.isNotEmpty() }?.let { com.pokedaisy.app.companion.data.PokeType.valueOf(it) },
                 gifts = f.getOrNull(14)?.toBooleanStrict() ?: false,
+                // EVOLUTIONS and ABILITIES (off in a setup saved before them).
+                evolutions = f.getOrNull(15)?.toBooleanStrict() ?: false, abilities = f.getOrNull(16)?.toBooleanStrict() ?: false,
             )
         }.getOrNull()
 
@@ -417,8 +419,13 @@ class RomRandomizeFlow(
             if (o.fieldItems && takesFieldItems(b)) add(tr("Items lying around shuffled"))
             if (o.trainerItems && takesHeldItems(b)) add(tr("Trainers hold random items"))
             if (o.baseStats) add(tr("Base stats shuffled"))
+            if (o.abilities && takesAbilities(b)) add(tr("Random abilities"))
             if (o.learnsets) add(tr("Random moves learned by level"))
+            if (o.evolutions) add(tr("Random evolutions"))
         }
+
+        /** ABILITIES: the GBA and DS games (the Game Boy games' Pokémon have none). */
+        fun takesAbilities(b: Base) = !b.gb
 
         /** What each choice does, a line under it (English keys: [OptionLine] translates subtitles). */
         fun startersInfo(s: RomRandomizer.Starters) = when (s) {
@@ -514,13 +521,15 @@ fun RandomizeWindow(flow: RomRandomizeFlow, m: GbaTextMetrics, small: GbaTextMet
                     ) {
                         when (step) {
                             is RomRandomizeFlow.Step.Ready -> when (page) {
-                                RomRandomizeFlow.Page.POKEMON, RomRandomizeFlow.Page.RULES, RomRandomizeFlow.Page.TRAINERS, RomRandomizeFlow.Page.EXTRAS -> {
+                                RomRandomizeFlow.Page.POKEMON, RomRandomizeFlow.Page.RULES, RomRandomizeFlow.Page.TRAINERS, RomRandomizeFlow.Page.ITEMS,
+                                RomRandomizeFlow.Page.EXTRAS -> {
                                     OptionButton(tr("BACK"), m, modifier = Modifier.weight(1f), onClick = { flow.back() })
                                     OptionButton(tr("NEXT"), m, emphasis = true, modifier = Modifier.weight(1f), onClick = {
                                         flow.forward(when (page) {
                                             RomRandomizeFlow.Page.POKEMON -> RomRandomizeFlow.Page.RULES
                                             RomRandomizeFlow.Page.RULES -> RomRandomizeFlow.Page.TRAINERS
-                                            RomRandomizeFlow.Page.TRAINERS -> RomRandomizeFlow.Page.EXTRAS
+                                            RomRandomizeFlow.Page.TRAINERS -> RomRandomizeFlow.Page.ITEMS
+                                            RomRandomizeFlow.Page.ITEMS -> RomRandomizeFlow.Page.EXTRAS
                                             else -> RomRandomizeFlow.Page.READY
                                         })
                                     })
@@ -643,7 +652,6 @@ private fun WizardPage(
         }
         RomRandomizeFlow.Page.TRAINERS -> {
             heading(tr("TRAINERS"))
-            val held = RomRandomizeFlow.takesHeldItems(base)
             row(tr("TEAMS"), shuffled(o.trainers),
                 if (o.trainers) tk("Every trainer gets a new team at the same levels.") else tk("Trainers keep their own teams.")) {
                 flow.options = o.copy(trainers = !o.trainers)
@@ -653,8 +661,16 @@ private fun WizardPage(
                 flow.options = o.copy(trainersKeepType = !o.trainersKeepType)
             }
             row(tr("LEVELS"), RomRandomizeFlow.levelsLabel(o.levelScale),
-                if (o.levelScale > 0) tr("Every trainer's Pokémon {0}% higher.", o.levelScale) else tk("The game's own levels."), last = !held) {
+                if (o.levelScale > 0) tr("Every trainer's Pokémon {0}% higher.", o.levelScale) else tk("The game's own levels."), last = true) {
                 choose("LEVELS")
+            }
+        }
+        RomRandomizeFlow.Page.ITEMS -> {
+            heading(tr("ITEMS"))
+            val held = RomRandomizeFlow.takesHeldItems(base)
+            row(tr("FIELD ITEMS"), shuffled(o.fieldItems),
+                if (o.fieldItems) tk("Items swap places. Key items stay put.") else tk("Items stay where the game puts them."), last = !held) {
+                flow.options = o.copy(fieldItems = !o.fieldItems)
             }
             // Only where the picked game takes them: Red / Blue / Yellow's trainers hold nothing.
             if (held) {
@@ -666,17 +682,24 @@ private fun WizardPage(
         }
         RomRandomizeFlow.Page.EXTRAS -> {
             heading(tr("EXTRAS"))
-            row(tr("FIELD ITEMS"), shuffled(o.fieldItems),
-                if (o.fieldItems) tk("Items swap places. Key items stay put.") else tk("Items stay where the game puts them.")) {
-                flow.options = o.copy(fieldItems = !o.fieldItems)
-            }
             row(tr("BASE STATS"), shuffled(o.baseStats),
                 if (o.baseStats) tk("Each Pokémon's stats in a new order, the same total.") else tk("Stats as the game has them.")) {
                 flow.options = o.copy(baseStats = !o.baseStats)
             }
+            // Only where the picked game has them: the Game Boy games' Pokémon have no abilities.
+            if (RomRandomizeFlow.takesAbilities(base)) {
+                row(tr("ABILITIES"), tr(if (o.abilities) "RANDOM" else "AS THEY ARE"),
+                    if (o.abilities) tk("Each Pokémon gets abilities picked at random.") else tk("Abilities as the game has them.")) {
+                    flow.options = o.copy(abilities = !o.abilities)
+                }
+            }
             row(tr("LEARNSETS"), tr(if (o.learnsets) "RANDOM" else "AS THEY ARE"),
-                if (o.learnsets) tk("New moves learned at the same levels.") else tk("Moves as the game has them."), last = true) {
+                if (o.learnsets) tk("New moves learned at the same levels.") else tk("Moves as the game has them.")) {
                 flow.options = o.copy(learnsets = !o.learnsets)
+            }
+            row(tr("EVOLUTIONS"), tr(if (o.evolutions) "RANDOM" else "AS THEY ARE"),
+                if (o.evolutions) tk("Each evolves into another Pokémon, the same way.") else tk("Evolutions as the game has them."), last = true) {
+                flow.options = o.copy(evolutions = !o.evolutions)
             }
         }
         RomRandomizeFlow.Page.READY -> {

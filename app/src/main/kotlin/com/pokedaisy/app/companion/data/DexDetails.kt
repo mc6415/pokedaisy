@@ -265,7 +265,7 @@ object DexDetails {
             // BULBASAUR evolves at 16 into IVYSAUR (species 1 -> 2) in every table-shaped game here ([EvoLayout.probeLevel]:
             // Monomyth's at 31). A randomized retail ROM's table is at retail's place (its hash says so), the randomizer's
             // evolutions in it.
-            if (!gameRandomized && out[1]?.firstOrNull()?.let { it.to == 2 && it.reqs == listOf(EvoReq.Level(layout.probeLevel)) } != true) return null
+            if (!speciesTablesRandomized && out[1]?.firstOrNull()?.let { it.to == 2 && it.reqs == listOf(EvoReq.Level(layout.probeLevel)) } != true) return null
             return out
         }
         val x = t.expansion ?: return null

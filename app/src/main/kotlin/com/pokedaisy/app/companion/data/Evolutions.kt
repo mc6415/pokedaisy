@@ -108,6 +108,6 @@ object EvolutionSource {
         // A hack of the same size that moved the table must not get wrong data:
         // BULBASAUR evolves at 16 into species 2. A randomized retail ROM's is at retail's place (its hash says so)
         // with the randomizer's evolutions in it.
-        return table.takeIf { gameRandomized || it.getOrNull(1)?.firstOrNull() == Evolution(EVO_LEVEL, 16, 2) }
+        return table.takeIf { speciesTablesRandomized || it.getOrNull(1)?.firstOrNull() == Evolution(EVO_LEVEL, 16, 2) }
     }
 }

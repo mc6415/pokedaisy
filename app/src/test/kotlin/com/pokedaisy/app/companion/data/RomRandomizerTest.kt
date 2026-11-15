@@ -194,6 +194,14 @@ class RomRandomizerTest {
     }
 
     @Test
+    fun `EVOLUTIONS and ABILITIES do what they say, and the starters still evolve twice`() = each { g, rom ->
+        val made = RomRandomizer.randomize(rom, EVOLVE_ABILITIES, 31L)!!
+        assertEquals(g.title, g, RomRandomizer.recognise(made))
+        val starters = g.starterSites.map { (_, at) -> u16(made, at) }.distinct()
+        checkEvolveAbilities(g.title, 3, RomRandomizer.view(rom, g), RomRandomizer.view(made, g), starters)
+    }
+
+    @Test
     fun `GIFTS swaps the gift and static Pokemon`() = each { g, rom ->
         val o = RomRandomizer.Options(RomRandomizer.Starters.OFF, RomRandomizer.Wild.OFF, false, gifts = true)
         val a = RomRandomizer.randomize(rom, o, 31L)!!
