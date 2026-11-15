@@ -339,11 +339,11 @@ object GameTitles {
 
     /** [rom]'s [RomCategory] (reads its header; [sha1] when [identify] hashed it). A Pokémon cart hashed but known as
      * neither retail nor a hack is a hack too (an unsupported one); a cart nobody hashes is its platform's. */
-    private fun categoryOf(rom: File, sha1: String?, hashed: Boolean, randomized: Boolean = false): RomCategory = when {
+    internal fun categoryOf(rom: File, sha1: String?, hashed: Boolean, randomized: Boolean = false): RomCategory = when {
         RomIdentity.isNds(rom) -> RomCategory.NDS
         sha1 != null && sha1 in HACKS -> RomCategory.HACK
-        // A randomized retail cart is still the retail game.
-        randomized -> RomCategory.GBA
+        // A randomized retail cart is still the retail game, on its own console (a RANDOMIZE'd Red is a GB game).
+        randomized -> if (RomIdentity.isGameBoy(rom)) gameBoyPlatform(rom) { sha1 } else RomCategory.GBA
         hashed && sha1 != null && sha1 !in RETAIL && sha1 !in RETAIL_PORT_TITLES -> RomCategory.HACK
         RomIdentity.isGameBoy(rom) -> gameBoyPlatform(rom) { sha1 }
         else -> RomCategory.GBA
@@ -433,9 +433,10 @@ object GameTitles {
     private val KNOWN = "#known\t" + Integer.toHexString(BY_SHA1.keys.sorted().hashCode()) + RANDOMIZED_KNOWN
 
     /** How [RomCategory] was decided when the cache was written: a cache from before asks every file again. */
-    private const val CATEGORIES = "#categories\t4"
-    /** The ones before: only their GB games are asked again (Polished Crystal is GBC since 3, Gold / Silver since 4). */
-    private val CATEGORIES_GB_STALE = setOf("#categories\t2", "#categories\t3")
+    private const val CATEGORIES = "#categories\t5"
+    /** The ones before: only their GB games are asked again (Polished Crystal is GBC since 3, Gold / Silver since 4, a
+     * randomized Game Boy cart its console's since 5 - it was GBA). */
+    private val CATEGORIES_GB_STALE = setOf("#categories\t2", "#categories\t3", "#categories\t4")
 
     private fun load(context: Context): MutableMap<String, Entry> {
         val map = java.util.concurrent.ConcurrentHashMap<String, Entry>()

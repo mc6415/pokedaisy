@@ -67,4 +67,21 @@ class GameTitlesTest {
         assertEquals(RomCategory.GB, platform("Pokemon - Gelbe Edition - Special Pikachu Edition (Germany) (GBC,SGB Enhanced).gb"))
         assertEquals(RomCategory.GB, platform("Pokemon - Red Version (USA, Europe) (SGB Enhanced).gb"))
     }
+
+    /** A RANDOMIZE'd Game Boy cart is its console's kind (it was GBA, so the library drew the GBA picture on a Red). */
+    @Test
+    fun `a randomized Game Boy cart is a Game Boy game`() {
+        val dir = File(com.pokedaisy.app.companion.data.RETAIL_ROM_DIR).parentFile
+        val cases = listOf(
+            "gb/Pokemon - Red Version (USA, Europe) (SGB Enhanced).gb" to RomCategory.GB,
+            "gbc/Pokemon - Crystal Version (USA, Europe) (Rev 1).gbc" to RomCategory.GBC,
+        ).filter { File(dir, it.first).isFile }
+        org.junit.Assume.assumeTrue("no Game Boy carts here", cases.isNotEmpty())
+        for ((name, kind) in cases) {
+            val rom = File(dir, name).readBytes()
+            val made = com.pokedaisy.app.companion.data.GbRandomizer.randomize(rom, com.pokedaisy.app.companion.data.RomRandomizer.Options(), 3L)!!
+            val f = File.createTempFile("randomized", "." + name.substringAfterLast('.')).apply { writeBytes(made); deleteOnExit() }
+            assertEquals(name, kind, GameTitles.categoryOf(f, com.pokedaisy.app.companion.data.GbRandomizer.sha1(made), hashed = true, randomized = true))
+        }
+    }
 }
