@@ -52,8 +52,9 @@ private val statLabels = mapOf(
 /** The nature's raised / lowered stat marks: later games' red up, blue down. */
 private val NatureUp = Color(0xFFE04040)
 private val NatureDown = Color(0xFF3984F7)
-/** A perfect (31) IV's bar. */
-private val IvPerfect = Color(0xFFE8B830)
+/** A perfect (31) IV's bar and star: a sky blue none of the HP colours come near (a gold one read as the yellow, 2026-11-15),
+ * lighter than the nature's down arrow. */
+private val IvPerfect = Color(0xFF30C0F0)
 
 /**
  * The summary's STATS page: per stat (the game's summary order) its value,
@@ -119,12 +120,17 @@ internal fun MonStatsSection(
     }
 }
 
-/** An IV's bar and number (or the IV total's, out of 186). */
+/** An IV's bar and number (or the IV total's, out of 186): a perfect one gets a star before its number. */
 @Composable
 private fun RowScope.IvCell(value: Int, max: Int, small: GbaTextMetrics) {
     val u = small.u
     IvBar(value, max, small, Modifier.weight(1f).padding(start = u * 2))
-    GbaText("$value", optionLook.value, optionLook.valueShadow, small, modifier = Modifier.padding(start = u * 3).width(small.lineHeight * 1.6f))
+    // The star's room is kept on every row, so the numbers stay lined up.
+    val starSize = small.lineHeight * 0.6f
+    Box(Modifier.padding(start = u * 2).size(starSize), contentAlignment = Alignment.Center) {
+        if (value >= max) PixelIcon(PixelIcons.star, IvPerfect, Modifier.size(starSize))
+    }
+    GbaText("$value", optionLook.value, optionLook.valueShadow, small, modifier = Modifier.padding(start = u * 1).width(small.lineHeight * 1.6f))
 }
 
 /** label | stat | IV bar + number | EV, at fixed shares of the width. */
