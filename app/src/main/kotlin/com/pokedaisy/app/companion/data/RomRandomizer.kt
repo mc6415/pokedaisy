@@ -140,6 +140,44 @@ object RomRandomizer {
         return game.takeIf { sha1(rom) == it.retailSha1 || madeHash(rom, it) == it.madeSha1 }
     }
 
+    /**
+     * The GUIDE's view of a cart this tool made ([recognise]): each item ball's item by its object's flag and each hidden
+     * item's by its flag (FireRed / LeafGreen's hidden items count from flag 1000, Ruby / Sapphire's 600, Emerald's 500:
+     * the event's hidden item number added, as the GUIDE's area data has them). Trades and gift Pokémon stay retail's.
+     */
+    fun guide(rom: ByteArray, g: Game): RandomizedGuide {
+        val hiddenFlags = when (g.code.take(3)) { "BPR", "BPG" -> 1000; "AXV", "AXP" -> 600; else -> 500 }
+        val r = Reader(rom)
+        val items = HashMap<Int, Int>()
+        fun isPtr(v: Int) = v in 0 until rom.size
+        var group = 0
+        while (group < 64 && isPtr(r.ptr(g.mapGroups + group * 4))) {
+            val maps = r.ptr(g.mapGroups + group * 4)
+            var m = 0
+            while (m < 256 && isPtr(r.ptr(maps + m * 4))) {
+                val e = r.ptr(r.ptr(maps + m * 4) + 4)
+                if (isPtr(e)) {
+                    val objects = r.ptr(e + 4)
+                    if (isPtr(objects)) for (k in 0 until r.u8(e)) {
+                        val o = objects + k * 24
+                        val at = r.ptr(o + 16)
+                        if (isPtr(at) && at + 12 <= rom.size && r.u8(at) == 0x1A && r.u16(at + 1) == 0x8000 && r.u8(at + 5) == 0x1A)
+                            items[r.u16(o + 20)] = r.u16(at + 3)
+                    }
+                    val bgs = r.ptr(e + 16)
+                    if (isPtr(bgs)) for (k in 0 until r.u8(e + 3)) {
+                        val b = bgs + k * 12
+                        // Not an item id: FireRed's one stray hidden event (43264), whose flag a real one has.
+                        if (r.u8(b + 5) == 7 && r.u16(b + 8) in 1 until ITEM_COUNT) items[hiddenFlags + r.u8(b + 10)] = r.u16(b + 8)
+                    }
+                }
+                m++
+            }
+            group++
+        }
+        return RandomizedGuide(items, trades = null, statics = null)
+    }
+
     /** [rom] is one this tool made (not the untouched cart): its game, else null. For the Poller and the library. */
     fun recognise(rom: ByteArray): Game? {
         val game = header(rom) ?: return null

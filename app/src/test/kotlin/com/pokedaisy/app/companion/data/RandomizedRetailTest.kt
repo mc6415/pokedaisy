@@ -111,8 +111,8 @@ class RandomizedRetailTest {
             val areas = allAreaThingsOf(if (r.code == "BPEE") GuideId.EMERALD else GuideId.FIRERED)
             for (t in areas.values.flatten()) when (t.kind) {
                 AreaKind.ITEM, AreaKind.HIDDEN -> assertEquals("${r.name} flag ${t.flag}", t.id, g.items[t.flag])
-                AreaKind.TRADE -> assertEquals(r.name, t.id to t.wants, g.trades["${t.id}/${t.wants}"])
-                AreaKind.MON, AreaKind.EGG -> g.statics[t.id]?.let { assertEquals(r.name, t.id, it) }
+                AreaKind.TRADE -> assertEquals(r.name, t.id to t.wants, g.trades!!["${t.id}/${t.wants}"])
+                AreaKind.MON, AreaKind.EGG -> g.statics!![t.id]?.let { assertEquals(r.name, t.id, it) }
                 else -> Unit
             }
         }

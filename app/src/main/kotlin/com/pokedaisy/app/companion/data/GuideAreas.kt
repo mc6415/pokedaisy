@@ -116,7 +116,7 @@ fun areaThings(guide: GuideId?, mapsec: Int): List<AreaThing> =
 /** Every area of [guide]'s game: region map section -> what's in it. On a randomized game ([runningRandomized]) the
  * randomizer's items, trades and gift Pokémon ([randomizedAreas]). */
 fun allAreaThings(guide: GuideId): Map<Int, List<AreaThing>> {
-    val r = runningRandomized?.randomizedGuide ?: return retailAreaThings(guide)
+    val r = runningRandomized?.randomizedGuide ?: ownRandomizedGuide ?: return retailAreaThings(guide)
     randomizedCache?.let { (g, id, m) -> if (g === r && id == guide) return m }
     return randomizedAreas(retailAreaThings(guide), r).also { randomizedCache = Triple(r, guide, it) }
 }
@@ -133,8 +133,8 @@ internal fun randomizedAreas(areas: Map<Int, List<AreaThing>>, r: RandomizedGuid
         things.mapNotNull { t ->
             when (t.kind) {
                 AreaKind.ITEM, AreaKind.HIDDEN -> r.items[t.flag]?.let { t.copy(id = it) }
-                AreaKind.TRADE -> r.trades["${t.id}/${t.wants}"]?.let { (given, wanted) -> t.copy(id = given, wants = wanted) }
-                AreaKind.MON, AreaKind.EGG -> r.statics[t.id]?.let { t.copy(id = it) }
+                AreaKind.TRADE -> if (r.trades == null) t else r.trades["${t.id}/${t.wants}"]?.let { (given, wanted) -> t.copy(id = given, wants = wanted) }
+                AreaKind.MON, AreaKind.EGG -> if (r.statics == null) t else r.statics[t.id]?.let { t.copy(id = it) }
                 AreaKind.GIFT, AreaKind.KEY -> t
             }
         }

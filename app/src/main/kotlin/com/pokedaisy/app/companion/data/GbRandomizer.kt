@@ -153,6 +153,53 @@ object GbRandomizer {
         return out
     }
 
+    /**
+     * What a RANDOMIZE cart's GUIDE reads from it: each map's grass and surfing species by slot (Gen 1 by wCurMap, Gen 2 by
+     * group << 8 | number; National Dex numbers) and any trainer's team, as the game builds it.
+     */
+    class Shuffle(val game: Game, rom: ByteArray) {
+        private val r = Reader(rom, game)
+        val grass = HashMap<Int, IntArray>()
+        val water = HashMap<Int, IntArray>()
+
+        init {
+            if (game.gen == 1) {
+                var m = 0
+                var p = game.wild[0]
+                while (u16(rom, p) != 0xFFFF && m < 256) {
+                    var q = r.ptr(p)
+                    for (which in 0 until 2) {
+                        val rate = r.u8(q++)
+                        if (rate != 0) {
+                            (if (which == 0) grass else water)[m] = IntArray(10) { r.dex.getOrElse(r.u8(q + it * 2 + 1)) { 0 } }
+                            q += 20
+                        }
+                    }
+                    p += 2; m++
+                }
+            } else for (t in game.wild) {
+                var a = kotlin.math.abs(t)
+                while (r.u8(a) != 0xFF) {
+                    val key = r.u8(a) shl 8 or r.u8(a + 1)
+                    // The first table naming a map is its own: Crystal's swarm tables come after (the guide leaves swarms out).
+                    if (t > 0) { grass.putIfAbsent(key, IntArray(21) { r.u8(a + 5 + it * 2 + 1) }); a += 5 + 42 }
+                    else { water.putIfAbsent(key, IntArray(3) { r.u8(a + 3 + it * 2 + 1) }); a += 3 + 6 }
+                }
+            }
+        }
+
+        /** Trainer class [cls]'s [no]th party (both from 1), or null when it doesn't read as one. */
+        fun party(cls: Int, no: Int): List<TrainerMon>? = runCatching { r.party(cls, no) }.getOrNull()
+    }
+
+    private fun u16(b: ByteArray, at: Int) = (b[at].toInt() and 0xFF) or ((b[at + 1].toInt() and 0xFF) shl 8)
+
+    /** The cart [Shuffle] the GUIDE reads: set as a Game Boy game loads (Gen1Art.prefetch, which runs for every one), null for any other. */
+    @Volatile var shuffle: Shuffle? = null
+
+    /** [rom]'s [Shuffle] when it's a cart this tool made, else null. */
+    fun readShuffle(rom: ByteArray): Shuffle? = recognise(rom)?.let { Shuffle(it, rom) }
+
     /** The item balls' and hidden items' item bytes, but the kept ones. */
     internal fun fieldSites(rom: ByteArray, g: Game): List<Int> = ArrayList<Int>().also { l -> Reader(rom, g).fieldItems { l += it } }
 
@@ -425,6 +472,49 @@ object GbRandomizer {
         }
 
         /** The last four moves [id] has learnt by [level]. */
+        /** Class [cls]'s [no]th party as the game reads it: Gen 1 / 2's level-up moves where the party gives none. */
+        fun party(cls: Int, no: Int): List<TrainerMon>? {
+            var a = ptr(g.trainers + (cls - 1) * 2)
+            if (g.gen == 1) {
+                repeat(no - 1) { a = gen1Party(a)?.second ?: return null }
+                val (mons, _) = gen1Party(a) ?: return null
+                val flat = u8(a) != 0xFF
+                return mons.map { (at, _) ->
+                    val level = if (flat) u8(a) else u8(at - 1)
+                    TrainerMon(dex[u8(at)], level, 0, gen1Moves(u8(at), level))
+                }
+            }
+            // ReadTrainerParty: scan to each trainer's 0xFF.
+            repeat(no - 1) { while (u8(a) != 0xFF) a++; a++ }
+            val (mons, _) = gen2Party(a) ?: return null
+            val type = gen2Type(a)
+            return mons.map { (at, moves) ->
+                val level = u8(at - 1)
+                val item = if (type and 2 != 0) u8(at + 1) else 0
+                TrainerMon(u8(at), level, item, if (moves >= 0) (0 until 4).map { u8(moves + it) }.filter { it != 0 } else movesAt(u8(at), level))
+            }
+        }
+
+        /** A Gen 2 party's type byte (after its name). */
+        private fun gen2Type(a: Int): Int { var q = a; while (u8(q) != 0x50) q++; return u8(q + 1) }
+
+        /** Gen 1: the four level-1 moves in the base stats, then the level-up learnset to [level] (AddPartyMon / WriteMonMoves). */
+        fun gen1Moves(id: Int, level: Int): List<Int> {
+            val n = dex[id]
+            val at = if (n == 151 && g.mewStats != 0) g.mewStats else g.baseStats + (n - 1) * 28
+            val known = (15..18).map { u8(at + it) }.filter { it != 0 }.toMutableList()
+            var a = evolutions(id).second
+            while (u8(a) != 0 && u8(a) <= level) {
+                val move = u8(a + 1)
+                if (move !in known) {
+                    if (known.size == 4) known.removeAt(0)
+                    known += move
+                }
+                a += 2
+            }
+            return known
+        }
+
         fun movesAt(id: Int, level: Int): List<Int> {
             var a = evolutions(id).second
             val known = ArrayList<Int>()

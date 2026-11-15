@@ -440,6 +440,7 @@ class TelemetrySampler {
         val size = runCatching { EmulatorCore.current.romSize() }.getOrDefault(0L)
         romSha1 = null
         retailEngine = null
+        ownRandomizedGuide = null
         fireRedEngine =code.startsWith("BPR") || code.startsWith("BPG")
 
         // LeafGreen / Ruby / Sapphire / the other Emeralds: retail only, read
@@ -458,8 +459,11 @@ class TelemetrySampler {
                     // BOXES too: the configs' storage was checked on retail captures only (every box record's checksum held).
                     val hash = runCatching { romHash(reader, size) }.getOrNull()
                     // A cart the library's RANDOMIZE made from retail counts as retail: it changes data only, never code or RAM.
-                    val retail = hash in ShinyOdds.RETAIL_SHA1S ||
-                        size == 0x1000000L && runCatching { RomRandomizer.recognise(readRom(reader, size.toInt())) }.getOrNull() != null
+                    val made = if (size == 0x1000000L && hash !in ShinyOdds.RETAIL_SHA1S) runCatching {
+                        readRom(reader, size.toInt()).let { b -> RomRandomizer.recognise(b)?.let { RomRandomizer.guide(b, it) } }
+                    }.getOrNull() else null
+                    ownRandomizedGuide = made
+                    val retail = hash in ShinyOdds.RETAIL_SHA1S || made != null
                     retailRom = retail
                     // Retail LeafGreen's battle cursors: on its own configs, checked on the retail carts only.
                     val cfg = when {

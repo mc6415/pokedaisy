@@ -376,8 +376,12 @@ object Gen1Art {
     /** In the background, once per ROM file: a Game Boy cart is at most a few MB. */
     fun prefetch(filesDir: Path, rom: Path) {
         background("pokedaisy-gen1-art") {
+            GbRandomizer.shuffle = null
             runCatching {
-                val wrote = extractTo(readRomFile(rom), RomArt.dir(filesDir))
+                val bytes = readRomFile(rom)
+                // A RANDOMIZE cart's own wild Pokémon and teams, for the GUIDE.
+                runCatching { GbRandomizer.shuffle = GbRandomizer.readShuffle(bytes) }.onFailure { Logs.w("Gen1Art: shuffle failed", it) }
+                val wrote = extractTo(bytes, RomArt.dir(filesDir))
                 if (wrote.isNotEmpty()) RomArt.announce()
             }.onFailure { Logs.w("Gen1Art: failed", it) }
         }

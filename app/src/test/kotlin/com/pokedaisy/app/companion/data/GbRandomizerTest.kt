@@ -141,6 +141,44 @@ class GbRandomizerTest {
     }
 
     @Test
+    fun `the GUIDE reads a randomized cart's own wild Pokémon and teams`() = each { g, rom ->
+        val guide: GuideWorld = when (g.title) {
+            "Red" -> RED_WORLD
+            "Blue" -> BLUE_WORLD
+            "Yellow" -> YELLOW_WORLD
+            "Crystal" -> CrystalWorld
+            else -> return@each   // Gold / Silver have no GUIDE
+        }
+        val keys = GbRandomizer.Shuffle(g, rom).let { it.grass.keys + it.water.keys }
+        val bosses = if (g.gen == 1) G1_BOSS_TRAINERS.indices.toList()
+            else listOf("FALKNER", "CLAIR", "WILL", "LANCE", "BROCK", "RED").map { CrystalWorld.trainer(it) }
+        fun read(): Pair<List<MapEncounters>, List<List<TrainerMon>>> =
+            keys.map { k -> if (g.gen == 1) guide.encounters(0, k, null) else guide.encounters(k shr 8, k and 0xFF, null) } to
+                bosses.map { guide.party(it, null) }
+        fun teams(t: List<List<TrainerMon>>) = t.map { p -> p.map { Triple(it.species, it.level, it.heldItem) } }
+        try {
+            GbRandomizer.shuffle = null
+            val (wild0, bosses0) = read()
+            // The cart read the guide's way gives the built-in data back.
+            GbRandomizer.shuffle = GbRandomizer.Shuffle(g, rom)
+            val (wild1, bosses1) = read()
+            assertEquals(g.title, wild0, wild1)
+            assertEquals(g.title, teams(bosses0), teams(bosses1))
+            // A randomized one: its own.
+            val a = GbRandomizer.randomize(rom, RomRandomizer.Options(), 11L)!!
+            GbRandomizer.shuffle = GbRandomizer.readShuffle(a)!!
+            val (wild2, bosses2) = read()
+            assertTrue(g.title, wild0.indices.count { wild0[it] != wild2[it] } > wild0.size / 2)
+            assertTrue(g.title, bosses0.indices.count { teams(bosses0)[it] != teams(bosses2)[it] } > bosses0.size / 2)
+            // The levels stay the game's.
+            assertEquals(g.title, bosses0.map { p -> p.map { it.level } }, bosses2.map { p -> p.map { it.level } })
+            assertNull(GbRandomizer.readShuffle(rom))
+        } finally {
+            GbRandomizer.shuffle = null
+        }
+    }
+
+    @Test
     fun `anything else is refused`() = each { g, rom ->
         val other = rom.copyOf().also { it[0x2000] = (it[0x2000] + 1).toByte() }
         assertNull(GbRandomizer.gameOf(other))

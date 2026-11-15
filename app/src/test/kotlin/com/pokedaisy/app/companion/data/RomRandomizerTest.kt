@@ -150,4 +150,26 @@ class RomRandomizerTest {
         assertNull(g.title, RomRandomizer.gameOf(hack))
         assertNull(g.title, RomRandomizer.recognise(hack))
     }
+
+    @Test
+    fun `HERE lists a randomized cart's own item balls and hidden items`() = each { g, rom ->
+        val id = when (g.code) { "BPRE" -> GuideId.FIRERED; "BPGE" -> GuideId.LEAFGREEN; "AXVE" -> GuideId.RUBY; "AXPE" -> GuideId.SAPPHIRE; else -> GuideId.EMERALD }
+        fun items() = allAreaThings(id).values.flatten().filter { it.kind == AreaKind.ITEM || it.kind == AreaKind.HIDDEN }
+        try {
+            ownRandomizedGuide = null
+            val retail = allAreaThings(id)
+            val before = items()
+            // Read the guide's way off the retail cart: every line as it was, none dropped.
+            ownRandomizedGuide = RomRandomizer.guide(rom, g)
+            assertEquals(g.title, retail, allAreaThings(id))
+            val a = RomRandomizer.randomize(rom, RomRandomizer.Options(fieldItems = true), 8L)!!
+            ownRandomizedGuide = RomRandomizer.guide(a, g)
+            val after = items()
+            assertEquals(g.title, before.size, after.size)
+            assertTrue("${g.title} ${before.size}", before.indices.count { before[it].id != after[it].id } > before.size / 2)
+            assertEquals(g.title, before.map { it.id }.sorted().size, after.size)
+        } finally {
+            ownRandomizedGuide = null
+        }
+    }
 }

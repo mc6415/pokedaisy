@@ -91,7 +91,10 @@ fun readGen1Progress(r: MemoryReader, ram: Gen1GuideRam): SaveProgress {
  * One Gen 1 game's wild Pokémon and bosses. A map's grass and water both roll WildMonEncounterSlotChances; the OLD and
  * GOOD ROD bite the same way wherever there's water, the SUPER ROD by map. Trainers are keyed by their line's index.
  */
-class Gen1World(wildRaw: List<String>, bossRaw: List<String>) : GuideWorld {
+class Gen1World(wildRaw: List<String>, bossRaw: List<String>, private val randomized: String? = null) : GuideWorld {
+    /** The cart RANDOMIZE made from this game, while it's the one running ([GbRandomizer.shuffle]): its own tables win. */
+    private val shuffle get() = GbRandomizer.shuffle?.takeIf { randomized != null && it.game.title == randomized }
+
     private class Slot(val level: Int, val species: Int, val odds: Double)
     private class Line(val key: String, val title: String, val where: String, val done: List<Int>, val team: Int?, val mons: List<TrainerMon>)
 
@@ -135,9 +138,13 @@ class Gen1World(wildRaw: List<String>, bossRaw: List<String>) : GuideWorld {
             EncounterSlot(species, g.minOf { it.level }, g.maxOf { it.level }, (g.sumOf { it.odds }).roundToInt())
         }.sortedByDescending { it.percent }
         val fishes = num in water || num in superRod
+        // A RANDOMIZE cart: the same slots and levels, its species (it never changes the rods').
+        fun cart(slots: List<Slot>, mine: IntArray?) =
+            if (mine == null) slots else slots.mapIndexed { i, s -> Slot(s.level, mine.getOrElse(i) { s.species }, s.odds) }
+        val sh = shuffle
         return MapEncounters(
-            grass = merge(grass[num].orEmpty()),
-            water = merge(water[num].orEmpty()),
+            grass = merge(cart(grass[num].orEmpty(), sh?.grass?.get(num))),
+            water = merge(cart(water[num].orEmpty(), sh?.water?.get(num))),
             rockSmash = emptyList(),
             oldRod = if (fishes) merge(oldRod) else emptyList(),
             goodRod = if (fishes) merge(goodRod) else emptyList(),
@@ -145,7 +152,11 @@ class Gen1World(wildRaw: List<String>, bossRaw: List<String>) : GuideWorld {
         )
     }
 
-    override fun party(trainer: Int, progress: SaveProgress?): List<TrainerMon> = lines.getOrNull(trainer)?.mons.orEmpty()
+    override fun party(trainer: Int, progress: SaveProgress?): List<TrainerMon> {
+        val own = lines.getOrNull(trainer)?.mons.orEmpty()
+        val sh = shuffle ?: return own
+        return G1_BOSS_TRAINERS.getOrNull(trainer)?.let { (cls, no) -> sh.party(cls, no) } ?: own
+    }
 
     /** NEXT BOSS's list, in the game's order. A boss with a team per value of the champion's var shows the one the save
      * holds; before the var is set (or on a value none of them has), every team, each under its ace's name. */
@@ -171,9 +182,19 @@ class Gen1World(wildRaw: List<String>, bossRaw: List<String>) : GuideWorld {
     }
 }
 
-internal val YELLOW_WORLD = Gen1World(G1Y_WILD_RAW, G1Y_BOSSES_RAW)
-internal val RED_WORLD = Gen1World(G1R_WILD_RAW, G1R_BOSSES_RAW)
-internal val BLUE_WORLD = Gen1World(G1B_WILD_RAW, G1B_BOSSES_RAW)
+/**
+ * Each boss line's trainer class and party (both from 1), the same in Red, Blue and Yellow: the eight leaders (BROCK 34 ..
+ * GIOVANNI 29's third), the Elite Four, the champion's three teams. Found by matching the lines' teams in the retail carts;
+ * a RANDOMIZE cart's teams are read there.
+ */
+internal val G1_BOSS_TRAINERS = listOf(
+    34 to 1, 35 to 1, 36 to 1, 37 to 1, 38 to 1, 40 to 1, 39 to 1, 29 to 3,
+    44 to 1, 33 to 1, 46 to 1, 47 to 1, 43 to 1, 43 to 2, 43 to 3,
+)
+
+internal val YELLOW_WORLD = Gen1World(G1Y_WILD_RAW, G1Y_BOSSES_RAW, randomized = "Yellow")
+internal val RED_WORLD = Gen1World(G1R_WILD_RAW, G1R_BOSSES_RAW, randomized = "Red")
+internal val BLUE_WORLD = Gen1World(G1B_WILD_RAW, G1B_BOSSES_RAW, randomized = "Blue")
 val YELLOW_LEGACY_WORLD = Gen1World(G1L_WILD_RAW, G1L_BOSSES_RAW)
 
 private fun gen1Guide(world: Gen1World) = GameGuide(verified = false, bosses = world.bosses, world = world, pages = emptyList())

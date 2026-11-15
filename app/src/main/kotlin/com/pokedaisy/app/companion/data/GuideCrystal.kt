@@ -52,7 +52,12 @@ open class CrystalEngineWorld(
     bossRaw: List<String>,
     private val grassOdds: IntArray,
     private val waterOdds: IntArray,
+    /** The title of the game RANDOMIZE takes this for ([GbRandomizer.Game.title]), or null. */
+    private val randomized: String? = null,
 ) : GuideWorld {
+    /** The cart RANDOMIZE made from this game, while it's the one running ([GbRandomizer.shuffle]): its own tables win. */
+    private val shuffle get() = GbRandomizer.shuffle?.takeIf { randomized != null && it.game.title == randomized }
+
     private val wild by lazy { Gen2WildTables(wildRaw) }
     private val bosses by lazy { Gen2BossTables(bossRaw) }
 
@@ -64,9 +69,14 @@ open class CrystalEngineWorld(
         val tod = progress.crystalTimeOfDay()
         fun merge(rows: List<Triple<Int, IntRange, Double>>) = wild.merge(rows)
         fun one(s: Gen2WildTables.Slot, odds: Double) = Triple(s.species, s.level..s.level, odds)
-        val grass = wild.grass[key]?.takeIf { it.first[tod] > 0 }?.second?.drop(tod * grassOdds.size)?.take(grassOdds.size)
+        // A RANDOMIZE cart: the same slots and levels, its species (it never changes the rods', trees' or rocks').
+        val sh = shuffle
+        fun cart(slots: List<Gen2WildTables.Slot>, mine: IntArray?) =
+            if (mine == null) slots else slots.mapIndexed { i, s -> Gen2WildTables.Slot(s.level, mine.getOrElse(i) { s.species }, s.odds) }
+        val grass = wild.grass[key]?.takeIf { it.first[tod] > 0 }?.second?.let { cart(it, sh?.grass?.get(key)) }
+            ?.drop(tod * grassOdds.size)?.take(grassOdds.size)
             ?.mapIndexed { i, s -> one(s, grassOdds[i].toDouble()) }?.let(::merge).orEmpty()
-        val water = wild.water[key]?.takeIf { it.first > 0 }?.second
+        val water = wild.water[key]?.takeIf { it.first > 0 }?.second?.let { cart(it, sh?.water?.get(key)) }
             ?.mapIndexed { i, s -> Triple(s.species, s.level..s.level + 4, waterOdds[i].toDouble()) }?.let(::merge).orEmpty()
         val rods = wild.fishMaps[key]?.let { wild.fish[it] }.orEmpty().map { rod ->
             merge(rod.mapNotNull { s ->
@@ -90,7 +100,8 @@ open class CrystalEngineWorld(
     }
 
     override fun party(trainer: Int, progress: SaveProgress?): List<TrainerMon> =
-        bosses.teams[trainer].orEmpty().map { TrainerMon(it.species, it.level, it.item, it.moves) }
+        shuffle?.party(trainer shr 8, trainer and 0xFF)
+            ?: bosses.teams[trainer].orEmpty().map { TrainerMon(it.species, it.level, it.item, it.moves) }
 
     override fun clockNote(progress: SaveProgress?): String = when (progress.crystalTimeOfDay()) {
         CR_MORN -> "MORNING"
@@ -99,7 +110,7 @@ open class CrystalEngineWorld(
     }
 }
 
-object CrystalWorld : CrystalEngineWorld(CR_WILD_RAW, CR_BOSSES_RAW, CR_GRASS_ODDS, CR_WATER_ODDS)
+object CrystalWorld : CrystalEngineWorld(CR_WILD_RAW, CR_BOSSES_RAW, CR_GRASS_ODDS, CR_WATER_ODDS, randomized = "Crystal")
 
 /** Crystal Legacy v1.3.1's: GuideCrystalLegacyGen.kt, from its own build, in the same format. */
 object CrystalLegacyWorld : CrystalEngineWorld(CL_WILD_RAW, CL_BOSSES_RAW, CL_GRASS_ODDS, CL_WATER_ODDS)

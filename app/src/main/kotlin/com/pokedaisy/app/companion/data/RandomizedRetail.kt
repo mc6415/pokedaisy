@@ -74,8 +74,9 @@ class RandomizedRetailRom(
  */
 class RandomizedGuide(
     val items: Map<Int, Int>,
-    val trades: Map<String, Pair<Int, Int>>,
-    val statics: Map<Int, Int>,
+    /** Null: retail's (the library's RANDOMIZE leaves trades and gift Pokémon as they are). */
+    val trades: Map<String, Pair<Int, Int>>?,
+    val statics: Map<Int, Int>?,
 )
 
 object RandomizedRetail {
