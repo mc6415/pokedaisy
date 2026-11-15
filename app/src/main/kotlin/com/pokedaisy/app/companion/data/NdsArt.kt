@@ -128,6 +128,7 @@ object NdsArt {
         OriginHeartGold.data = null
         RenegadePlatinum.data = null
         Black2Redux.data = null
+        DsRandomizer.shuffle = null
         background("pokedaisy-nds-art") {
             // The names first (a few text banks): the companion's first samples use them.
             runCatching { names = readNames(rom) }.onFailure { Logs.w("NdsArt: names failed", it) }
@@ -137,6 +138,8 @@ object NdsArt {
                 .onFailure { Logs.w("NdsArt: Renegade Platinum's tables failed", it) }
             runCatching { Black2Redux.data = if (Black2Redux.matches(rom)) readRedux(rom) else null }
                 .onFailure { Logs.w("NdsArt: the Redux hacks' tables failed", it) }
+            // A cart the library's RANDOMIZE made: its shuffled wild sets and teams for the GUIDE.
+            runCatching { DsRandomizer.shuffle = DsRandomizer.readShuffle(rom) }.onFailure { Logs.w("NdsArt: shuffle failed", it) }
             names?.let { n ->
                 if (activeGame.isDsGame) {
                     romLanguage = n.language

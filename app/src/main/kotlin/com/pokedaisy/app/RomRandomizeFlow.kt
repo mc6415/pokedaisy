@@ -30,6 +30,7 @@ import com.pokedaisy.app.companion.ui.OptionOverlay
 import com.pokedaisy.app.companion.ui.OptionSelector
 import com.pokedaisy.app.companion.ui.OptionTitleWindow
 import java.io.File
+import okio.Path.Companion.toOkioPath
 
 /**
  * RANDOMIZE, the library's TOOLS: the player's retail FireRed (rev 1) / Emerald looked for among every ROM the app knows,
@@ -43,14 +44,14 @@ class RomRandomizeFlow(
     private val onAdded: (File) -> Unit,
 ) {
     /** A ROM the tool can take: [label] is the library's name for it. */
-    class Base(val file: File, val label: String, val game: String)
+    class Base(val file: File, val label: String, val game: String, val ds: Boolean = false)
 
     sealed class Step {
         class Looking(val progress: Float) : Step()
-        /** No retail FireRed rev 1 / Emerald in the library. */
+        /** None of the carts the tool takes in the library. */
         data object NotFound : Step()
         class Ready(val bases: List<Base>) : Step()
-        class Making(val base: Base) : Step()
+        class Making(val base: Base, val progress: Float = -1f) : Step()
         class Done(val file: File, val label: String) : Step()
         class Failed(val message: String) : Step()
     }
@@ -78,7 +79,21 @@ class RomRandomizeFlow(
                         RomRandomizer.GAMES.any { it.code == code && it.rev == rev }
                     } == true
             }
+            // DS carts (plain .nds: a zipped one would have to be unpacked first) by their header, then their files.
+            val carts = RomFolder.allRomFiles(activity, prefs).filter { f ->
+                f.extension.equals("nds", ignoreCase = true) && RomArchive.readAt(f, 0xC, 0x13)?.let { h ->
+                    val code = String(h, 0, 4, Charsets.US_ASCII)
+                    val rev = h[0x12].toInt() and 0xFF
+                    com.pokedaisy.app.companion.data.DsRandomizer.GAMES.any { it.code == code && it.rev == rev }
+                } == true
+            }
+            val total = (files.size + carts.size).coerceAtLeast(1)
             val found = ArrayList<Base>()
+            carts.forEachIndexed { i, f ->
+                val game = com.pokedaisy.app.companion.data.DsRandomizer.gameOf(f.toOkioPath(), retail = true)
+                if (game != null) found += Base(f, GameTitles.label(activity, prefs, f), game.title, ds = true)
+                postFor(token) { if (step is Step.Looking) step = Step.Looking((i + 1f) / total) }
+            }
             files.forEachIndexed { i, f ->
                 val bytes = runCatching { RomArchive.open(f).use { it.readBytes() } }.getOrNull()
                 // Only the player's own carts: copies already randomized (by this tool or another) are left out.
@@ -86,7 +101,7 @@ class RomRandomizeFlow(
                 if (game != null) {
                     found += Base(f, GameTitles.label(activity, prefs, f), game.title)
                 }
-                postFor(token) { if (step is Step.Looking) step = Step.Looking((i + 1f) / files.size) }
+                postFor(token) { if (step is Step.Looking) step = Step.Looking((carts.size + i + 1f) / total) }
             }
             postFor(token) {
                 base = 0
@@ -105,6 +120,7 @@ class RomRandomizeFlow(
         val token = run
         Thread({
             val result = runCatching {
+                if (b.ds) return@runCatching makeDs(b, opts, s, token)
                 val bytes = RomArchive.open(b.file).use { it.readBytes() }
                 val out = RomRandomizer.randomize(bytes, opts, s) ?: error("not randomizable")
                 val dir = RomPatcher.outputDir(RomPatcher.Platform.GBA, b.file, prefs.romsFolders, importedDir)
@@ -124,6 +140,30 @@ class RomRandomizeFlow(
                 onAdded(file)
             }
         }, "pokedaisy-randomize").apply { isDaemon = true; start() }
+    }
+
+    /** A DS cart: copied, then its shuffled files written in place ([com.pokedaisy.app.companion.data.DsRandomizer]). */
+    private fun makeDs(b: Base, opts: RomRandomizer.Options, s: Long, token: Int): File {
+        val dir = RomPatcher.outputDir(RomPatcher.Platform.NDS, b.file, prefs.romsFolders, importedDir)
+        dir.mkdirs()
+        val name = RomUris.sanitizeFileName("Pokemon ${b.game} Randomized (seed $s).nds")
+        var out = File(dir, name)
+        var n = 2
+        while (out.exists()) { out = File(dir, "${name.substringBeforeLast('.')} ($n).nds"); n++ }
+        val tmp = File(dir, ".${out.name}.part")
+        tmp.delete()
+        var last = -1
+        try {
+            val ok = com.pokedaisy.app.companion.data.DsRandomizer.randomize(b.file.toOkioPath(), tmp.toOkioPath(), opts, s) { p ->
+                val pct = (p * 100).toInt()
+                if (pct != last) { last = pct; postFor(token) { if (step is Step.Making) step = Step.Making(b, p) } }
+            }
+            check(ok) { "not randomizable" }
+            if (!tmp.renameTo(out)) throw java.io.IOException("couldn't name ${out.name}")
+        } finally {
+            tmp.delete()
+        }
+        return out
     }
 
     fun newSeed(): Long = kotlin.random.Random.nextLong(100_000, 1_000_000).also { seed = it }
@@ -197,11 +237,15 @@ fun RandomizeWindow(flow: RomRandomizeFlow, m: GbaTextMetrics, small: GbaTextMet
                             RomRandomizeFlow.Step.NotFound -> Padded(m) {
                                 Message(tr("NO GAME TO RANDOMIZE"), m, value = true)
                                 Spacer(Modifier.height(m.u * 2))
-                                Message(tr("RANDOMIZE works on the English FireRed and LeafGreen (Rev 1), Ruby and Sapphire (Rev 2) and Emerald. Add one to your library or a ROMs folder, then try again."), small)
+                                Message(tr("RANDOMIZE works on the English FireRed and LeafGreen (Rev 1), Ruby and Sapphire (Rev 2), Emerald and Platinum (Rev 1). Add one to your library or a ROMs folder, then try again."), small)
                             }
                             is RomRandomizeFlow.Step.Ready -> ReadyRows(flow, step, m, small) { choosing = it }
                             is RomRandomizeFlow.Step.Making -> Padded(m) {
                                 Message(tr("Randomizing {0}…", step.base.label), m)
+                                if (step.progress >= 0f) {
+                                    Spacer(Modifier.height(m.u * 3))
+                                    SyncProgressBar(step.progress, m)
+                                }
                             }
                             is RomRandomizeFlow.Step.Done -> Padded(m) {
                                 Message(tr("RANDOMIZED!"), m, value = true)

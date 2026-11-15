@@ -6,6 +6,7 @@ import com.pokedaisy.app.companion.data.RETAIL_PORT_CODE_TITLES
 import com.pokedaisy.app.companion.data.RETAIL_PORT_TITLES
 import com.pokedaisy.app.companion.data.TelemetrySampler
 import java.io.File
+import okio.Path.Companion.toOkioPath
 import okio.source
 
 /**
@@ -266,6 +267,11 @@ object GameTitles {
 
     /** [rom]'s name as retail randomized by Universal Pokémon Randomizer ZX ([RandomizedRetail]), or null. Blocking. */
     internal fun randomizedTitle(rom: File, code: String?): String? {
+        // A DS cart the library's RANDOMIZE made (its few written files checked, not the whole cart).
+        if (RomIdentity.isNds(rom)) {
+            if (!rom.extension.equals("nds", ignoreCase = true)) return null
+            return com.pokedaisy.app.companion.data.DsRandomizer.recognise(rom.toOkioPath())?.let { "Pokémon ${it.title}$RANDOMIZED" }
+        }
         // The library's own RANDOMIZE output (LeafGreen, Ruby, Sapphire; FireRed / Emerald's pass the check below too).
         if (code in setOf("BPGE", "AXVE", "AXPE") && RomArchive.romSize(rom) == 0x1000000L) {
             val game = runCatching { com.pokedaisy.app.companion.data.RomRandomizer.recognise(RomArchive.open(rom).use { it.readBytes() }) }.getOrNull()
@@ -357,7 +363,11 @@ object GameTitles {
                 val worthHashing = if (nds) RomIdentity.ndsGameCode(rom) in NDS_CODES
                     else RomIdentity.gameCode(rom) in CODES || RomIdentity.isGameBoy(rom)
                 val sha1 = if (worthHashing) RomIdentity.sha1(rom) else null
-                val randomized = if (sha1 != null && sha1 !in BY_SHA1 && !nds) randomizedTitle(rom, RomIdentity.gameCode(rom)) else null
+                val randomized = when {
+                    sha1 == null || sha1 in BY_SHA1 -> null
+                    nds -> randomizedTitle(rom, RomIdentity.ndsGameCode(rom))
+                    else -> randomizedTitle(rom, RomIdentity.gameCode(rom))
+                }
                 val title = sha1?.let { BY_SHA1[it] } ?: randomized
                 Entry(rom.length(), rom.lastModified(), title, categoryOf(rom, sha1, worthHashing, randomized != null), platformOf(rom) { sha1 })
             }

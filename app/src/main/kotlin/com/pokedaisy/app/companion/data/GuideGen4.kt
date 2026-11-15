@@ -91,7 +91,11 @@ class Gen4World(
     fun trainer(key: String): Int = bosses.second[key] ?: error("no boss $key")
 
     override fun encounters(group: Int, num: Int, progress: SaveProgress?): MapEncounters {
-        val set = wild.maps[num]?.let { wild.sets[it] } ?: return MapEncounters(emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList())
+        val setId = wild.maps[num]
+        val set = setId?.let { wild.sets[it] } ?: return MapEncounters(emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList())
+        // A Platinum the library's RANDOMIZE made: the cart's own species, slot for slot (levels and odds are the original's).
+        val cart = DsRandomizer.shuffle?.takeIf { !heartGold }
+        fun cartAt(offset: Int, was: Int) = cart?.speciesAt(setId, offset) ?: was
         val time = timeOfDay(progress)
         fun merge(rows: List<Triple<Int, IntRange, Int>>): List<EncounterSlot> =
             rows.filter { it.first != 0 }.groupBy { it.first }.map { (species, g) ->
@@ -101,31 +105,33 @@ class Gen4World(
             val species = when {
                 heartGold -> s.species.getOrElse(time) { s.species.first() }
                 i == 2 || i == 3 -> when (time) {
-                    DAY -> set.day.getOrElse(i - 2) { s.species[0] }
-                    NIGHT -> set.night.getOrElse(i - 2) { s.species[0] }
-                    else -> s.species[0]
+                    DAY -> cartAt(DsRandomizer.dayOffset(i - 2), set.day.getOrElse(i - 2) { s.species[0] })
+                    NIGHT -> cartAt(DsRandomizer.nightOffset(i - 2), set.night.getOrElse(i - 2) { s.species[0] })
+                    else -> cartAt(DsRandomizer.grassOffset(i), s.species[0])
                 }
-                else -> s.species[0]
+                else -> cartAt(DsRandomizer.grassOffset(i), s.species[0])
             }
             Triple(species, s.min..s.max, LAND_ODDS[i])
         })
-        fun water(rate: Int, slots: List<Slot>, odds: List<Int>, night: Int = -1) =
+        fun water(rate: Int, slots: List<Slot>, odds: List<Int>, night: Int = -1, offset: (Int) -> Int? = { null }) =
             if (rate == 0) emptyList() else merge(slots.mapIndexed { i, s ->
-                val species = if (i == night && set.nightFish != 0 && time == NIGHT) set.nightFish else s.species[0]
+                val species = if (i == night && set.nightFish != 0 && time == NIGHT) set.nightFish
+                else offset(i)?.let { cartAt(it, s.species[0]) } ?: s.species[0]
                 Triple(species, s.min..s.max, odds.getOrElse(i) { 0 })
             })
         val (old, good, superRod) = set.rods
         return MapEncounters(
             grass = grass,
-            water = water(set.surfRate, set.surf, WATER_ODDS),
+            water = water(set.surfRate, set.surf, WATER_ODDS) { DsRandomizer.surfOffset(it) },
             rockSmash = water(set.rockRate, set.rock, ROCK_SMASH_ODDS),
-            oldRod = water(old.first, old.second, if (heartGold) HG_ROD_ODDS else PT_OLD_ROD_ODDS),
-            goodRod = water(good.first, good.second, if (heartGold) HG_ROD_ODDS else PT_ROD_ODDS, night = if (heartGold) 3 else -1),
-            superRod = water(superRod.first, superRod.second, if (heartGold) HG_ROD_ODDS else PT_ROD_ODDS, night = if (heartGold) 1 else -1),
+            oldRod = water(old.first, old.second, if (heartGold) HG_ROD_ODDS else PT_OLD_ROD_ODDS) { DsRandomizer.rodOffset(0, it) },
+            goodRod = water(good.first, good.second, if (heartGold) HG_ROD_ODDS else PT_ROD_ODDS, night = if (heartGold) 3 else -1) { DsRandomizer.rodOffset(1, it) },
+            superRod = water(superRod.first, superRod.second, if (heartGold) HG_ROD_ODDS else PT_ROD_ODDS, night = if (heartGold) 1 else -1) { DsRandomizer.rodOffset(2, it) },
         )
     }
 
-    override fun party(trainer: Int, progress: SaveProgress?): List<TrainerMon> = bosses.first[trainer].orEmpty()
+    override fun party(trainer: Int, progress: SaveProgress?): List<TrainerMon> =
+        DsRandomizer.shuffle?.takeIf { !heartGold }?.team(trainer) ?: bosses.first[trainer].orEmpty()
 
     override fun clockNote(progress: SaveProgress?): String = when (timeOfDay(progress)) {
         MORNING -> "MORNING"

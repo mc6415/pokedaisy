@@ -1328,6 +1328,19 @@ randomized retail as above. `randomize` checks both before it returns. Same ROM,
 - Trainers: every party's species at +4; a party with its own moves (flag bit 0) gets the last four moves the new species
   has learnt by the trainer's level (gLevelUpLearnsets), at +6 or +8 with a held item (bit 1).
 
+The DS games (`DsRandomizer.kt`, Platinum US rev 1 so far) keep this data in the cart's file system, so the tool copies the
+cart and writes a few files back in place, each its own size: overlay 78's three starter words (choose_starter_app.c's
+GetSelectedSpecies pool, 0x1BC0), every species word of `pl_enc_data.narc`'s WildEncounters records and `trpoke.narc`'s
+parties (their type from `trdata.narc`). Two more writes make the starter screen match: MakePokemonSprites builds its
+species inline (0x204 - 0x81 = TURTWIG), so its three calls (overlay 78 + 0x690, 42 bytes) become a loop over
+GetSelectedSpecies (`SpritePatch`), and `pl_msg.narc` bank 360's lines 1-3 ("... Pokémon TURTWIG! Will you take this
+Pokémon?") are rewritten in place as the new name plus the line's own "!..." (`Gen4Text.rewrite`, 0xFFFF-padded within
+the line's length). A cart is the tool's when those files with the sites zeroed hash to `madeSha1` (no 128 MB hash); then
+`DsRandomizer.shuffle` (read by NdsArt.prefetch) feeds Platinum's `Gen4World`: HERE's species slot for slot and NEXT
+BOSS's teams. Checked headless with nds_dump and field scripts (StartChooseStarterScene, StartTrainerBattle, Warp): the
+briefcase showed and gave the shuffled starters, Roark and Route 201's grass were shuffled. HG / SS and Gen 5 are next:
+each needs its starter places and `Game` row.
+
 SIMILAR STRENGTH keeps a swap within 10% of the base stat total, widening by 5% until six candidates fit. Ruby / Sapphire have
 no GF header, so their base stats come from the records (`speciesInfo`). FireRed rev 0 / LeafGreen rev 0 / Ruby and Sapphire
 rev 0 / 1 aren't offered yet (a `Game` row each: its offsets, then `madeSha1` from its cart). `RomRandomizeFlow.kt` is the

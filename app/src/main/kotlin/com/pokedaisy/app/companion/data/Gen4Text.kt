@@ -18,6 +18,36 @@ object Gen4Text {
         }
     }
 
+    /** The character [code] stands for ("" when none): for finding a known character in a line's codes. */
+    internal fun charOf(code: Int): String = chars[code].orEmpty()
+
+    /** Line [i]'s place in message file [file] (its codes' first byte) and its length in codes. */
+    internal fun span(file: ByteArray, i: Int): Pair<Int, Int> {
+        val key = u16(file, 2)
+        var k = (765 * (i + 1) * key) and 0xFFFF
+        k = k or (k shl 16)
+        return (u32(file, 4 + i * 8) xor k.toLong()).toInt() to (u32(file, 8 + i * 8) xor k.toLong()).toInt()
+    }
+
+    /** Line [i]'s codes, decrypted (control codes and all). */
+    internal fun codes(file: ByteArray, i: Int): IntArray {
+        val (off, len) = span(file, i)
+        var seed = ((i + 1) * 596947) and 0xFFFF
+        return IntArray(len) { j -> (u16(file, off + j * 2) xor seed).also { seed = (seed + 18749) and 0xFFFF } }
+    }
+
+    /** Line [i] rewritten in place with [codes] (no longer than it, 0xFFFF-padded): the file's table is untouched. */
+    internal fun rewrite(file: ByteArray, i: Int, codes: IntArray) {
+        val (off, len) = span(file, i)
+        require(codes.size <= len) { "line $i too long" }
+        var seed = ((i + 1) * 596947) and 0xFFFF
+        for (j in 0 until len) {
+            val v = (codes.getOrElse(j) { 0xFFFF }) xor seed
+            file[off + j * 2] = v.toByte(); file[off + j * 2 + 1] = (v shr 8).toByte()
+            seed = (seed + 18749) and 0xFFFF
+        }
+    }
+
     /** Every line of the message file [file] (1-based in the game, here from 0). */
     fun lines(file: ByteArray): List<String> {
         if (file.size < 4) return emptyList()
