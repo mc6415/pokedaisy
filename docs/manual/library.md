@@ -125,7 +125,7 @@ A randomized run plays a game you know with everything shuffled: a different fir
 | `LEGENDARIES` | `NONE` keeps legendary Pokémon out of the grass and out of trainers' teams. |
 | `SEED` | The number the shuffle is made from. The same game, options and seed always make the same game, so a friend can play the same run. Tap it for another number. |
 
-3. Tap `RANDOMIZE`. When it's done, the new game is in your library as, for example, "Pokémon Ruby (Randomized)", and `PLAY` starts it.
+3. Tap `RANDOMIZE`. When it's done, the new game is in your library as, for example, "Pokémon Ruby (Randomized, seed 123456)", so two runs of one game are easy to tell apart, and `PLAY` starts it.
 
 Your own game is never changed: the randomized one is a new file, named with its seed (`Pokemon FireRed Randomized (seed 123456).gba`), saved where a [patched game](#patch-a-rom-hack) would go. It has its own save, so start a new game in it. The companion treats it as the game it came from, with every feature that game has, and reads the shuffled Pokémon from it: the [guide](guide.md)'s wild Pokémon and leaders' teams follow the shuffle.
 

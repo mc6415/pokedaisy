@@ -11,6 +11,17 @@ import java.io.File
 
 class GameTitlesTest {
     @Test
+    fun `a randomized game shows the seed its file is named with`() {
+        assertEquals("874812", GameTitles.seedIn("Pokemon FireRed Randomized (seed 874812)"))
+        assertEquals("42", GameTitles.seedIn("FireRed randomized Seed_42"))
+        assertEquals(null, GameTitles.seedIn("Pokemon FireRed Randomized"))
+        assertEquals("Pokémon FireRed (Randomized, seed 874812)", GameTitles.shown("Pokémon FireRed (Randomized)", "874812"))
+        assertEquals("Pokémon FireRed (Randomized)", GameTitles.shown("Pokémon FireRed (Randomized)", null))
+        // Not randomized: the seed-looking part of a file name is never added.
+        assertEquals("Pokémon FireRed", GameTitles.shown("Pokémon FireRed", "874812"))
+    }
+
+    @Test
     fun `every hack the companion supports has a name`() {
         val missing = TelemetrySampler.SUPPORTED_HACK_SHA1S - GameTitles.BY_SHA1.keys
         assertTrue("no title for $missing", missing.isEmpty())

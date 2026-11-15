@@ -247,14 +247,22 @@ object GameTitles {
 
     /** The game's name, if [identify] has already recognised this exact file. Cheap. */
     fun title(context: Context, rom: File): String? =
-        cache(context)[rom.absolutePath]?.takeIf { it.matches(rom) }?.title?.let(::shown)
+        cache(context)[rom.absolutePath]?.takeIf { it.matches(rom) }?.title?.let { shown(it, seedIn(RomArchive.baseName(rom))) }
+
+    /** The seed a randomized game's file is named with (RANDOMIZE's "... (seed 874812)", most randomizers' "seed 874812"):
+     * two randomized copies of one game are told apart by it in the library. */
+    internal fun seedIn(fileName: String): String? = SEED.find(fileName)?.groupValues?.get(1)
+    private val SEED = Regex("""\bseed[ _-]?(\d{1,20})""", RegexOption.IGNORE_CASE)
 
     /** What a randomized retail cart is cached as ([RandomizedRetail]): retail's name and this, in English. */
     private const val RANDOMIZED = " (Randomized)"
 
     /** [title] in the app's language: a randomized cart's "(Randomized)" is translated. */
-    internal fun shown(title: String): String =
-        if (title.endsWith(RANDOMIZED)) com.pokedaisy.app.companion.i18n.tr("{0} (Randomized)", title.removeSuffix(RANDOMIZED)) else title
+    internal fun shown(title: String, seed: String? = null): String = when {
+        !title.endsWith(RANDOMIZED) -> title
+        seed != null -> com.pokedaisy.app.companion.i18n.tr("{0} (Randomized, seed {1})", title.removeSuffix(RANDOMIZED), seed)
+        else -> com.pokedaisy.app.companion.i18n.tr("{0} (Randomized)", title.removeSuffix(RANDOMIZED))
+    }
 
     /** [rom]'s name as retail randomized by Universal Pokémon Randomizer ZX ([RandomizedRetail]), or null. Blocking. */
     internal fun randomizedTitle(rom: File, code: String?): String? {
