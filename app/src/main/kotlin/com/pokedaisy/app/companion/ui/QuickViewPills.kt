@@ -43,7 +43,7 @@ import com.pokedaisy.app.companion.ui.theme.gbaFocusRing
  * The library's quick views: a row of pills over the games, one per [LibraryView], each in its own colour - the
  * consoles and HACKS in their [CategoryArt] colours (GB grey, GBC yellow, GBA purple, DS turquoise, HACKS red), ALL
  * slate, FAVORITES the favorite star's gold, RECENT blue. The open one is filled with its colour and [CategoryArt]'s stripes, the
- * others a white pill framed in it. [counts]: how many games each view holds, shown after its name.
+ * others a white pill framed in it. [counts]: how many games each view holds, shown after the open one's name.
  */
 @Composable
 fun QuickViewPills(
@@ -89,7 +89,8 @@ fun QuickViewPills(
         for (view in views) {
             val on = view == selected
             QuickViewPill(
-                view, on, counts[view], m, small, cursor = on && cursor,
+                // The open pill alone says how many games it holds: nine counts pushed the row off the Thor's top screen.
+                view, on, counts[view]?.takeIf { on }, m, small, cursor = on && cursor,
                 Modifier.onPlaced { c -> c.parentLayoutCoordinates?.let { row ->
                     val x = row.localPositionOf(c, androidx.compose.ui.geometry.Offset.Zero).x.toInt()
                     edges[view] = x..(x + c.size.width)
@@ -164,7 +165,7 @@ fun quickViewLabel(view: LibraryView): String = when (view) {
     LibraryView.FAVORITES -> tr("FAVORITES")
     LibraryView.RECENT -> tr("RECENT")
     LibraryView.HACKS -> tr("HACKS")
-    LibraryView.RANDOMIZED -> tr("RANDOMIZED")
+    LibraryView.RANDOMIZED -> tr("RANDOM")
     else -> view.label
 }
 

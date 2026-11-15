@@ -138,7 +138,7 @@ enum class LibraryView(
     GBA(5, "GBA", platform = RomCategory.GBA),
     DS(6, "DS", platform = RomCategory.NDS),
     HACKS(7, "HACKS", category = RomCategory.HACK),
-    RANDOMIZED(8, "RANDOMIZED", randomized = true);
+    RANDOMIZED(8, "RANDOM", randomized = true);
 
     /** A view of some games by what they are (a console, the hacks, randomized copies): shown only while the library has one. */
     val byKind get() = platform != null || category != null || randomized
