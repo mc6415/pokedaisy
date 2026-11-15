@@ -2156,6 +2156,9 @@ fun main(args: Array<String>) {
         Shot("library-views-ds", tw, th, td, activity { platformLibrary(com.pokedaisy.app.LibraryView.DS); LibraryActivity() }),
         Shot("library-views-hacks", tw, th, td, activity { platformLibrary(com.pokedaisy.app.LibraryView.HACKS); LibraryActivity() }),
         Shot("library-views-randomized", tw, th, td, activity { platformLibrary(com.pokedaisy.app.LibraryView.RANDOMIZED); LibraryActivity() }),
+        Shot("library-views-randomized-grid", tw, th, td, activity { platformLibrary(com.pokedaisy.app.LibraryView.RANDOMIZED); LibraryActivity() }) {
+            onNodeWithContentDescription("Toggle view").performClick()
+        },
         // GAMES / TOOLS / SETTINGS: a rail down the left of a wide screen, a bar along the bottom of an upright one. Each with
         // the games, then TOOLS open.
         // A big game being got ready to start: the library dimmed under the rocking ball.

@@ -61,7 +61,7 @@ The row of coloured buttons under the header narrows the library down to one kin
 | `HACKS` | ROM hacks. |
 | `RANDOM` | Randomized copies of your games, the ones [RANDOMIZE](#randomize-a-game) makes and other randomizers' too. |
 
-The console views and `HACKS` use the same colours as the covers of games without art (see [Cover art](#cover-art)). They and `RANDOM` only show while your library has such a game. A randomized game is in its console's view too. A hack is in `HACKS` and in its console's view too, so a FireRed hack shows under `GBA` as well.
+The console views and `HACKS` use the same colours as the covers of games without art (see [Cover art](#cover-art)). They and `RANDOM` only show while your library has such a game. A randomized game is in its console's view too. Its cover also carries a small green die in the corner, so you can tell it from the original at a glance. A hack is in `HACKS` and in its console's view too, so a FireRed hack shows under `GBA` as well.
 
 ![The GBC quick view open: its button filled in yellow stripes, and only the Game Boy Color games listed](shots/library-views.png "A quick view")
 

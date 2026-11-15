@@ -6,6 +6,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipRect
 import com.pokedaisy.app.RomCategory
 
@@ -54,6 +55,43 @@ private const val GRID = 18
 
 /** A category's colours: the backdrop and its stripes, the letters and their shadow. */
 class CategoryLook(val back: Color, val stripe: Color, val text: Color, val shadow: Color)
+
+/** The RANDOM quick view's colours, and the die [drawRandomBadge] puts on a randomized game's cover. */
+val RandomLook = CategoryLook(Color(0xFF3A9E4A), Color(0xFF2F8A3E), Color(0xFFFFFFFF), Color(0xFF0E3F17))
+
+/** A die showing five, in [RandomLook]'s green: D its dark outline, G the face, W a pip. */
+private val RANDOM_DIE = listOf(
+    ".DDDDDDDDDD.",
+    "DGGGGGGGGGGD",
+    "DGWWGGGGWWGD",
+    "DGWWGGGGWWGD",
+    "DGGGGGGGGGGD",
+    "DGGGGWWGGGGD",
+    "DGGGGWWGGGGD",
+    "DGGGGGGGGGGD",
+    "DGWWGGGGWWGD",
+    "DGWWGGGGWWGD",
+    "DGGGGGGGGGGD",
+    ".DDDDDDDDDD.",
+)
+
+/**
+ * A randomized game's mark: [RANDOM_DIE] in the cover's bottom-right corner, about a quarter of its width (a third of a
+ * small thumbnail's), in whole
+ * screen pixels per die pixel (so it stays crisp from the list's thumbnail to the grid's cover), [inset] die pixels in.
+ */
+fun DrawScope.drawRandomBadge(inset: Int = 2) {
+    val n = RANDOM_DIE.size
+    // A list row's thumbnail is small: the die takes a bigger share of it, or it reads as a speck.
+    val share = if (size.width < 240f) 0.36f else 0.25f
+    val px = maxOf(2f, kotlin.math.floor(size.width * share / n))
+    val left = size.width - (n + inset) * px
+    val top = size.height - (n + inset) * px
+    for ((y, row) in RANDOM_DIE.withIndex()) for ((x, ch) in row.withIndex()) {
+        val c = when (ch) { 'D' -> RandomLook.shadow; 'G' -> RandomLook.back; 'W' -> RandomLook.text; else -> continue }
+        drawRect(c, Offset(left + x * px, top + y * px), Size(px, px))
+    }
+}
 
 object CategoryLooks {
     private fun c(rgb: Long) = Color(0xFF000000 or rgb)

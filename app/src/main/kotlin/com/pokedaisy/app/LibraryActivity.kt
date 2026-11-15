@@ -1,5 +1,6 @@
 package com.pokedaisy.app
 
+import com.pokedaisy.app.companion.ui.drawRandomBadge
 import com.pokedaisy.app.companion.ui.produceKeyedState
 import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -267,6 +268,8 @@ class LibraryActivity : ComponentActivity() {
         val label: String, val hasSave: Boolean, val isNew: Boolean, val hasCover: Boolean,
         /** What kind of game it is (GameTitles.category), for the cover when there is no art; null until identified. */
         val category: RomCategory?,
+        /** A randomized copy (GameTitles.isRandomized): a die on its cover. */
+        val randomized: Boolean,
     )
     private val cardFacts = HashMap<String, CardFacts>()
     private var cardFactsRevision = -1
@@ -283,6 +286,7 @@ class LibraryActivity : ComponentActivity() {
                 isNew = RomAdded.isNew(this, rom),
                 hasCover = coverFile(rom).let { it.isFile && it.length() > 0 },
                 category = GameTitles.category(this, rom),
+                randomized = GameTitles.isRandomized(this, rom),
             )
         }
     }
@@ -1125,6 +1129,7 @@ class LibraryActivity : ComponentActivity() {
             }
         }
         val u = m.u
+        val randomized = factsFor(rom).randomized
         Box(
             modifier = modifier
                 .aspectRatio(ICON_ASPECT)
@@ -1134,6 +1139,8 @@ class LibraryActivity : ComponentActivity() {
                     drawContent()
                     val px = u.toPx()
                     drawLayeredFrame(listOf(OptionColors.frameDark to px, OptionColors.frameLight to px), radius = 3 * px)
+                    // Over the art and the frame: a randomized copy's die, bottom right.
+                    if (randomized) drawRandomBadge()
                 },
             contentAlignment = Alignment.Center,
         ) {

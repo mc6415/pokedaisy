@@ -179,7 +179,7 @@ object QuickViewLooks {
     private val ALL = CategoryLook(c(0x4A5670), c(0x404B63), c(0xFFFFFF), c(0x1C2233))
     private val FAVORITES = CategoryLook(c(0xE0A010), c(0xCC9008), c(0xFFFFFF), c(0x6E4A00))
     private val RECENT = CategoryLook(c(0x2F7FD8), c(0x2670C4), c(0xFFFFFF), c(0x0C315E))
-    private val RANDOMIZED = CategoryLook(c(0x3A9E4A), c(0x2F8A3E), c(0xFFFFFF), c(0x0E3F17))
+    private val RANDOMIZED = RandomLook
 
     fun of(view: LibraryView): CategoryLook = when (view) {
         LibraryView.ALL -> ALL
