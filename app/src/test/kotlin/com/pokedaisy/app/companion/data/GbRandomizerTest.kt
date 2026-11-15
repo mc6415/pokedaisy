@@ -79,6 +79,20 @@ class GbRandomizerTest {
         assertTrue(g.starters.all { dexOk(a[it.second].toInt() and 0xFF) })
     }
 
+    /** A randomized cart gets its original's art (Gen1Art / Gen2Art go by the original's hash): its icons, font and map. */
+    @Test
+    fun `a randomized cart gets its art`() = each { g, rom ->
+        val a = GbRandomizer.randomize(rom, RomRandomizer.Options(), 7L)!!
+        val dir = okio.FileSystem.SYSTEM_TEMPORARY_DIRECTORY / "gbrand-art-${g.title}-${System.nanoTime()}"
+        okio.FileSystem.SYSTEM.createDirectories(dir)
+        try {
+            val wrote = if (g.gen == 2) Gen2Art.extractTo(a, dir) else Gen1Art.extractTo(a, dir)
+            assertTrue("${g.title}: ${wrote.size}", wrote.size > 100)
+        } finally {
+            okio.FileSystem.SYSTEM.deleteRecursively(dir)
+        }
+    }
+
     @Test
     fun `anything else is refused`() = each { g, rom ->
         val other = rom.copyOf().also { it[0x2000] = (it[0x2000] + 1).toByte() }

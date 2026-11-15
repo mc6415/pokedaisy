@@ -545,7 +545,8 @@ object Gen2Art {
      * versions and colour builds) share their paths, so starting another of them rebuilds them.
      */
     fun extractTo(rom: ByteArray, dir: Path): List<String> {
-        val sha1 = sha1(rom).hex()
+        // A cart RANDOMIZE made (GbRandomizer) has its original's art: only species and moves in its tables moved.
+        val sha1 = GbRandomizer.recognise(rom)?.retailSha1 ?: sha1(rom).hex()
         val t = GAMES.firstOrNull { sha1 in it.sha1s } ?: return emptyList()
         val marker = dir / "gen2/${t.name}-built"
         val stamp = "v$VERSION $sha1"

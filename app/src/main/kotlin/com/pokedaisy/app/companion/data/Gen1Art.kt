@@ -355,7 +355,8 @@ object Gen1Art {
 
     /** Writes [rom]'s art into [dir] if it's a known Gen 1 cart (once per [VERSION]); returns the paths written. */
     fun extractTo(rom: ByteArray, dir: Path): List<String> {
-        val sha1 = sha1(rom).hex()
+        // A cart RANDOMIZE made (GbRandomizer) has its original's art: only species and moves in its tables moved.
+        val sha1 = GbRandomizer.recognise(rom)?.retailSha1 ?: sha1(rom).hex()
         val t = GAMES.firstOrNull { it.sha1 == sha1 } ?: return emptyList()
         val marker = dir / "gen1/scanned-v$VERSION-${sha1.take(12)}"
         if (marker.isFile) return emptyList()
