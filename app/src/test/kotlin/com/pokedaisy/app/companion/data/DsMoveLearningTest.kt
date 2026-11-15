@@ -1,5 +1,6 @@
 package com.pokedaisy.app.companion.data
 
+import okio.Path.Companion.toOkioPath
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -25,7 +26,7 @@ class DsMoveLearningTest {
     @Test fun `level-up moves and the bag's machines`() {
         assumeTrue("no Black 2 ROM at $rom", rom.isFile)
         activeGame = GameKind.BLACK2
-        dir = kotlin.io.path.createTempDirectory("nds-art").toFile().also { assertTrue(NdsArt.extractTo(rom, it)); NdsArt.dir = it }
+        dir = kotlin.io.path.createTempDirectory("nds-art").toFile().also { assertTrue(NdsArt.extractTo(rom.toOkioPath(), it.toOkioPath())); NdsArt.dir = it.toOkioPath() }
         val v = buildSnapshotView(readGen5Telemetry(FixtureMemoryReader.load("black2"), GEN5_BLACK2))
         val t = v.pokedex!!.tables
         assertTrue(MoveLearning.available(t, v.guideTables))
