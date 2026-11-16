@@ -498,7 +498,8 @@ fun RandomizeWindow(flow: RomRandomizeFlow, m: GbaTextMetrics, small: GbaTextMet
     val ready = step as? RomRandomizeFlow.Step.Ready
     val page = flow.page.takeIf { ready != null }
     OptionOverlay(onDismiss = { flow.back() }, modifier = Modifier.widthIn(max = 900.dp)) {
-        Column {
+        // Each page and step starts the D-pad's focus on its own first control (the overlay only does it once, as it opens).
+        com.pokedaisy.app.companion.ui.OverlayPage(step::class to page) { Column {
             OptionTitleWindow(tr("RANDOMIZE"), m, onBack = { flow.back() }.takeIf { step !is RomRandomizeFlow.Step.Making })
             Spacer(Modifier.height(m.u * 4))
             OptionListWindow(m, Modifier.fillMaxWidth()) {
@@ -584,7 +585,7 @@ fun RandomizeWindow(flow: RomRandomizeFlow, m: GbaTextMetrics, small: GbaTextMet
                     }
                 }
             }
-        }
+        } }
     }
     when (choosing.takeIf { ready != null }) {
         "TYPE" -> {

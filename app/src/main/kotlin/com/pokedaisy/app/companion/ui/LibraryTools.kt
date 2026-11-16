@@ -1,5 +1,6 @@
 package com.pokedaisy.app.companion.ui
 
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -59,7 +60,7 @@ fun ToolsPage(
         onColumns(cols)
         val probe = subcompose("probe") { tools.forEach { ToolCard(it, m, small) } }.map { it.measure(Constraints(minWidth = w, maxWidth = w)) }
         val h = probe.maxOfOrNull { it.height } ?: 0
-        val cards = subcompose("cards") { tools.forEachIndexed { i, t -> ToolCard(t, m, small, cursor = i == cursor) } }.map { it.measure(Constraints.fixed(w, h)) }
+        val cards = subcompose("cards") { tools.forEachIndexed { i, t -> ToolCard(t, m, small, cursor = i == cursor, placed = true) } }.map { it.measure(Constraints.fixed(w, h)) }
         val rows = (cards.size + cols - 1) / cols
         // At least the page's height (its weight asks for it), the cards from the top: a smaller layout was centred in it.
         layout(c.maxWidth, (rows * h + (rows - 1).coerceAtLeast(0) * g).coerceAtLeast(c.minHeight)) {
@@ -71,14 +72,18 @@ fun ToolsPage(
 /** A tool's card: the title window's white box, its icon, the name (and NEW) over a line saying what it does,
  * both from the card's top-left padding, so every card's icon and name line up whatever its blurb's length. */
 @Composable
-private fun ToolCard(tool: LibraryTool, m: GbaTextMetrics, small: GbaTextMetrics, cursor: Boolean = false) {
+private fun ToolCard(tool: LibraryTool, m: GbaTextMetrics, small: GbaTextMetrics, cursor: Boolean = false, placed: Boolean = false) {
     val u = m.u
     val interaction = remember { MutableInteractionSource() }
     val focused = interaction.collectIsFocusedAsState().value || cursor
     val label = tr(tool.label)
+    // In a pop-up (RANDOMIZE's STYLE page) the first card is where the D-pad's focus starts; the measuring copy never is.
+    val self = remember { androidx.compose.ui.focus.FocusRequester() }
+    if (placed) LocalOverlayStart.current?.register(self, current = false)
     Row(
         Modifier
             .fillMaxWidth()
+            .focusRequester(self)
             .gbaFocusRing(focused, PixelRoundedShape(u * 3))
             .drawBehind { drawLayeredBox(OptionColors.titleLayers.inPx(u.toPx()), if (focused) OptionColors.rowSelected else OptionColors.titleFill, radius = 3 * u.toPx()) }
             .soundClickable(interactionSource = interaction, indication = null, onClick = tool.open)

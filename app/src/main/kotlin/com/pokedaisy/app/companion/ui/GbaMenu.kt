@@ -790,6 +790,24 @@ fun OptionOverlay(onDismiss: () -> Unit, modifier: Modifier = Modifier, content:
     }
 }
 
+/**
+ * A pop-up's content whose D-pad focus starts afresh whenever [key] changes - a wizard's page or step in one [OptionOverlay]
+ * (RANDOMIZE): the page's current choice if it has one, else its first control, a frame after it composes. The overlay
+ * itself only places the focus once, when it opens, so a new page's rows had none and the D-pad did nothing.
+ */
+@Composable
+fun OverlayPage(key: Any?, content: @Composable () -> Unit) {
+    val stack = LocalOverlayStack.current
+    val start = remember(key) { OverlayStart() }
+    if (stack != null) {
+        androidx.compose.runtime.LaunchedEffect(start) {
+            androidx.compose.runtime.withFrameNanos { }
+            (start.preferred ?: start.first)?.let { runCatching { it.requestFocus() } }
+        }
+    }
+    androidx.compose.runtime.CompositionLocalProvider(LocalOverlayStart provides start.takeIf { stack != null }) { content() }
+}
+
 /** A pop-up's first control and its current choice, as they compose: where its focus starts. */
 class OverlayStart {
     internal var first: FocusRequester? = null
