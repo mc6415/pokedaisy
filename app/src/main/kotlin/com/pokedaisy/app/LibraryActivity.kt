@@ -374,8 +374,13 @@ class LibraryActivity : ComponentActivity() {
 
         setContent {
             AppTheme { com.pokedaisy.app.companion.ui.CompactTextOnSmallWindows {
-                // The library's windows (INFO, RENAME, the pick-lists...) register their BACK here, as on the companion.
-                androidx.compose.runtime.CompositionLocalProvider(com.pokedaisy.app.companion.ui.LocalCompanionBack provides libraryBack) {
+                // The library's windows (INFO, RENAME, the pick-lists...) register their BACK here, as on the companion; and,
+                // as in Settings, an open pop-up takes the D-pad's focus and keeps it (RANDOMIZE's wizard once left it on the
+                // library behind, where A started a game), giving it back to what opened it when it closes.
+                androidx.compose.runtime.CompositionLocalProvider(
+                    com.pokedaisy.app.companion.ui.LocalCompanionBack provides libraryBack,
+                    com.pokedaisy.app.companion.ui.LocalOverlayStack provides overlays,
+                ) {
                     val s = setup
                     when {
                         s != null -> SetupHost(s)
@@ -1982,6 +1987,9 @@ class LibraryActivity : ComponentActivity() {
     }
 
     /** Every window over the main screen (pass keys to them, not the launcher). */
+    /** The pop-ups open over the library, for the D-pad ([com.pokedaisy.app.companion.ui.OverlayStack]). */
+    private val overlays = com.pokedaisy.app.companion.ui.OverlayStack()
+
     private val libraryDialogOpen
         get() = searching || pickingSort || addMenu || renaming != null || deleting != null || gameInfo != null || coverPickerFor != null ||
             pendingImport != null || patcher.step != null || randomizer.step != null || spritePack.step != null || saveLoad != null || backupPick != null || updates.release != null || crashAsk ||

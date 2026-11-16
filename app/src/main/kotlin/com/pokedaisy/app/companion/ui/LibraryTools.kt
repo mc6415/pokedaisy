@@ -80,13 +80,15 @@ private fun ToolCard(tool: LibraryTool, m: GbaTextMetrics, small: GbaTextMetrics
     // In a pop-up (RANDOMIZE's STYLE page) the first card is where the D-pad's focus starts; the measuring copy never is.
     val self = remember { androidx.compose.ui.focus.FocusRequester() }
     if (placed) LocalOverlayStart.current?.register(self, current = false)
+    val overlays = LocalOverlayStack.current
     Row(
         Modifier
             .fillMaxWidth()
             .focusRequester(self)
             .gbaFocusRing(focused, PixelRoundedShape(u * 3))
             .drawBehind { drawLayeredBox(OptionColors.titleLayers.inPx(u.toPx()), if (focused) OptionColors.rowSelected else OptionColors.titleFill, radius = 3 * u.toPx()) }
-            .soundClickable(interactionSource = interaction, indication = null, onClick = tool.open)
+            // A tool opening a pop-up (RANDOMIZE) gets the focus back when it closes.
+            .soundClickable(interactionSource = interaction, indication = null, onClick = { overlays?.lastClicked = self; tool.open() })
             .semantics { contentDescription = label }
             .padding(u * 6),
         verticalAlignment = Alignment.Top,
