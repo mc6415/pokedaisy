@@ -26,16 +26,24 @@ class RomRandomizeFlowTest {
         val modes = o.copy(levelScale = 25, noDuplicates = true, allCatchable = true, trainersKeepType = true,
             monotype = com.pokedaisy.app.companion.data.PokeType.DRAGON, gifts = true)
         assertEquals(modes, RomRandomizeFlow.decode(RomRandomizeFlow.encode(modes)))
-        assertEquals(o.copy(levelScale = 0, gifts = false, evolutions = false, abilities = false),
+        // The options added after a setup was saved read as off.
+        fun before(x: com.pokedaisy.app.companion.data.RomRandomizer.Options) =
+            x.copy(easyEvolutions = false, wildItems = false, tmMoves = false, tmLearners = false, toughTrainers = false)
+        assertEquals(before(o.copy(levelScale = 0, gifts = false, evolutions = false, abilities = false)),
             RomRandomizeFlow.decode(RomRandomizeFlow.encode(o).split(',').take(9).joinToString(",")))
         // EVOLUTIONS and ABILITIES (CHAOS has both): a setup saved before them (fifteen fields) reads with them off.
         assertTrue(o.evolutions && o.abilities)
-        assertEquals(o.copy(evolutions = false, abilities = false), RomRandomizeFlow.decode(RomRandomizeFlow.encode(o).split(',').take(15).joinToString(",")))
+        assertEquals(before(o.copy(evolutions = false, abilities = false)), RomRandomizeFlow.decode(RomRandomizeFlow.encode(o).split(',').take(15).joinToString(",")))
         // GYM TYPES, RIVAL, WILD LEVELS and HABITATS: kept, and off in a setup saved before them (seventeen fields).
         val bosses = o.copy(bossTypes = com.pokedaisy.app.companion.data.RomRandomizer.BossTypes.RANDOM, rivalStarter = true,
             wildLevelScale = 50, habitats = true)
         assertEquals(bosses, RomRandomizeFlow.decode(RomRandomizeFlow.encode(bosses)))
-        assertEquals(o, RomRandomizeFlow.decode(RomRandomizeFlow.encode(bosses).split(',').take(17).joinToString(",")))
+        assertEquals(before(o), RomRandomizeFlow.decode(RomRandomizeFlow.encode(bosses).split(',').take(17).joinToString(",")))
+        // EASY EVOLUTIONS, WILD ITEMS, TM MOVES, TM LEARNERS and TOUGHER TRAINERS: kept, and off in a setup saved before
+        // them (twenty-two fields).
+        val all = o.copy(toughTrainers = true)
+        assertEquals(all, RomRandomizeFlow.decode(RomRandomizeFlow.encode(all)))
+        assertEquals(before(all), RomRandomizeFlow.decode(RomRandomizeFlow.encode(all).split(',').take(22).joinToString(",")))
     }
 
     @Test
@@ -62,9 +70,11 @@ class RomRandomizeFlowTest {
             assertTrue(s.name, RomRandomizeFlow.summary(o, red).isNotEmpty())
         }
         assertEquals(false, RomRandomizeFlow.optionsOf(RomRandomizeFlow.Style.WILD_ONLY).trainers)
-        // Red's trainers hold nothing and its Pokémon have no abilities: CHAOS's held items and abilities aren't promised there.
+        // Red's trainers hold nothing and its Pokémon have no abilities or held items: CHAOS's held items, wild items and
+        // abilities aren't promised there (its easy evolutions and TMs are).
         val redChaos = RomRandomizeFlow.summary(RomRandomizeFlow.optionsOf(RomRandomizeFlow.Style.CHAOS), red)
-        assertEquals(9, redChaos.size)
+        assertEquals(11, redChaos.size)
+        assertTrue(!redChaos.contains(com.pokedaisy.app.companion.i18n.tr("Wild Pokémon hold random items")))
         assertTrue(redChaos.contains(com.pokedaisy.app.companion.i18n.tr("Random evolutions")))
         assertTrue(!redChaos.contains(com.pokedaisy.app.companion.i18n.tr("Random abilities")))
         val nothing = com.pokedaisy.app.companion.data.RomRandomizer.Options(

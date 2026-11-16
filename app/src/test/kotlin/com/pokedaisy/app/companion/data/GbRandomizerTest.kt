@@ -92,10 +92,9 @@ class GbRandomizerTest {
         }
         // Every trainer and wild species is a Pokémon.
         val dexOk: (Int) -> Boolean = if (g.gen == 2) { s -> s in 1..251 } else { s -> s in 1..190 && (a[g.dexOrder + s - 1].toInt() and 0xFF) != 0 }
-        for (at in GbRandomizer.sites(a, g)) if (g.starters.none { it.second == at }) {
-            val v = a[at].toInt() and 0xFF
-            if (g.gen == 2 && v < 0xFF && v > 251) error("${g.title}: ${Integer.toHexString(at)} = $v")
-        }
+        // (The tool's sites also hold levels, items, moves and TM bits now: the species are read through the view.)
+        val v = GbRandomizer.view(a, g)
+        for (s in v.wild.flatten() + v.trainers.map { it.first }) assertTrue("${g.title}: species $s", dexOk(s))
         assertTrue(g.starters.all { dexOk(a[it.second].toInt() and 0xFF) })
     }
 
@@ -244,6 +243,41 @@ class GbRandomizerTest {
     }
 
     @Test
+    fun `EASY EVOLUTIONS leaves no trade`() = each { g, rom ->
+        val made = GbRandomizer.randomize(rom, RunModesCheck.EASY, 71L)!!
+        assertSame(g, GbRandomizer.recognise(made))
+        RunModesCheck.easy(g.title, GbRandomizer.view(rom, g), GbRandomizer.view(made, g), setOf(3))
+    }
+
+    @Test
+    fun `TM MOVES and TM LEARNERS change the TMs, never the HMs`() = each { g, rom ->
+        val made = GbRandomizer.randomize(rom, RunModesCheck.TMS, 72L)!!
+        assertSame(g, GbRandomizer.recognise(made))
+        val n = if (g.gen == 1) 55 else 57
+        fun table(b: ByteArray) = (0 until n).map { b[g.tmMoves + it].toInt() and 0xFF }
+        RunModesCheck.tmTable(g.title, table(rom), table(made), 50)
+        if (g.gen == 2) {
+            // Each species' HM bits (byte 6's from bit 2, byte 7) kept.
+            for (id in 1..251) {
+                val at = g.baseStats + (id - 1) * 0x20 + 24
+                assertEquals("${g.title} $id", rom[at + 6].toInt() and 0xFC, made[at + 6].toInt() and 0xFC)
+                assertEquals("${g.title} $id", rom[at + 7], made[at + 7])
+            }
+        }
+    }
+
+    @Test
+    fun `TOUGHER TRAINERS keeps every trainer's Pokemon and levels`() = each { g, rom ->
+        val made = GbRandomizer.randomize(rom, RunModesCheck.TOUGH, 73L)!!
+        // Red / Blue / Yellow's trainers have no chosen moves: nothing changes there (the wizard hides the row).
+        if (g.gen == 1) return@each assertArrayEquals(g.title, rom.copyOfRange(0x150, rom.size), made.copyOfRange(0x150, made.size))
+        assertSame(g, GbRandomizer.recognise(made))
+        assertEquals(g.title, GbRandomizer.view(rom, g).trainers, GbRandomizer.view(made, g).trainers)
+        // Gen 2's moves parties get their best moves: some lists change.
+        if (g.gen == 2) assertTrue(g.title, GbRandomizer.sites(rom, g).count { rom[it] != made[it] } > 20)
+    }
+
+    @Test
     fun `ZONES give every area one type`() = each { g, rom ->
         for ((mode, seed) in listOf(RomRandomizer.Zones.RANDOM to 51L, RomRandomizer.Zones.TERRAIN to 52L)) {
             val made = GbRandomizer.randomize(rom, RunModesCheck.zonesOptions(mode), seed)!!
@@ -271,6 +305,13 @@ class GbRandomizerTest {
         assertSame(g, GbRandomizer.recognise(a))
         fun read(b: ByteArray) = GbRandomizer.statics(g).map { one -> one.map { b[it].toInt() and 0xFF } }
         checkGifts(g.title, read(rom), read(a))
+        // Trades: each wants one that lives in the wild, nobody gives the same twice.
+        val wild = GbRandomizer.view(a, g).wild.flatten().toSet()
+        val at = g.tradeRetail.indices.map { if (g.gen == 1) g.trades + it * 14 else g.trades + it * 32 + 1 }
+        val wants = at.map { a[it].toInt() and 0xFF }
+        val gets = at.map { a[it + 1].toInt() and 0xFF }
+        assertEquals(g.title, gets.size, gets.toSet().size)
+        assertTrue("${g.title}: $wants not all wild", wants.all { it in wild })
     }
 
     @Test

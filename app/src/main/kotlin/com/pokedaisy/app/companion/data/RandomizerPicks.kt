@@ -279,3 +279,100 @@ internal class CartView(
     /** ZONES: each area's wild species, land and water apart ("<area>:land" / "<area>:water"), and the areas that are caves. */
     val zoned: Map<String, List<Int>> = emptyMap(), val caves: Set<String> = emptySet(),
 )
+
+/**
+ * EASY EVOLUTIONS ([RomRandomizer.Options.easyEvolutions]): every evolution a run can't make on its own becomes one it can,
+ * as each engine numbers its methods ([Rules]). A trade becomes level 37, or a stone when the Pokémon already evolves by
+ * level (SLOWPOKE's second, CLAMPERL's); a trade holding an item becomes, where the game has it (the DS), levelling up
+ * holding that item by day, else the same as a plain trade; an evolution the game can't do at all (FireRed's day / night
+ * friendship with no clock; a beauty, a mossy rock or a magnet where the game has none) becomes the stone [Rules.impossible]
+ * names, or the first one the Pokémon doesn't already use. The target never changes, and nothing else does.
+ */
+internal object EasyEvolutions {
+    class Rules(
+        /** The game's level method, its use-an-item method, and its other methods whose parameter is an item. */
+        val level: Int, val useItem: Int, val itemMethods: Set<Int> = emptySet(),
+        /** Trades (Gen 5's trade for a species too), and a trade holding an item. */
+        val trades: Set<Int>, val tradeItem: Int?,
+        /** Levelling up holding an item by day (the DS); null: the game has none. */
+        val holdDay: Int?,
+        /** Methods the game can't do, and the stone each becomes (null: the first free one). */
+        val impossible: Map<Int, Int?> = emptyMap(),
+        /** The stones, in the order handed out; empty: never a stone (Gen 1's item entries are a byte longer). */
+        val stones: List<Int>,
+    )
+
+    /** One species' evolutions ([entries]: method, parameter) as they become. */
+    fun convert(entries: List<Pair<Int, Int>>, r: Rules): List<Pair<Int, Int>> {
+        val used = entries.filter { it.first == r.useItem || it.first in r.itemMethods }.map { it.second }.toMutableSet()
+        var hasLevel = entries.any { it.first == r.level }
+        fun stone(want: Int? = null): Pair<Int, Int>? {
+            val s = want?.takeIf { it !in used } ?: r.stones.firstOrNull { it !in used } ?: return null
+            used += s
+            return r.useItem to s
+        }
+        fun levelOrStone(): Pair<Int, Int> =
+            if (!hasLevel) { hasLevel = true; r.level to LEVEL } else stone() ?: (r.level to LEVEL)
+        return entries.map { (m, p) ->
+            when {
+                m == r.tradeItem && r.holdDay != null -> r.holdDay to p
+                m in r.trades || (m == r.tradeItem && r.tradeItem != null) -> levelOrStone()
+                m in r.impossible -> stone(r.impossible[m]) ?: levelOrStone()
+                else -> m to p
+            }
+        }
+    }
+
+    /** What a trade becomes: UPR's level for it. */
+    const val LEVEL = 37
+}
+
+/**
+ * TM MOVES / TM LEARNERS ([RomRandomizer.Options.tmMoves], [RomRandomizer.Options.tmLearners]), the same on every engine: a
+ * new move for each TM (the HMs keep theirs: the story needs them), none twice, most of them ones that do damage; and who
+ * learns each TM picked again, likelier for a Pokémon sharing the move's type, a fair few for a NORMAL move, fewer for any
+ * other. HMs' learners stay the game's.
+ */
+internal object TmPicks {
+    /** [count] TM moves from [pool] (never an HM's), about two in three of them [damaging]. */
+    fun moves(count: Int, pool: List<Int>, damaging: Set<Int>, rnd: Random): List<Int> {
+        val hits = pool.filter { it in damaging }.shuffled(rnd)
+        val rest = pool.filter { it !in damaging }.shuffled(rnd)
+        val want = (count * 2 + 2) / 3
+        val out = (hits.take(want) + rest.take(count - minOf(want, hits.size))).toMutableList()
+        // Too few of either kind: fill from what's left.
+        val left = (hits.drop(want) + rest.drop(count - minOf(want, hits.size))).shuffled(rnd)
+        out += left.take(count - out.size)
+        return out.shuffled(rnd).take(count)
+    }
+
+    /** Whether a Pokémon of [types] learns a move of [moveType] ([normal]: the generation's NORMAL). */
+    fun learns(types: Set<Int>, moveType: Int, normal: Int, rnd: Random): Boolean = rnd.nextInt(100) < when {
+        moveType in types -> 90
+        moveType == normal -> 50
+        else -> 25
+    }
+}
+
+/**
+ * TOUGHER TRAINERS ([RomRandomizer.Options.toughTrainers]): the four moves a trainer's Pokémon fights with, from all it has
+ * learnt by its level ([pick]): its three best hits of different types (power x accuracy, half again for its own type),
+ * then its newest move that doesn't do damage (a stat boost, sleep, poison), else its next best hit, else what's left.
+ */
+internal object BestMoves {
+    class Move(val power: Int, val accuracy: Int, val type: Int)
+
+    fun pick(known: List<Int>, info: (Int) -> Move, own: Set<Int>): List<Int> {
+        if (known.size <= 4) return known
+        fun score(m: Int) = info(m).let { it.power * (if (it.accuracy in 1..100) it.accuracy else 100) * (if (it.type in own) 3 else 2) }
+        // Power 1 is the games' "varies" (fixed-damage moves and the like): neither a hit to rank nor a status move.
+        val hits = known.filter { info(it).power > 1 }.sortedByDescending(::score)
+        val out = ArrayList<Int>()
+        val types = HashSet<Int>()
+        for (m in hits) if (out.size < 3 && types.add(info(m).type)) out += m
+        known.lastOrNull { info(it).power == 0 }?.let { if (out.size < 4) out += it }
+        for (m in hits) if (out.size < 4 && m !in out) out += m
+        for (m in known.asReversed()) if (out.size < 4 && m !in out) out += m
+        return out
+    }
+}

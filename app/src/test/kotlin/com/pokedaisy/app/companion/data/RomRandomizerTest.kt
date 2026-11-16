@@ -219,6 +219,70 @@ class RomRandomizerTest {
     }
 
     @Test
+    fun `EASY EVOLUTIONS leaves no trade, and WILD ITEMS gives wild Pokemon items`() = each { g, rom ->
+        val made = RomRandomizer.randomize(rom, RunModesCheck.EASY, 71L)!!
+        assertEquals(g.title, g, RomRandomizer.recognise(made))
+        val frlg = g.code == "BPRE" || g.code == "BPGE"
+        RunModesCheck.easy(g.title, RomRandomizer.view(rom, g), RomRandomizer.view(made, g), if (frlg) setOf(5, 6, 2, 3, 15) else setOf(5, 6))
+        // Held items (base stats +12 / +14): some species hold one, none holds the same in both slots.
+        val held = (1..411).map { u16(made, g.baseStats + it * 28 + 12) to u16(made, g.baseStats + it * 28 + 14) }
+        assertTrue(g.title, held.count { it.first != 0 } > 50)
+        assertTrue(g.title, held.none { it.first != 0 && it.first == it.second })
+    }
+
+    @Test
+    fun `TM MOVES and TM LEARNERS change the TMs, never the HMs`() = each { g, rom ->
+        val made = RomRandomizer.randomize(rom, RunModesCheck.TMS, 72L)!!
+        assertEquals(g.title, g, RomRandomizer.recognise(made))
+        fun table(b: ByteArray, at: Int) = (0 until 58).map { u16(b, at + it * 2) }
+        for (t in g.tmMoves) {
+            RunModesCheck.tmTable(g.title, table(rom, t), table(made, t), 50)
+            assertEquals(g.title, table(made, g.tmMoves[0]), table(made, t))
+        }
+        // Learners: each species' HM bits (50-57) kept, its TM bits often changed.
+        fun row(b: ByteArray, s: Int) = (0 until 8).fold(0L) { a, k -> a or ((b[g.tmLearnsets + s * 8 + k].toLong() and 0xFF) shl (8 * k)) }
+        var changed = 0
+        for (s in 1..411) {
+            val was = row(rom, s); val now = row(made, s)
+            assertEquals("${g.title} species $s HMs", was ushr 50, now ushr 50)
+            if (was and ((1L shl 50) - 1) != now and ((1L shl 50) - 1)) changed++
+        }
+        assertTrue("${g.title}: $changed species' TMs changed", changed > 300)
+    }
+
+    @Test
+    fun `TOUGHER TRAINERS gives bosses perfect IVs and changes chosen moves, nothing else`() = each { g, rom ->
+        val made = RomRandomizer.randomize(rom, RunModesCheck.TOUGH, 73L)!!
+        assertEquals(g.title, g, RomRandomizer.recognise(made))
+        val retail = RomRandomizer.view(rom, g)
+        val now = RomRandomizer.view(made, g)
+        // The same Pokémon at the same levels.
+        assertEquals(g.title, retail.trainers, now.trainers)
+        // Each boss's Pokémon: IV byte 255 (party +0).
+        var bosses = 0
+        var changed = 0
+        for (t in 1 until g.trainerCount) {
+            val at = g.trainers + t * 40
+            val cls = made[at + 1].toInt() and 0xFF
+            val flags = made[at].toInt() and 0xFF
+            val party = (u16(made, at + 36) or (u16(made, at + 38) shl 16)) - 0x08000000
+            val stride = if (flags and 1 != 0) 16 else 8
+            for (i in 0 until (made[at + 32].toInt() and 0xFF)) {
+                val m = party + i * stride
+                if (cls in g.bossClasses) { bosses++; assertEquals("${g.title} trainer $t", 255, u16(made, m)) }
+                if (flags and 1 != 0) {
+                    val mv = m + if (flags and 2 != 0) 8 else 6
+                    if ((0 until 8).any { made[mv + it] != rom[mv + it] }) changed++
+                    val list = (0 until 4).map { u16(made, mv + it * 2) }.filter { it != 0 }
+                    assertEquals("${g.title} trainer $t: a move twice", list.size, list.toSet().size)
+                }
+            }
+        }
+        assertTrue(g.title, bosses > 10)
+        assertTrue("${g.title}: $changed move lists changed", changed > 20)
+    }
+
+    @Test
     fun `ZONES give every area one type`() = each { g, rom ->
         for ((mode, seed) in listOf(RomRandomizer.Zones.RANDOM to 51L, RomRandomizer.Zones.TERRAIN to 52L)) {
             val made = RomRandomizer.randomize(rom, RunModesCheck.zonesOptions(mode), seed)!!
@@ -246,5 +310,14 @@ class RomRandomizerTest {
         assertEquals(g.title, g, RomRandomizer.recognise(a))
         fun read(b: ByteArray) = RomRandomizer.statics(g).map { one -> one.map { (b[it].toInt() and 0xFF) or ((b[it + 1].toInt() and 0xFF) shl 8) } }
         checkGifts(g.title, read(rom), read(a))
+        // Trades: each wants one that lives in the wild, nobody gives the same twice, and the GUIDE names the new pair.
+        val wild = RomRandomizer.view(a, g).wild.flatten().toSet()
+        val gets = g.tradeRetail.indices.map { u16(a, g.tradeTable + it * 0x3C + 0x0C) }
+        val wants = g.tradeRetail.indices.map { u16(a, g.tradeTable + it * 0x3C + 0x38) }
+        assertEquals(g.title, gets.size, gets.toSet().size)
+        assertTrue("${g.title}: $wants not all wild", wants.all { it in wild })
+        assertTrue(g.title, gets.indices.count { gets[it] != g.tradeRetail[it].first } >= gets.size / 2)
+        val guide = RomRandomizer.guide(a, g).trades!!
+        for ((k, was) in g.tradeRetail.withIndex()) assertEquals(g.title, gets[k] to wants[k], guide["${was.first}/${was.second}"])
     }
 }

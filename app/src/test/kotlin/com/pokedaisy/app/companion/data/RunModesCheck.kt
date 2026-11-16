@@ -89,6 +89,36 @@ internal object RunModesCheck {
         assertTrue("$title: only ${landTypes.size} zone types", landTypes.size >= 5)
     }
 
+    /** EASY EVOLUTIONS and WILD ITEMS, nothing else. */
+    val EASY = RomRandomizer.Options(RomRandomizer.Starters.OFF, RomRandomizer.Wild.OFF, false, easyEvolutions = true, wildItems = true)
+
+    /** TOUGHER TRAINERS, nothing else. */
+    val TOUGH = RomRandomizer.Options(RomRandomizer.Starters.OFF, RomRandomizer.Wild.OFF, false, toughTrainers = true)
+
+    /** TM MOVES and TM LEARNERS, nothing else. */
+    val TMS = RomRandomizer.Options(RomRandomizer.Starters.OFF, RomRandomizer.Wild.OFF, false, tmMoves = true, tmLearners = true)
+
+    /** [TMS]' table read back: the TMs all different and mostly new, the HMs' moves as they were and never a TM's. */
+    fun tmTable(title: String, retail: List<Int>, made: List<Int>, tms: Int) {
+        assertEquals(title, retail.size, made.size)
+        assertEquals("$title HMs", retail.drop(tms), made.drop(tms))
+        val now = made.take(tms)
+        assertEquals("$title: a TM twice", tms, now.toSet().size)
+        assertTrue("$title: an HM's move on a TM", now.none { it in retail.drop(tms) })
+        assertTrue("$title: few TMs changed", now.indices.count { now[it] != retail[it] } > tms * 3 / 4)
+    }
+
+    /** [EASY] read back: every evolution where it was with its target, none left by [gone] (trades and what the game can't
+     * do), some changed, and none changed that wasn't one. */
+    fun easy(title: String, retail: CartView, made: CartView, gone: Set<Int>) {
+        assertEquals(title, retail.evolutions.map { it.first to it.third }, made.evolutions.map { it.first to it.third })
+        assertTrue("$title has none of them", retail.evolutions.any { it.second in gone })
+        for ((i, e) in made.evolutions.withIndex()) {
+            assertTrue("$title: ${e.first} > ${e.third} still by ${e.second}", e.second !in gone)
+            if (retail.evolutions[i].second !in gone) assertEquals("$title ${e.first} > ${e.third}", retail.evolutions[i].second, e.second)
+        }
+    }
+
     fun spread(title: String, retail: CartView, made: CartView, without: CartView) {
         for ((i, t) in made.trainers.withIndex()) {
             val was = retail.types(retail.trainers[i].first)

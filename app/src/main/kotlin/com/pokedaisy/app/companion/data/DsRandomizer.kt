@@ -20,6 +20,19 @@ import kotlin.random.Random
  * together), which is cheap next to hashing a 128-512 MB cart; [readShuffle] gives the GUIDE the shuffled wild sets and teams.
  */
 object DsRandomizer {
+    /** The DS games' stones (EASY EVOLUTIONS: Water, Thunder, Fire, Leaf, Moon, Sun, Dawn, Dusk, Shiny) and the items a wild
+     * Pokémon may hold (WILD ITEMS: the berries, 149-212, and the held items after them). */
+    private const val THUNDER_STONE = 83
+    private const val LEAF_STONE = 85
+    private val DS_STONES = listOf(84, THUNDER_STONE, 82, LEAF_STONE, 81, 80, 109, 108, 107)
+    /** The TMs' moves (TM01 on; the HMs not among them): Gen 4's 92, Gen 5's 95 (Black 2 / White 2 keep Black's). */
+    private fun tmMovesOf(g: Game): List<Int> = when {
+        g.gen == 5 -> tmMovesBlack.take(95)
+        g.hgss -> tmMovesHeartGold.take(92)
+        else -> tmMovesPlatinum.take(92)
+    }
+    private val DS_HELD = (149..280).toList()
+
     class Game(
         val code: String,
         val rev: Int,
@@ -130,7 +143,7 @@ object DsRandomizer {
 
     val GAMES = listOf(
         Game(
-            "CPUE", 1, "Platinum", "5d5cabda01a05c31d9fa94864ddecc82d254d8f3", "aac272136dd5607ae0cbeb126788253d848cbf0e",
+            "CPUE", 1, "Platinum", "5d5cabda01a05c31d9fa94864ddecc82d254d8f3", "9dfb998e65743f070bfad3d796e468c06a132578",
             starterOverlay = 78, starterOffsets = listOf(0x1BC0, 0x1BC4, 0x1BC8),
             encounters = "/fielddata/encountdata/pl_enc_data.narc",
             trainers = "/poketool/trainer/trdata.narc", trainerParties = "/poketool/trainer/trpoke.narc",
@@ -145,8 +158,8 @@ object DsRandomizer {
             bossClasses = setOf(62, 64, 65, 66, 67, 68, 69) + (74..79), rivalClasses = setOf(63),
         ),
     ) + listOf(
-        Triple("IPKE", "HeartGold", "eae1ff0c304d5649a415f6cab09ae525b2a9dd46" to "07d7b3c921a5e9a4b899ac463ef91ed920c782ed"),
-        Triple("IPGE", "SoulSilver", "c952be7a10f9b8d4ffd299ccc6d0fada08ab5402" to "f0b8196269b7663d1ce0a9beeec7cad078d16121"),
+        Triple("IPKE", "HeartGold", "eae1ff0c304d5649a415f6cab09ae525b2a9dd46" to "1597fe20f1748f3fa82d42a702aade71555bb9d4"),
+        Triple("IPGE", "SoulSilver", "c952be7a10f9b8d4ffd299ccc6d0fada08ab5402" to "e362df4f8d369b83ed3d48ae66251ca0802a1700"),
     ).map { (code, title, hashes) ->
         // pret/pokeheartgold: choose_starter.c's species (ARM9), choose_starter_app.c's sSpecies (overlay 61), msg_0190.
         Game(
@@ -159,8 +172,8 @@ object DsRandomizer {
             bossClasses = setOf(66, 67, 70, 72, 73, 74, 75, 76, 86, 87, 88, 89, 98) + (103..110) + setOf(112), rivalClasses = setOf(23),
         )
     } + listOf(
-        Triple("IRBO", "Black", "0755b5db26c5b4ba029c3490b46e16681a667526" to "c83532883d42091842fec63eb59050caff7ab49b"),
-        Triple("IRAO", "White", "d374a4cd16883bba0bbed6858a2110b88f9a45e0" to "dfd0373012ab9eae4e6de84c834c8d34df570c90"),
+        Triple("IRBO", "Black", "0755b5db26c5b4ba029c3490b46e16681a667526" to "706789866d8bce6721ab69fed7ac9838bb83bb5d"),
+        Triple("IRAO", "White", "d374a4cd16883bba0bbed6858a2110b88f9a45e0" to "17a27c4e41c6f9f792b7ca6e3d50e03bb52429cb"),
     ).map { (code, title, hashes) ->
         // No decomp: the archives from the cart (scripts/gen_gen5_guide.py's FILES_BW), the choice screen overlay 223's list.
         Game(
@@ -173,8 +186,8 @@ object DsRandomizer {
             bossClasses = setOf(10, 11, 12, 19, 20, 21, 22, 23, 54, 55, 56, 78, 79, 80, 81, 89), rivalClasses = setOf(37, 38),
         )
     } + listOf(
-        Triple("IREO", "Black 2", "88ce3290c2ef6b921388ffea79166a14905e5488" to "771d0f9fd21299a5a4e07e9f8440672b57bf0f6b"),
-        Triple("IRDO", "White 2", "219c256de4c963766639d41436fffdfa5f01851d" to "1bacb4014bd8c9982550874993e92f2ad1f4cd45"),
+        Triple("IREO", "Black 2", "88ce3290c2ef6b921388ffea79166a14905e5488" to "ed4fa539e0fa10c7be947156b6abada9acae8483"),
+        Triple("IRDO", "White 2", "219c256de4c963766639d41436fffdfa5f01851d" to "0679de5cefd95ada2f93ba25a85bba8ba51d7260"),
     ).map { (code, title, hashes) ->
         // pret has no decomp of these: the archives from the cart (scripts/gen_gen5_guide.py reads the same ones).
         Game(
@@ -470,7 +483,12 @@ object DsRandomizer {
             if (zeroed) {
                 statSites(pe) { at -> for (i in 0 until 6) pe[at + i] = 0 }
                 abilitySites(pe) { at -> pe[at] = 0 }
-                evolutionTargets(ev) { _, at -> ev[at] = 0; ev[at + 1] = 0 }
+                // Each evolution's whole entry: EASY EVOLUTIONS writes its method and parameter too.
+                evolutionTargets(ev) { _, at -> for (i in -4 until 2) ev[at + i] = 0 }
+                // WILD ITEMS: both held items.
+                heldItemSites(pe) { at -> for (i in 0 until 4) pe[at + i] = 0 }
+                // TM LEARNERS: the TM bits' 12 bytes (Gen 4's 92 TMs, Gen 5's 95).
+                tmBitSites(pe) { at -> for (i in 0 until 12) pe[at + i] = 0 }
                 learnSites(le) { at, len -> for (i in 0 until len) le[at + i] = 0 }
                 g.packedStarters?.let { ps ->
                     for (k in 0 until 3 * ps.width) { ps.arm9Offset?.let { a9[it + k] = 0 }; po[ps.overlayOffset + k] = 0 }
@@ -480,6 +498,8 @@ object DsRandomizer {
                 encounterSites(g.gen, Narc(e), { _, at, width -> for (i in 0 until width) e[at + i] = 0 }, g.hgss)
                 levelSites(g.gen, Narc(e), g.hgss) { at -> e[at] = 0 }
                 trainerMons(Narc(p)) { at, moves ->
+                    // TOUGHER TRAINERS: the difficulty byte.
+                    p[at] = 0
                     p[at + 2] = 0
                     p[at + 4] = 0; p[at + 5] = 0
                     // Gen 5's form word goes with the species.
@@ -537,6 +557,19 @@ object DsRandomizer {
         fun statSites(d: ByteArray, each: (at: Int) -> Unit) {
             val n = Narc(d)
             for (s in 1..minOf(g.speciesCount, n.size - 1)) if (n.end(s) - n.start(s) >= 6) each(n.start(s))
+        }
+
+        /** Each species' TM bits' place in [d] (the species records: Gen 4's +0x1C, Gen 5's +0x28). */
+        fun tmBitSites(d: ByteArray, each: (at: Int) -> Unit) {
+            val n = Narc(d)
+            val off = if (g.gen == 5) 0x28 else 0x1C
+            for (s in 1..minOf(g.speciesCount, n.size - 1)) if (n.end(s) - n.start(s) >= off + 12) each(n.start(s) + off)
+        }
+
+        /** Each species' two held items' place in [d] (the species records: +0x0C, both u16). */
+        fun heldItemSites(d: ByteArray, each: (at: Int) -> Unit) {
+            val n = Narc(d)
+            for (s in 1..minOf(g.speciesCount, n.size - 1)) if (n.end(s) - n.start(s) >= 0x10) each(n.start(s) + 0x0C)
         }
 
         /** Each species' ability bytes in [d] (the species records): Gen 4's two at 0x16 / 0x17, Gen 5's three at 0x18-0x1A
@@ -937,6 +970,10 @@ object DsRandomizer {
             if (o.baseStats) baseStats()
             if (o.learnsets) learnsets()
             if (o.abilities) abilities()
+            if (o.easyEvolutions) easyEvolutions()
+            if (o.wildItems) wildItems()
+            // TM MOVES isn't done on the DS yet (its table sits in the ARM9 code): TM LEARNERS goes by the game's own TMs.
+            if (o.tmLearners) tmLearners()
             // Before the starters: "evolve twice" goes by the new evolutions.
             if (o.evolutions) evolutions()
             starters()
@@ -949,7 +986,92 @@ object DsRandomizer {
             if (o.trainers) trainers()
             rivals()
             if (o.trainerItems) trainerItems()
+            if (o.toughTrainers) toughTrainers()
             if (o.fieldItems) fieldItems()
+        }
+
+        /** TOUGHER TRAINERS: each trainer Pokémon with chosen moves gets its best ([BestMoves]: a move's record has Gen 4's
+         * power / type / accuracy at +3 / +4 / +5, Gen 5's at +3 / +0 / +4); the bosses' and the rival's difficulty byte
+         * (a party Pokémon's +0: 0-255 = 0-31 in every IV) goes to 255. */
+        fun toughTrainers() {
+            fun info(m: Int): BestMoves.Move {
+                if (m !in 1 until moveData.size) return BestMoves.Move(0, 100, -1)
+                val r = moveData.member(m)
+                fun at(i: Int) = r[i].toInt() and 0xFF
+                return if (g.gen == 5) BestMoves.Move(at(3), at(4), at(0)) else BestMoves.Move(at(3), at(5), at(4))
+            }
+            val pn = Narc(f.personal)
+            f.trainerMonsOf(Narc(f.parties)) { t, at, moves ->
+                val species = u16(f.parties, at + 4) and speciesMask(g.gen)
+                if (species !in 1..g.speciesCount) return@trainerMonsOf
+                if (moves >= 0 && species < pn.size) {
+                    val own = pn.member(species).let { setOf(it[6].toInt() and 0xFF, it[7].toInt() and 0xFF) }
+                    val list = BestMoves.pick(knownAt(species, f.parties[at + 2].toInt() and 0xFF), ::info, own)
+                    for (k in 0 until 4) put16(f.parties, moves + k * 2, list.getOrElse(k) { 0 })
+                }
+                val cls = f.trainerClass(t)
+                if (cls in g.bossClasses || cls in g.rivalClasses) f.parties[at] = 255.toByte()
+            }
+        }
+
+        /**
+         * EASY EVOLUTIONS ([EasyEvolutions]): Gen 4's methods (4 level, 7 stone, 5 trade, 6 trade holding an item -> 18,
+         * levelling up holding it by day; 16 / 17 a stone by gender) and Gen 5's (one later from 7, its trade for a species).
+         * HeartGold / SoulSilver have no Poffins, mossy / icy rock or magnetic cave: their beauty (15), magnet (24, Thunder
+         * Stone), moss (25, Leaf Stone) and ice (26) become stones. Unova has no way to raise beauty either (16).
+         */
+        fun easyEvolutions() {
+            val rules = if (g.gen == 5) EasyEvolutions.Rules(
+                level = 4, useItem = 8, itemMethods = setOf(17, 18), trades = setOf(5, 7), tradeItem = 6, holdDay = 19,
+                impossible = mapOf(16 to null), stones = DS_STONES,
+            ) else EasyEvolutions.Rules(
+                level = 4, useItem = 7, itemMethods = setOf(16, 17), trades = setOf(5), tradeItem = 6, holdDay = 18,
+                impossible = if (g.hgss) mapOf(15 to null, 24 to THUNDER_STONE, 25 to LEAF_STONE, 26 to null) else emptyMap(),
+                stones = DS_STONES,
+            )
+            val d = f.evo
+            val n = Narc(d)
+            for (s in 1..minOf(g.speciesCount, n.size - 1)) {
+                val at = (0 until 7).map { n.start(s) + it * 6 }.filter { it + 6 <= n.end(s) && u16(d, it) != 0 }
+                val now = EasyEvolutions.convert(at.map { u16(d, it) to u16(d, it + 2) }, rules)
+                at.forEachIndexed { i, a -> put16(d, a, now[i].first); put16(d, a + 2, now[i].second) }
+            }
+        }
+
+        /** WILD ITEMS: each species' two held items (its record's +0x0C, 50%; +0x0E, 5%) from the berries and held items
+         * (149-280: both generations number them alike); about a quarter get a common one, most a rare one. */
+        fun wildItems() {
+            val d = f.personal
+            val n = Narc(d)
+            for (s in 1..minOf(g.speciesCount, n.size - 1)) {
+                if (n.end(s) - n.start(s) < 0x10) continue
+                val at = n.start(s) + 0x0C
+                val common = if (rnd.nextInt(100) < 25) DS_HELD.random(rnd) else 0
+                var rare = if (rnd.nextInt(100) < 60) DS_HELD.random(rnd) else 0
+                if (rare == common) rare = 0
+                put16(d, at, common)
+                put16(d, at + 2, rare)
+            }
+        }
+
+        /** TM LEARNERS ([TmPicks]): each species' TM bits (Gen 4's 92 from its record's +0x1C, Gen 5's 95 from +0x28); the HMs'
+         * after them stay. A move's type is its record's +4 (Gen 4) or +0 (Gen 5). */
+        fun tmLearners() {
+            val tms = tmMovesOf(g)
+            val types = tms.map { m -> moveData.member(m).let { (it[if (g.gen == 5) 0 else 4].toInt() and 0xFF) } }
+            val d = f.personal
+            val n = Narc(d)
+            val off = if (g.gen == 5) 0x28 else 0x1C
+            for (s in 1..minOf(g.speciesCount, n.size - 1)) {
+                if (n.end(s) - n.start(s) < off + 12) continue
+                val at = n.start(s) + off
+                val mine = setOf(d[n.start(s) + 6].toInt() and 0xFF, d[n.start(s) + 7].toInt() and 0xFF)
+                for (tm in tms.indices) {
+                    val bit = 1 shl (tm % 8)
+                    val v = d[at + tm / 8].toInt() and 0xFF
+                    d[at + tm / 8] = (if (TmPicks.learns(mine, types[tm], 0, rnd)) v or bit else v and bit.inv()).toByte()
+                }
+            }
         }
 
         /** ABILITIES: each species' slots (Gen 5's hidden one too; an empty slot stays empty). */
@@ -1208,7 +1330,10 @@ object DsRandomizer {
 
         /** The last four moves [species] has learnt by [level] (Platinum's wotbl: move | level << 9, to 0xFFFF; Gen 5's:
          * (move, level) pairs, to a 0xFFFF move). */
-        fun movesAt(species: Int, level: Int): List<Int> {
+        fun movesAt(species: Int, level: Int): List<Int> = knownAt(species, level).takeLast(4)
+
+        /** Every move [species] has learnt by [level], once each, in the order it learns them. */
+        fun knownAt(species: Int, level: Int): List<Int> {
             val m = learn.member(species)
             val known = ArrayList<Int>()
             val step = if (g.gen == 5) 4 else 2
@@ -1217,10 +1342,7 @@ object DsRandomizer {
                 val move = if (g.gen == 5) u16(m, i) else u16(m, i) and 0x1FF
                 val at = if (g.gen == 5) u16(m, i + 2) else u16(m, i) shr 9
                 if (at > level) break
-                if (move !in known) {
-                    if (known.size == 4) known.removeAt(0)
-                    known += move
-                }
+                if (move !in known) known += move
                 i += step
             }
             return known

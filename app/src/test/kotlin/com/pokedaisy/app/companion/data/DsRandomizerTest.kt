@@ -255,6 +255,17 @@ class DsRandomizerTest {
         RunModesCheck.spread(g.title, retail, made(RunModesCheck.SPREAD, 22L, "spread"), made(RunModesCheck.SPREAD.copy(allCatchable = false), 22L, "without"))
         for ((mode, seed) in listOf(RomRandomizer.BossTypes.OWN to 41L, RomRandomizer.BossTypes.RANDOM to 42L))
             RunModesCheck.bosses(g.title, g.gen, retail, made(RunModesCheck.BOSSES.copy(bossTypes = mode), seed, "bosses-$mode"), mode)
+        // EASY EVOLUTIONS: no trade (Gen 5's for a species too), nor what the game can't do.
+        val gone = when {
+            g.gen == 5 -> setOf(5, 6, 7, 16)
+            g.hgss -> setOf(5, 6, 15, 24, 25, 26)
+            else -> setOf(5, 6)
+        }
+        RunModesCheck.easy(g.title, retail, made(RunModesCheck.EASY, 71L, "easy"), gone)
+        // TM LEARNERS (TM MOVES is left alone on the DS): made inside the tool's own places, so recognised.
+        made(RunModesCheck.TMS, 72L, "tms")
+        // TOUGHER TRAINERS: the same Pokémon at the same levels.
+        assertEquals(g.title, retail.trainers, made(RunModesCheck.TOUGH, 73L, "tough").trainers)
         for ((mode, seed) in listOf(RomRandomizer.Zones.RANDOM to 51L, RomRandomizer.Zones.TERRAIN to 52L))
             RunModesCheck.zones(g.title, g.gen, made(RunModesCheck.zonesOptions(mode), seed, "zones-$mode"), mode)
     }

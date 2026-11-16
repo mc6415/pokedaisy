@@ -40,6 +40,12 @@ object GbRandomizer {
         val moves: Int = 0,
         /** Where the maps' item balls and hidden items are found (null: none read). */
         val field: Field? = null,
+        /** TechnicalMachines / TMHMMoves: TM01-TM50's move bytes, then the HMs'. */
+        val tmMoves: Int = 0,
+        /** GIFTS' trades: TradeMons (Gen 1, 14 bytes a trade: wanted, given) / NPCTrades (Gen 2, 32: dialog, wanted, given),
+         * and each trade's retail (wanted, given), for the GUIDE. */
+        val trades: Int = 0,
+        val tradeRetail: List<Pair<Int, Int>> = emptyList(),
     ) {
         /** The untouched cart's CRC32 (EXPAND's tables go by it). */
         val retailCrc: Int get() = CRCS.getValue(title)
@@ -66,6 +72,12 @@ object GbRandomizer {
 
     private fun redField(hiddenItems: Int) = Field(0x01AE, 0xE799, 0xC23D, 0x46A40, 0x46A96, hiddenItems, 0xCAEA, hiddenItems + 0x30)
 
+    /** The TMs (TM01-TM50; HMs after them). */
+    private const val TMS = 50
+
+    /** Gen 2's stones (EASY EVOLUTIONS): Water, Thunder, Fire, Leaf, Moon, Sun. */
+    private val GEN2_STONES = listOf(0x18, 0x17, 0x16, 0x22, 0x08, 0xA9)
+
     private val CRCS = mapOf(
         "Red" to 0x9F7FDD53.toInt(), "Blue" to 0xD6DA8A1A.toInt(), "Yellow" to 0x7D527D62, "Gold" to 0x6BDE3C3E,
         "Silver" to 0x8AD48636.toInt(), "Crystal" to 0x3358E30A,
@@ -88,24 +100,30 @@ object GbRandomizer {
     }
 
     val GAMES = listOf(
-        Game("Red", "ea9bcae617fdf159b045185467ae58b2e4a48b9a", "9be7ad21c3c62f5f5194a96751d29f1ebebdf3e5", 1, listOf(0xCEEB), 0x39D3B, 47, 0x383DE, 0x3B05C,
+        Game("Red", "ea9bcae617fdf159b045185467ae58b2e4a48b9a", "4f43910b893d73b65805dd32cfab0a64d6368d9b", 1, listOf(0xCEEB), 0x39D3B, 47, 0x383DE, 0x3B05C,
             dexOrder = 0x41024, mewStats = 0x425B, starters = red(blue = false), trainersEnd = 0x3A52E, moves = 0x38000,
-            field = redField(0x76688)),
-        Game("Blue", "d7037c83e1ae5b39bde3c30787637ba1d4c48ce2", "02860b473d2fe6822706d641100d27db0e4b5e2c", 1, listOf(0xCEEB), 0x39D3B, 47, 0x383DE, 0x3B05C,
+            field = redField(0x76688), tmMoves = 0x13773,
+            trades = 0x71B7B, tradeRetail = listOf(0xA7 to 0xA8, 0x94 to 0x2A, 0x7D to 0x72, 0xA3 to 0x3A, 0x05 to 0x40, 0x08 to 0x0B, 0x6E to 0x48, 0x55 to 0x8D, 0x41 to 0x1E, 0x03 to 0x0F)),
+        Game("Blue", "d7037c83e1ae5b39bde3c30787637ba1d4c48ce2", "2385d0764b0a479982f2de6062e58855e62c14de", 1, listOf(0xCEEB), 0x39D3B, 47, 0x383DE, 0x3B05C,
             dexOrder = 0x41024, mewStats = 0x425B, starters = red(blue = true), trainersEnd = 0x3A52E, moves = 0x38000,
-            field = redField(0x76689)),
-        Game("Yellow", "cc7d03262ebfaf2f06772c1a480c7d9d5f4a38e1", "2363a42659fb3688dea07683ccb1f11754244f97", 1, listOf(0xCB95), 0x39DD1, 47, 0x383DE, 0x3B1E5,
+            field = redField(0x76689), tmMoves = 0x13773,
+            trades = 0x71B7B, tradeRetail = listOf(0xA7 to 0xA8, 0x94 to 0x2A, 0x7D to 0x72, 0xA3 to 0x3A, 0x05 to 0x40, 0x08 to 0x0B, 0x6E to 0x48, 0x55 to 0x8D, 0x41 to 0x1E, 0x03 to 0x0F)),
+        Game("Yellow", "cc7d03262ebfaf2f06772c1a480c7d9d5f4a38e1", "b44516b2ceae3825fc6dbff2e591344104aba31e", 1, listOf(0xCB95), 0x39DD1, 47, 0x383DE, 0x3B1E5,
             dexOrder = 0x410B1, trainersEnd = 0x3A5B2, moves = 0x38000,
-            field = Field(0xFC1F2, 0xE6DD, 0xFC3E4, 0xF268D, 0, 0x75F74, 0xC892, 0x75FAA)),
-        Game("Gold", "d8b8a3600a465308c9953dfa04f0081c05bdcb94", "b04a379e25dea7e1b66bd2f414dba018f2cc186f", 2,
+            field = Field(0xFC1F2, 0xE6DD, 0xFC3E4, 0xF268D, 0, 0x75F74, 0xC892, 0x75FAA), tmMoves = 0x1232D,
+            trades = 0x71C1D, tradeRetail = listOf(0x0B to 0x76, 0x04 to 0x2A, 0x7D to 0x72, 0x02 to 0x88, 0x15 to 0x15, 0x1E to 0x2E, 0x97 to 0x97, 0x80 to 0x01, 0x21 to 0x78, 0x11 to 0x29)),
+        Game("Gold", "d8b8a3600a465308c9953dfa04f0081c05bdcb94", "d49b7174014b44610cc8a80e39e9c8eaf3f1464b", 2,
             listOf(0x2AB35, 0x2B7C0, 0x2BE1C, -0x2B669, -0x2BD43, -0x2BED9), 0x3993E, 66, 0x51B0B, 0x427BD,
-            starters = elm(0x1800D2, 0x180114, 0x180150), moves = 0x41AFE, field = Field(0x940ED, 0x68A0)),
-        Game("Silver", "49b163f7e57702bc939d642a18f591de55d92dae", "d42e66790e3007a1393629cac6b6098013511d72", 2,
+            starters = elm(0x1800D2, 0x180114, 0x180150), moves = 0x41AFE, field = Field(0x940ED, 0x68A0), tmMoves = 0x11A66,
+            trades = 0xFCC24, tradeRetail = listOf(0x60 to 0x42, 0x45 to 0x5F, 0x62 to 0x64, 0x94 to 0x70, 0x2C to 0x4E, 0x71 to 0x8E)),
+        Game("Silver", "49b163f7e57702bc939d642a18f591de55d92dae", "b06031a450da1a3356cde64024c7db2ea4ac8fbe", 2,
             listOf(0x2AB35, 0x2B7C0, 0x2BE1C, -0x2B669, -0x2BD43, -0x2BED9), 0x3993E, 66, 0x51B0B, 0x427BD,
-            starters = elm(0x1800D2, 0x180114, 0x180150), moves = 0x41AFE, field = Field(0x940ED, 0x68A0)),
-        Game("Crystal", "f2f52230b536214ef7c9924f483392993e226cfb", "f771b93a2ac72eb398ce30ed2bb109d53d11d91e", 2,
+            starters = elm(0x1800D2, 0x180114, 0x180150), moves = 0x41AFE, field = Field(0x940ED, 0x68A0), tmMoves = 0x11A66,
+            trades = 0xFCC24, tradeRetail = listOf(0x60 to 0x42, 0x45 to 0x5F, 0x62 to 0x64, 0x94 to 0x70, 0x2C to 0x4E, 0x71 to 0x8E)),
+        Game("Crystal", "f2f52230b536214ef7c9924f483392993e226cfb", "b4b2669cbe31574872565b5540d3f9371dee3785", 2,
             listOf(0x2A5E9, 0x2B274, 0x2B8D0, -0x2B11D, -0x2B7F7, -0x2B92F), 0x39999, 67, 0x51424, 0x425B1,
-            starters = elm(0x78C7F, 0x78CC1, 0x78CFD), moves = 0x41AFB, field = Field(0x94000, 0x67C1)),
+            starters = elm(0x78C7F, 0x78CC1, 0x78CFD), moves = 0x41AFB, field = Field(0x94000, 0x67C1), tmMoves = 0x1167A,
+            trades = 0xFCE58, tradeRetail = listOf(0x3F to 0x42, 0x45 to 0x5F, 0x62 to 0x64, 0x94 to 0x55, 0x5D to 0xB2, 0x71 to 0x8E, 0x33 to 0x52)),
     )
 
     // Trainer classes (pret's pokered / pokecrystal constants; Gold's are Crystal's). Gen 1: each leader a class of their
@@ -219,7 +237,15 @@ object GbRandomizer {
         r.trainerItems { out += it }
         r.statSites { at, n -> for (k in 0 until n) out += at + k }
         r.learnMoves { out += it }
-        r.evolutionTargets { _, at, _ -> out += at }
+        // Each evolution's target, and the method and level / item before it (EASY EVOLUTIONS).
+        r.evolutionTargets { _, at, _ -> out += at; out += at - 1; out += at - 2 }
+        // GIFTS' trades: each trade's two species.
+        for (k in g.tradeRetail.indices) { out += r.tradeAt(k); out += r.tradeAt(k) + 1 }
+        // TM MOVES: TM01-TM50; TM LEARNERS: every species' TM bytes (the first 7: TM50's bit is byte 6's second).
+        for (k in 0 until TMS) out += g.tmMoves + k
+        for (id in (1 until r.dex.size).filter { r.species(it) }) for (k in 0 until 7) out += r.tmhmAt(id) + k
+        // WILD ITEMS: Gen 2's two held items.
+        if (g.gen == 2) for (id in 1..251) { out += g.baseStats + (id - 1) * 0x20 + 11; out += g.baseStats + (id - 1) * 0x20 + 12 }
         r.fieldItems { out += it }
         require(out.all { it in rom.indices }) { "not this game's tables" }
         return out
@@ -267,7 +293,12 @@ object GbRandomizer {
             val places = statics(game)
             val gifts = was.indices.filter { i -> was.count { it == was[i] } == 1 && r.species(was[i]) && r.species(r.u8(places[i][0])) }
                 .associate { i -> r.dex[was[i]] to r.dex[r.u8(places[i][0])] }
-            RandomizedGuide(r.itemsByFlag(), trades = null, statics = gifts, keepUnknown = true)
+            // Trades by retail's "given/wanted" Pokédex numbers (the area data's), as this cart has them.
+            val trades = game.tradeRetail.withIndex().filter { (_, p) -> r.species(p.first) && r.species(p.second) }.associate { (k, p) ->
+                val at = r.tradeAt(k)
+                "${r.dex[p.second]}/${r.dex[p.first]}" to (r.dex[r.u8(at + 1)] to r.dex[r.u8(at)])
+            }
+            RandomizedGuide(r.itemsByFlag(), trades = trades, statics = gifts, keepUnknown = true)
         }
 
         /** Trainer class [cls]'s [no]th party (both from 1), or null when it doesn't read as one. */
@@ -747,6 +778,16 @@ object GbRandomizer {
         private fun gen2Type(a: Int): Int { var q = a; while (u8(q) != 0x50) q++; return u8(q + 1) }
 
         /** [id]'s two type bytes (Gen 1: base stats +6 / +7 by Pokédex number; Gen 2: +7 / +8). */
+        /** Trade [k]'s wanted species byte (its given one follows). */
+        fun tradeAt(k: Int): Int = if (g.gen == 1) g.trades + k * 14 else g.trades + k * 32 + 1
+
+        /** [id]'s TM / HM flags in its base data (Gen 1: 7 bytes at +20; Gen 2: 8 at +24), a bit a TM / HM from bit 0. */
+        fun tmhmAt(id: Int): Int {
+            if (g.gen == 2) return g.baseStats + (id - 1) * 0x20 + 24
+            val n = dex[id]
+            return (if (n == 151 && g.mewStats != 0) g.mewStats else g.baseStats + (n - 1) * 28) + 20
+        }
+
         fun types(id: Int): Set<Int> {
             if (g.gen == 2) return setOf(u8(g.baseStats + (id - 1) * 0x20 + 7), u8(g.baseStats + (id - 1) * 0x20 + 8))
             val n = dex[id]
@@ -790,16 +831,16 @@ object GbRandomizer {
             return known
         }
 
-        fun movesAt(id: Int, level: Int): List<Int> {
+        fun movesAt(id: Int, level: Int): List<Int> = knownAt(id, level).takeLast(4)
+
+        /** Every move [id] has learnt by [level] (its level-up list), once each, in the order it learns them. */
+        fun knownAt(id: Int, level: Int): List<Int> {
             var a = evolutions(id).second
             val known = ArrayList<Int>()
             while (u8(a) != 0) {
                 if (u8(a) > level) break
                 val move = u8(a + 1)
-                if (move !in known) {
-                    if (known.size == 4) known.removeAt(0)
-                    known += move
-                }
+                if (move !in known) known += move
                 a += 2
             }
             return known
@@ -826,19 +867,104 @@ object GbRandomizer {
             // Stats and learnsets first: the strength match keeps working (the totals stay) and trainers' moves follow.
             if (o.baseStats) baseStats()
             if (o.learnsets) learnsets()
+            if (o.easyEvolutions) easyEvolutions()
+            if (o.wildItems && g.gen == 2) wildItems()
+            if (o.tmMoves) tmMoves()
+            if (o.tmLearners) tmLearners()
             // Before the starters: "evolve twice" goes by the new evolutions.
             if (o.evolutions) evolutions()
             starters()
             wild()
             if (o.wildLevelScale > 0) wildLevels()
             if (o.gifts) gifts()
+            // GIFTS' trades: after the wild swaps, so a trade asks for one that lives in the grass.
+            if (o.gifts) trades()
             if (o.levelScale > 0) levels()
             // RIVAL's slots from the teams as the cart has them (TRAINERS may put a starter line's Pokémon anywhere).
             planRivals()
             if (o.trainers) trainers()
             rivals()
             if (o.trainerItems) trainerItems()
+            if (o.toughTrainers) toughTrainers()
             if (o.fieldItems) fieldItems()
+        }
+
+        /** TOUGHER TRAINERS: each trainer Pokémon with chosen moves (Gen 2's moves parties; Gen 1's have none) gets its best
+         * ([BestMoves]); a move's record: power +2, type +3, accuracy +4 (out of 255). */
+        fun toughTrainers() {
+            val len = if (g.gen == 1) 6 else 7
+            fun info(m: Int): BestMoves.Move {
+                val at = g.moves + (m - 1) * len
+                return BestMoves.Move(u8(at + 2), u8(at + 4) * 100 / 255, u8(at + 3))
+            }
+            trainerMonsOf { at, moves, _, _ ->
+                if (moves < 0 || !species(u8(at))) return@trainerMonsOf
+                val list = BestMoves.pick(knownAt(u8(at), u8(at - 1)), ::info, types(u8(at)))
+                for (k in 0 until 4) b[moves + k] = list.getOrElse(k) { 0 }.toByte()
+            }
+        }
+
+        /**
+         * EASY EVOLUTIONS ([EasyEvolutions]): the Game Boy's methods (1 level, 2 stone, 3 trade - Gen 2's with an item or -1).
+         * Gen 1's stone entries are a byte longer than a trade's, so there a trade only ever becomes a level (none of its four
+         * trade Pokémon evolves by level too). Gold / Silver / Crystal keep a clock: nothing else needs changing.
+         */
+        fun easyEvolutions() {
+            val rules = EasyEvolutions.Rules(
+                level = 1, useItem = 2, trades = setOf(3), tradeItem = null, holdDay = null,
+                stones = if (g.gen == 1) emptyList() else GEN2_STONES,
+            )
+            for (id in (1 until dex.size).filter { species(it) }) {
+                // Each entry's place, for the 3-byte ones a trade can become (Gen 2's stat entries and Gen 1's stones stay).
+                val at = ArrayList<Int>()
+                var a = ptr(g.evolutions + (id - 1) * 2)
+                var n = 0
+                while (a in b.indices && u8(a) != 0 && n++ < 8) {
+                    val method = u8(a)
+                    val len = if (g.gen == 1) (if (method == 2) 4 else 3) else if (method == 5) 4 else 3
+                    if (len == 3) at += a
+                    a += len
+                }
+                val now = EasyEvolutions.convert(at.map { u8(it) to u8(it + 1) }, rules)
+                at.forEachIndexed { i, x -> b[x] = now[i].first.toByte(); b[x + 1] = now[i].second.toByte() }
+            }
+        }
+
+        /** WILD ITEMS (Gold / Silver / Crystal; Gen 1 has no held items): each species' two (base data +11, +12) from the
+         * items with a held effect in the ITEM pocket (ItemAttributes: effect +2, pocket +5); a quarter get a common one. */
+        fun wildItems() {
+            val f = g.field ?: return
+            val pool = (1 until 0xF3).filter { u8(f.keyItems + (it - 1) * 7 + 2) != 0 && u8(f.keyItems + (it - 1) * 7 + 5) == 1 }
+            if (pool.isEmpty()) return
+            for (id in (1..251)) {
+                val at = g.baseStats + (id - 1) * 0x20 + 11
+                val common = if (rnd.nextInt(100) < 25) pool.random(rnd) else 0
+                var rare = if (rnd.nextInt(100) < 60) pool.random(rnd) else 0
+                if (rare == common) rare = 0
+                b[at] = common.toByte()
+                b[at + 1] = rare.toByte()
+            }
+        }
+
+        /** TM MOVES ([TmPicks]): TM01-TM50's move bytes; the HMs after them stay, and none of their moves is a TM's. */
+        fun tmMoves() {
+            val hms = (TMS until if (g.gen == 1) 55 else 57).map { u8(g.tmMoves + it) }.toSet()
+            val pool = (1..(if (g.gen == 1) 164 else 251)).filter { it != 165 && it !in hms }
+            TmPicks.moves(TMS, pool, pool.filter { power(it) > 0 }.toSet(), rnd).forEachIndexed { i, m -> b[g.tmMoves + i] = m.toByte() }
+        }
+
+        /** TM LEARNERS ([TmPicks]): each species' TM bits (the first 50 of its base data's TM / HM flags; the HMs' stay). */
+        fun tmLearners() {
+            val types = (0 until TMS).map { u8(g.moves + (u8(g.tmMoves + it) - 1) * (if (g.gen == 1) 6 else 7) + 3) }
+            for (id in (1 until dex.size).filter { species(it) }) {
+                val at = tmhmAt(id)
+                val mine = types(id)
+                for (tm in 0 until TMS) {
+                    val bit = 1 shl (tm % 8)
+                    val v = u8(at + tm / 8)
+                    b[at + tm / 8] = (if (TmPicks.learns(mine, types[tm], 0, rnd)) v or bit else v and bit.inv()).toByte()
+                }
+            }
         }
 
         /** WILD LEVELS: every wild slot's level (the byte before its species) raised. */
@@ -970,6 +1096,22 @@ object GbRandomizer {
                 }
                 used += now
                 b[at] = now.toByte()
+            }
+        }
+
+        /** GIFTS' trades: what each person gives you ([SpeciesPicker.pick], none twice) and the one they want, picked from
+         * the species in the wild now (so every trade can be made); the game names both from the table. */
+        fun trades() {
+            if (g.trades == 0) return
+            val wild = HashSet<Int>().also { l -> wildSlots { at -> u8(at).takeIf { species(it) }?.let(l::add) } }
+            val wanted = wild.filter { it in picker.pool }.ifEmpty { picker.pool }
+            val used = HashSet<Int>()
+            for (k in g.tradeRetail.indices) {
+                val at = tradeAt(k)
+                val get = picker.pick(u8(at + 1), used).also { used += it }
+                val want = picker.pick(u8(at), setOf(get), from = wanted)
+                b[at] = want.toByte()
+                b[at + 1] = get.toByte()
             }
         }
 
