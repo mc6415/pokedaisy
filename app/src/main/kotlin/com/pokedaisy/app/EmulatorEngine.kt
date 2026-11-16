@@ -154,11 +154,15 @@ class EmulatorEngine(
     @Volatile private var reusableTms = false
     @Volatile private var tmPatchDirty = false
 
-    fun setReusableTms(sites: List<com.pokedaisy.app.companion.data.ReusableTms.Site>, on: Boolean) {
+    fun setReusableTms(sites: List<com.pokedaisy.app.companion.data.ReusableTms.Site>, on: Boolean, ds: Boolean = false) {
         tmSites = sites
         reusableTms = on
+        dsReusableTms = ds
         tmPatchDirty = true
     }
+
+    /** A DS cart whose TM patch the native side knows ([setReusableTms]'s [ds]): it patches the RAM itself, every frame. */
+    @Volatile private var dsReusableTms = false
 
     /** INSTANT TEXT: the ROM's patch ([com.pokedaisy.app.companion.data.InstantText]; null = none known) and whether it's
      * in; with REUSABLE TMS's on the next frame boundary. */
@@ -2049,8 +2053,11 @@ class EmulatorEngine(
     /** REUSABLE TMS, INSTANT TEXT, NO HMS NEEDED, FULL EXP and LEVEL CAP onto the ROM (emu thread): what's on patched, the rest the file's bytes. */
     private fun applyTmPatch() {
         tmPatchDirty = false
+        if (nds) {
+            MgbaCore.pkNdsReusableTms(reusableTms && dsReusableTms)
+            return
+        }
         MgbaCore.pkRomUnpatch()
-        if (!gba) return
         // All or none, each: a ROM that only matched in part would still use TMs up on the other paths, and half a
         // routine can't run. pkRomUnpatch takes everything, so one that fails puts the ones before it back.
         val placed = ArrayList<() -> Boolean>()
@@ -2067,8 +2074,10 @@ class EmulatorEngine(
         }
         val sites = tmSites
         option("reusable TMs", reusableTms && sites.isNotEmpty()) {
-            sites.all { MgbaCore.pkRomPatch(it.at, it.expect, it.branch, com.pokedaisy.app.companion.data.ReusableTms.ALWAYS_SKIP) }
+            sites.all { MgbaCore.pkRomPatch(it.at, it.expect, it.branch, it.value) }
         }
+        // A Game Boy cart: REUSABLE TMS alone (ReusableTms.gbSites); the rest are GBA patches.
+        if (!gba) return
         val text = textPatch
         option("instant text", instantText && text != null) {
             text!!.writes.all { MgbaCore.pkRomPatch(it.addr, it.expect, it.addr, it.value) }

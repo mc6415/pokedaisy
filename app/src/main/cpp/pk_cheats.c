@@ -34,6 +34,8 @@
 #include <mgba/core/cheats.h>
 #include <mgba/internal/gba/gba.h>
 #include <mgba/internal/gba/cheats.h>
+#include <mgba/internal/gb/gb.h>
+#include <mgba/internal/gb/memory.h>
 #include <mgba-util/vfs.h>
 
 #include "pk_cheats.h"
@@ -250,8 +252,61 @@ void pk_cheats_swap_rom(struct mCore* core) {
 // the ROM holds `expect` over [expectAddr, expectAddr + expectLen) - the code
 // around it, so a ROM built differently is never patched. Returns 1 if it went in
 // (or was in already), 0 if the code didn't match.
+// A Game Boy cart's game option patch: the addresses are places in the ROM file (bank * 0x4000 + the address's low 14
+// bits), the bytes put in through mGBA's GBPatch8, which copies a still-mapped ROM first (_pristineCow) like GBA's.
+static int pk_cheats_patch_gb(struct mCore* core, uint32_t expectAddr, const uint8_t* expect, int expectLen,
+                              uint32_t addr, const uint8_t* value, int len) {
+    struct GB* gb = core->board;
+    size_t size = gb->memory.romSize;
+    if (!gb->memory.rom || len < 1 || len > 4 || expectLen < 1 || expectLen > 64 || (size_t) expectAddr + expectLen > size ||
+        (size_t) addr + len > size) {
+        return 0;
+    }
+    for (int i = 0; i < sOptionCount; i++) {
+        if (sOptions[i].addr == addr) {
+            return 1;
+        }
+    }
+    if (sOptionCount >= PK_MAX_OPTIONS) {
+        return 0;
+    }
+    uint8_t live[64];
+    memcpy(live, (const uint8_t*) gb->memory.rom + expectAddr, (size_t) expectLen);
+    pk_cheats_overlay_file(expectAddr, live, expectLen);
+    if (memcmp(live, expect, (size_t) expectLen)) {
+        return 0;
+    }
+    struct pk_fix* f = &sOptions[sOptionCount++];
+    f->addr = addr;
+    f->width = len;
+    for (int b = 0; b < len; b++) {
+        uint32_t at = addr + (uint32_t) b;
+        int8_t old = 0;
+        GBPatch8(gb->cpu, (uint16_t) (at < GB_SIZE_CART_BANK0 ? at : GB_SIZE_CART_BANK0 | (at & (GB_SIZE_CART_BANK0 - 1))),
+                 (int8_t) value[b], &old, (int) (at / GB_SIZE_CART_BANK0));
+        f->orig[b] = (uint8_t) old;
+    }
+    return 1;
+}
+
+// A Game Boy cart's bytes as the file holds them: the game options' originals over [off, off + len) of [dst], read from
+// the live (patched) ROM - what the Poller's hash and the readers must see (pkRomRead).
+void pk_cheats_overlay_file(uint32_t off, uint8_t* dst, int len) {
+    for (int i = 0; i < sOptionCount; i++) {
+        for (int b = 0; b < sOptions[i].width; b++) {
+            uint32_t a = sOptions[i].addr + (uint32_t) b;
+            if (a >= off && a - off < (uint32_t) len) {
+                dst[a - off] = sOptions[i].orig[b];
+            }
+        }
+    }
+}
+
 int pk_cheats_patch(struct mCore* core, uint32_t expectAddr, const uint8_t* expect, int expectLen,
                     uint32_t addr, const uint8_t* value, int len) {
+    if (core && core->platform(core) == mPLATFORM_GB) {
+        return pk_cheats_patch_gb(core, expectAddr, expect, expectLen, addr, value, len);
+    }
     if (!pk_cheats_is_gba(core) || len < 1 || len > 4 || addr < BASE_CART0 || addr >= BASE_CART_SRAM) {
         return 0;
     }
@@ -300,6 +355,16 @@ void pk_cheats_unpatch(struct mCore* core) {
                 uint8_t* rom = pk_rom_byte(core, sOptions[i].addr + b);
                 if (rom) {
                     *rom = sOptions[i].orig[b];
+                }
+            }
+        }
+    } else if (core && core->platform(core) == mPLATFORM_GB) {
+        struct GB* gb = core->board;
+        for (int i = sOptionCount - 1; i >= 0; i--) {
+            for (int b = 0; b < sOptions[i].width; b++) {
+                uint32_t a = sOptions[i].addr + (uint32_t) b;
+                if (gb->memory.rom && a < gb->memory.romSize) {
+                    ((uint8_t*) gb->memory.rom)[a] = sOptions[i].orig[b];
                 }
             }
         }

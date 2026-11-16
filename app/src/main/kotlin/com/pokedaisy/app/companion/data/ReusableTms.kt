@@ -27,8 +27,7 @@ import okio.Path
 object ReusableTms {
     /** One spot: [expect] is the ROM from [at] (the compare through the RemoveBagItem call); the branch to patch sits
      * [BRANCH] bytes in. */
-    class Site(val at: Long, val expect: ByteArray) {
-        val branch get() = at + BRANCH
+    class Site(val at: Long, val expect: ByteArray, val branch: Long = at + BRANCH, val value: ByteArray = ALWAYS_SKIP) {
         /** Where its call goes: the build's RemoveBagItem. */
         val calls: Long get() = blTarget(at + 12, expect, 12)
     }
@@ -43,6 +42,12 @@ object ReusableTms {
     /** Games whose own TMs never run out, so the row says so instead of offering it: Radical Red, Unbound and SoulGold
      * checked headless (a TM taught on their saves stayed in the bag: SoulGold v1.1.4 and v1.2's third build), Prism and
      * Polished Crystal (a bit per TM). */
+    /** The DS carts the RAM patch was proved on (nds/pk_nds.cpp's TM_PATCHES: the party menu's TeachMove keeps the TM),
+     * by game code and revision. Black, White and their sequels keep TMs by themselves ([BUILT_IN]). */
+    val DS_CARTS = setOf("CPUE" to 1, "IPKE" to 0, "IPGE" to 0)
+
+    fun dsProved(code: String, revision: Int?): Boolean = (code to revision) in DS_CARTS
+
     val BUILT_IN = setOf(GameKind.RADICAL_RED, GameKind.UNBOUND, GameKind.SOULGOLD, GameKind.PRISM, GameKind.POLISHED_CRYSTAL, GameKind.BLACK, GameKind.WHITE, GameKind.BLACK2, GameKind.WHITE2)
 
     /** How many sites the engine behind [code] (the header's game code) has: the FireRed engine (FireRed, LeafGreen,
@@ -51,6 +56,38 @@ object ReusableTms {
         code.startsWith("BPR") || code.startsWith("BPG") || code.startsWith("PUV") -> 3
         code.startsWith("BPE") || code.startsWith("AXV") || code.startsWith("AXP") -> 1
         else -> 0
+    }
+
+    /**
+     * Gold / Silver / Crystal: pret's ConsumeTM (engine/items/tmhm.asm, TeachTMHM's one call after a TM's move went in:
+     * `call ConvertCurItemIntoCurTMHM; ld a, [wTempTMHM]; dec a; ld hl, wTMsHMs; ...; dec a; ld [hl], a`) starts with a
+     * `ret` (C9), so the TM's count is never lowered - everything else, the friendship it gives included, stays the game's.
+     * Its 20 bytes in the ROM file, by the English carts' hashes (every Crystal release keeps it at 0B:4B0C, Gold and
+     * Silver at 0B:4911), checked again by the patch itself. Taught in the game's own PACK headless on all three: TM10 kept
+     * at 3 (2 without the patch).
+     * Red / Blue / Yellow: pret's pokered / pokeyellow ItemUseTMHM ends `call IsItemHM; ret c; jp RemoveUsedItem` (an HM
+     * returns before the bag loses it); its `ret c` (D8) made `ret` (C9) returns for every TM. The 7 bytes found once in each
+     * English cart by those two routines' addresses (Red / Blue 03:654B, Yellow 03:647F), the patch on the `ret c` alone.
+     */
+    private class GbConsumeTm(val sha1s: Set<String>, val offset: Long, val hex: String, val patchAt: Long = offset)
+
+    private val GB_CONSUME_TM = listOf(
+        GbConsumeTm(TelemetrySampler.CRYSTAL_SHA1S, 0x2CB0C, "cda747fa65d23d2159d806004f097ea7c83d77c0"),
+        GbConsumeTm(setOf(TelemetrySampler.GOLD_SHA1, TelemetrySampler.SILVER_SHA1), 0x2C911, "cdb245fa51d13d217ed506004f097ea7c83d77c0"),
+        GbConsumeTm(setOf(TelemetrySampler.RED_SHA1, TelemetrySampler.BLUE_SHA1), 0xE548, "cd4030d8c37165", patchAt = 0xE54B),
+        GbConsumeTm(setOf(TelemetrySampler.YELLOW_SHA1), 0xE47C, "cd352fd8c3a564", patchAt = 0xE47F),
+    )
+
+    /** `ret`, over ConsumeTM's first byte (Gold / Silver / Crystal) or ItemUseTMHM's `ret c` (Red / Blue / Yellow). */
+    val GB_RET = byteArrayOf(0xC9.toByte())
+
+    /** A Game Boy cart's site ([GB_CONSUME_TM]) for the ROM file whose SHA-1 is [sha1], if its bytes are ConsumeTM's. */
+    fun gbSites(sha1: String, rom: ByteArray): List<Site> {
+        val c = GB_CONSUME_TM.firstOrNull { sha1 in it.sha1s } ?: return emptyList()
+        val expect = c.hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        val at = c.offset.toInt()
+        if (rom.size < at + expect.size || !rom.copyOfRange(at, at + expect.size).contentEquals(expect)) return emptyList()
+        return listOf(Site(c.offset, expect, branch = c.patchAt, value = GB_RET))
     }
 
     private val cache = HashMap<String, List<Site>>()

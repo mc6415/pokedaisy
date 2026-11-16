@@ -47,6 +47,7 @@
 
 using namespace melonDS;
 
+static void reusableTmsTick(void);   // REUSABLE TMS, after every frame (below)
 static void expShareTick(void);   // EXP SHARE, after every frame (below)
 
 namespace {
@@ -76,6 +77,8 @@ struct Ds {
     bool drawn = true;                       // the last frame was drawn (pk_nds_frame_drawn)
     int fieldBits = 0;                       // the field read after the last frame
     bool wildOff = false;                    // WILD ENCOUNTERS OFF (pk_nds_field.cpp holds the map's rates at 0)
+    bool reusableTms = false;                // REUSABLE TMS (reusableTmsTick)
+    bool tmPatched = false;                  // the patch is ours, so taking it out puts the game's back
     bool keepStartMenu = false;              // DS LAYOUT floats the X menu: it comes back after a screen left by touch
     int expShare = 0;                        // EXP SHARE: 0 off, 1 SPLIT, 2 FULL EXP (expShareTick)
     uint32_t expMask = 0;                    // the party slots that aren't eggs (sideGetExpMask's bits)
@@ -335,6 +338,7 @@ void pk_ndsm_run_frame(void)
     }
     ds->audioFrames = nds->SPU.ReadOutput(ds->audio.data(), (int) ds->audio.size() / 2);
     ds->fieldBits = pk_ndsm_field_bits();
+    reusableTmsTick();
     expShareTick();
     pk_nds_call_frame(nds, ds->field);
     if (ds->wide) {
@@ -534,6 +538,42 @@ static bool oneColour(const u32* px)
         for (int gx = 0; gx < 16; gx++)
             if ((px[(gy * PK_NDS_H / 12 + PK_NDS_H / 24) * PK_NDS_W + gx * PK_NDS_W / 16 + PK_NDS_W / 32] & 0xFFFFFF) != first) return false;
     return true;
+}
+
+// REUSABLE TMS on the DS: the party menu's TeachMove takes a TM out of the bag unless Item_IsHMMove says it's an HM -
+// `bne` past Bag_TryRemoveItem. A `b` there keeps every TM (the friendship it gives still runs). pret's xMAPs give the
+// spot (Platinum's TeachMove, HeartGold / SoulSilver's PartyMenu_LearnMoveToSlot), both in the ARM9 main, which never
+// reloads: checked every frame anyway (a state load brings the old bytes back), and only on the word it expects.
+struct TmPatch { int callSet; u32 addr; u16 orig, patched; };
+static const TmPatch TM_PATCHES[] = {
+    {1, 0x020865EA, 0xD107, 0xE007},   // Platinum (US rev 1)
+    {2, 0x020825A6, 0xD107, 0xE007},   // HeartGold / SoulSilver (US; callSet 2's German / French carts if their code is there)
+};
+
+static void reusableTmsTick(void)
+{
+    if (!ds || !ds->field) return;
+    for (const TmPatch& p : TM_PATCHES) {
+        if (p.callSet != ds->field->callSet) continue;
+        u8* m = ds->nds->MainRAM;
+        const u32 mask = ds->nds->MainRAMMask;
+        const u16 now = (u16) (m[p.addr & mask] | (m[(p.addr + 1) & mask] << 8));
+        u16 want = now;
+        if (ds->reusableTms && now == p.orig) want = p.patched;
+        else if (!ds->reusableTms && ds->tmPatched && now == p.patched) want = p.orig;
+        if (want != now) {
+            m[p.addr & mask] = (u8) want;
+            m[(p.addr + 1) & mask] = (u8) (want >> 8);
+            // the JIT's compiled copy of that code goes with it
+            ds->nds->JIT.CheckAndInvalidate<0, ARMJIT_Memory::memregion_MainRAM>(p.addr & ~3u);
+        }
+        ds->tmPatched = ds->reusableTms && (want == p.patched);
+    }
+}
+
+void pk_ndsm_set_reusable_tms(bool on)
+{
+    if (ds) ds->reusableTms = on;
 }
 
 int pk_ndsm_field_bits(void)

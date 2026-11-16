@@ -180,6 +180,9 @@ class PokeDaisyActivity : Activity() {
 
     /** REUSABLE TMS: the ROM's spots that use a TM up ([com.pokedaisy.app.companion.data.ReusableTms]; empty = none). */
     private var tmSites: List<com.pokedaisy.app.companion.data.ReusableTms.Site> = emptyList()
+    /** REUSABLE TMS on a DS cart the patch was proved on (ReusableTms.DS_CARTS), on melonDS. */
+    @Volatile private var dsTmCart = false
+    private fun dsTms() = dsTmCart && !dsperate
     /** INSTANT TEXT: the ROM's patch ([com.pokedaisy.app.companion.data.InstantText]; null = the row shows N/A). */
     private var textPatch: com.pokedaisy.app.companion.data.InstantText.Patch? = null
     /** The POKéMON CENTER's specials in this ROM ([com.pokedaisy.app.companion.data.PokemonCenter]; null = none). */
@@ -1924,9 +1927,9 @@ class PokeDaisyActivity : Activity() {
             if (coopRefuses()) return
             if (on) com.pokedaisy.app.companion.FeatureTips.used(TipId.REUSABLE_TMS)
             Prefs(this@PokeDaisyActivity).reusableTms = on
-            if (::engine.isInitialized) engine.setReusableTms(tmSites, on)
+            if (::engine.isInitialized) engine.setReusableTms(tmSites, on, dsTms())
         }
-        override val reusableTmsSupported get() = tmSites.isNotEmpty()
+        override val reusableTmsSupported get() = tmSites.isNotEmpty() || dsTms()
         override val instantText get() = Prefs(this@PokeDaisyActivity).instantText
         override fun setInstantText(on: Boolean) {
             Prefs(this@PokeDaisyActivity).instantText = on
@@ -2777,6 +2780,9 @@ class PokeDaisyActivity : Activity() {
         com.pokedaisy.app.companion.data.AreaMaps.romChanged()
         wildFlag = 0L
         tmSites = emptyList()
+        // REUSABLE TMS on a DS cart (retail only: Renegade Platinum keeps retail's header and this code, but wasn't tried)
+        dsTmCart = nds && com.pokedaisy.app.companion.data.ReusableTms.dsProved(ndsCode, RomIdentity.ndsRevision(r)) &&
+            !(ndsCode == com.pokedaisy.app.companion.data.RenegadePlatinum.CODE && com.pokedaisy.app.companion.data.RenegadePlatinum.matches(r.toOkioPath()))
         if (::engine.isInitialized) engine.setReusableTms(tmSites, false)
         textPatch = null
         if (::engine.isInitialized) engine.setInstantText(null, false)
@@ -2818,7 +2824,7 @@ class PokeDaisyActivity : Activity() {
                 wildFlag = flag
                 if (::engine.isInitialized) engine.wildFlag = flag
                 tmSites = tms
-                if (::engine.isInitialized) engine.setReusableTms(tms, Prefs(this).reusableTms)
+                if (::engine.isInitialized) engine.setReusableTms(tms, Prefs(this).reusableTms, dsTms())
                 textPatch = text
                 if (::engine.isInitialized) engine.setInstantText(text, Prefs(this).instantText)
                 hmPatch = hm
@@ -2844,9 +2850,13 @@ class PokeDaisyActivity : Activity() {
         val gbRom = if (gameBoy) runCatching { r.readBytes() }.getOrNull() else null
         com.pokedaisy.app.companion.data.Gen1Dex.rom = gbRom
         // STEADY FF music: a Gen 1 cart's (and Crystal's) songs come from its own sound engine (Gen1MusicRenderer).
-        gen1Music = gbRom?.let {
-            val sha1 = java.security.MessageDigest.getInstance("SHA-1").digest(it).joinToString("") { b -> "%02x".format(b) }
-            com.pokedaisy.app.companion.data.Gen1Music.forSha1(sha1)
+        val gbSha1 = gbRom?.let { java.security.MessageDigest.getInstance("SHA-1").digest(it).joinToString("") { b -> "%02x".format(b) } }
+        gen1Music = gbSha1?.let { com.pokedaisy.app.companion.data.Gen1Music.forSha1(it) }
+        // REUSABLE TMS on the Game Boy: Gold / Silver / Crystal's ConsumeTM, Red / Blue / Yellow's ItemUseTMHM, by the cart's hash (ReusableTms.gbSites).
+        if (gbRom != null && gbSha1 != null && romBlocked == null) {
+            tmSites = com.pokedaisy.app.companion.data.ReusableTms.gbSites(gbSha1, gbRom)
+            if (tmSites.isNotEmpty()) Log.i("pokedaisy", "reusable TMs: Game Boy ConsumeTM found")
+            if (::engine.isInitialized) engine.setReusableTms(tmSites, Prefs(this).reusableTms)
         }
         ffMusicRenderer = when {
             gba -> FfMusicRenderer(r, crc, ffMusicCache, clickSound, unlockSound).also { it.start() }
@@ -3162,7 +3172,7 @@ class PokeDaisyActivity : Activity() {
         e.wildEncounters = p.wildEncounters
         e.ndsScale = p.dsResolution
         e.ndsCpuBoost = p.dsCpuBoost
-        e.setReusableTms(tmSites, p.reusableTms)
+        e.setReusableTms(tmSites, p.reusableTms, dsTms())
         e.setInstantText(textPatch, p.instantText)
         e.setHmFree(hmPatch, p.hmFree)
         e.setExpShare(expShareFound, if (expShareFound != null) com.pokedaisy.app.companion.data.ExpShare.Mode.of(p.expShare) else com.pokedaisy.app.companion.data.ExpShare.Mode.OFF)

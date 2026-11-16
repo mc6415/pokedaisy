@@ -510,6 +510,8 @@ bool pk_api_rom_read(int64_t off, uint8_t* dst, int len) {
         struct GB* gb = g.core->board;
         if (gb->memory.rom && (size_t) off + (size_t) len <= gb->pristineRomSize) {
             memcpy(dst, (const uint8_t*) gb->memory.rom + off, (size_t) len);
+            // The file's bytes: a game option's patch (REUSABLE TMS) mustn't change the Poller's hash.
+            pk_cheats_overlay_file((uint32_t) off, dst, len);
             ok = true;
         }
     }

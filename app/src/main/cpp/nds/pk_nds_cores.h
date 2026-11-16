@@ -27,6 +27,7 @@
     X(int, action_status, (int seq), (seq)) \
     X(bool, action_results, (int seq, uint32_t* out), (seq, out)) \
     X(void, set_wild_off, (bool off), (off)) \
+    X(void, set_reusable_tms, (bool on), (on)) \
     X(void, set_keep_start_menu, (bool on), (on)) \
     X(void, set_exp_share, (int mode, uint32_t mask), (mode, mask)) \
     X(void, set_cpu_boost, (bool on), (on)) \

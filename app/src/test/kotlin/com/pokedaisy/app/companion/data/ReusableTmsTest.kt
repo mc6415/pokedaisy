@@ -88,4 +88,66 @@ class ReusableTmsTest {
         assertEquals(1, ReusableTms.expectedSites("AXPJ"))
         assertEquals(0, ReusableTms.expectedSites("CGB0"))
     }
+
+    @Test fun dsCartsProved() {
+        org.junit.Assert.assertTrue(ReusableTms.dsProved("CPUE", 1))
+        org.junit.Assert.assertTrue(ReusableTms.dsProved("IPKE", 0))
+        org.junit.Assert.assertTrue(ReusableTms.dsProved("IPGE", 0))
+        org.junit.Assert.assertFalse(ReusableTms.dsProved("CPUE", 0))
+        org.junit.Assert.assertFalse(ReusableTms.dsProved("IPKD", 0))
+        org.junit.Assert.assertFalse(ReusableTms.dsProved("IRBO", 0))
+    }
+
+    /** Gold / Silver / Crystal ([ReusableTms.gbSites]): ConsumeTM by the cart's hash, its bytes checked; `ret` over its first. */
+    @Test fun gameBoySites() {
+        fun rom(off: Int, hex: String) = ByteArray(0x200000).also { b ->
+            hex.chunked(2).forEachIndexed { i, h -> b[off + i] = h.toInt(16).toByte() }
+        }
+        val crystal = rom(0x2CB0C, "cda747fa65d23d2159d806004f097ea7c83d77c0")
+        for (sha1 in TelemetrySampler.CRYSTAL_SHA1S) {
+            val s = ReusableTms.gbSites(sha1, crystal).single()
+            assertEquals(0x2CB0CL, s.at)
+            assertEquals(0x2CB0CL, s.branch)
+            assertTrue(s.value.contentEquals(byteArrayOf(0xC9.toByte())))
+            assertEquals(20, s.expect.size)
+        }
+        val gold = rom(0x2C911, "cdb245fa51d13d217ed506004f097ea7c83d77c0")
+        for (sha1 in listOf(TelemetrySampler.GOLD_SHA1, TelemetrySampler.SILVER_SHA1)) {
+            assertEquals(0x2C911L, ReusableTms.gbSites(sha1, gold).single().at)
+        }
+        // Red / Blue / Yellow: ItemUseTMHM's `call IsItemHM; ret c; jp RemoveUsedItem` checked, `ret` over the `ret c` alone.
+        val red = rom(0xE548, "cd4030d8c37165")
+        for (sha1 in listOf(TelemetrySampler.RED_SHA1, TelemetrySampler.BLUE_SHA1)) {
+            val s = ReusableTms.gbSites(sha1, red).single()
+            assertEquals(0xE548L, s.at)
+            assertEquals(0xE54BL, s.branch)
+            assertEquals(7, s.expect.size)
+        }
+        val yellow = rom(0xE47C, "cd352fd8c3a564")
+        assertEquals(0xE47FL, ReusableTms.gbSites(TelemetrySampler.YELLOW_SHA1, yellow).single().branch)
+        assertTrue(ReusableTms.gbSites(TelemetrySampler.YELLOW_SHA1, red).isEmpty())
+        // Another cart's hash, or bytes that aren't ConsumeTM's: nothing.
+        assertTrue(ReusableTms.gbSites(TelemetrySampler.GOLD_DE_SHA1, gold).isEmpty())
+        assertTrue(ReusableTms.gbSites(TelemetrySampler.GOLD_SHA1, crystal).isEmpty())
+        assertTrue(ReusableTms.gbSites(TelemetrySampler.CRYSTAL_REV1_SHA1, ByteArray(0x1000)).isEmpty())
+    }
+
+    /** Each English cart here (in `gb/` or `gbc/`), its real bytes. Skips a ROM that isn't here. */
+    @Test fun gameBoySitesInTheCarts() {
+        val root = File(System.getProperty("romDir") ?: System.getenv("POKEDAISY_ROM_DIR") ?: return).parentFile
+        val carts = listOf(
+            "Pokemon - Red Version (USA, Europe) (SGB Enhanced).gb",
+            "Pokemon - Blue Version (USA, Europe) (SGB Enhanced).gb",
+            "Pokemon - Yellow Version - Special Pikachu Edition (USA, Europe) (CGB+SGB Enhanced).gb",
+            "Pokemon - Crystal Version (USA, Europe) (Rev 1).gbc",
+            "Pokemon - Gold Version (USA, Europe) (SGB Enhanced) (GB Compatible).gbc",
+            "Pokemon - Silver Version (USA, Europe) (SGB Enhanced) (GB Compatible).gbc",
+        ).mapNotNull { n -> listOf("gb", "gbc").map { root.resolve("$it/$n") }.firstOrNull { it.isFile } }
+        assumeTrue(carts.isNotEmpty())
+        for (f in carts) {
+            val b = f.readBytes()
+            val sha1 = java.security.MessageDigest.getInstance("SHA-1").digest(b).joinToString("") { "%02x".format(it) }
+            assertEquals(f.name, 1, ReusableTms.gbSites(sha1, b).size)
+        }
+    }
 }
