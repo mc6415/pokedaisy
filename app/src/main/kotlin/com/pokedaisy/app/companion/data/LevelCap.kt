@@ -28,7 +28,17 @@ object LevelCap {
      * when the level is 100. */
     class Site(val addr: Long, val expect: ByteArray, val skipsOnEqual: Boolean)
 
-    class Found(val sites: List<Site>)
+    /** [sites] (the GBA's getexp), or for another engine its own writes for a cap ([custom]: the Game Boy's, [LevelCapGb]);
+     * [ds]: a DS game's, whose battle code the native side patches itself (pk_nds_field.cpp's pk_nds_level_cap_tick). */
+    class Found(val sites: List<Site>, val custom: ((Int) -> List<InstantText.Write>)? = null, val ds: Boolean = false)
+
+    /** The DS games whose battle EXP checks are known (Platinum rev 1, HeartGold / SoulSilver, Black / White / Black 2 /
+     * White 2, US / Europe), on melonDS; null = N/A (DSperate, a hack keeping retail's header, another cart). */
+    fun dsFind(code: String, rev: Int, dsperate: Boolean, hack: Boolean): Found? = when {
+        dsperate || hack -> null
+        code == "CPUE" && rev == 1 || rev == 0 && code in setOf("IPKE", "IPGE", "IRBO", "IRAO", "IREO", "IRDO") -> Found(emptyList(), ds = true)
+        else -> null
+    }
 
     /** The cap now: [level], from [boss]'s team (its title as the guide has it). */
     data class Cap(val level: Int, val boss: String)
@@ -81,6 +91,7 @@ object LevelCap {
     /** [f]'s writes for a cap of [level] (1..99): each `cmp r0, #level` and its branch taken on "at or past it". */
     fun writes(f: Found, level: Int): List<InstantText.Write> {
         require(level in 1 until MAX_LEVEL)
+        f.custom?.let { return it(level) }
         return f.sites.map { s ->
             val v = s.expect.copyOf()
             v[0] = level.toByte()
@@ -97,12 +108,14 @@ object LevelCap {
      */
     fun next(snap: SnapshotView): Cap? {
         val p = snap.progress ?: return null
-        val live = snap.guideTables ?: return null
+        // The GBA's teams come from the ROM's trainer table (its live tables); a Game Boy / DS guide's from its world data.
+        val live = snap.guideTables
         val guide = gameGuide(guideId(snap.game, live)) ?: return null
+        if (live == null && guide.world == null) return null
         val bosses = guide.bossesFor?.invoke(snap.mapGroup) ?: guide.bosses
         val boss = bosses.firstOrNull { !it.isDone(p) } ?: return null
         val top = boss.trainers(p).mapNotNull { id ->
-            (guide.world?.party(id, p) ?: GuideRomSource.party(live, id))?.maxOfOrNull { it.level }
+            (guide.world?.party(id, p) ?: live?.let { GuideRomSource.party(it, id) })?.maxOfOrNull { it.level }
         }.maxOrNull() ?: return null
         return if (top in 1 until MAX_LEVEL) Cap(top, boss.title) else null
     }
@@ -111,7 +124,7 @@ object LevelCap {
     fun hasBosses(snap: SnapshotView): Boolean? {
         if (!snap.connected || snap.game == null) return null
         val guide = gameGuide(guideId(snap.game, snap.guideTables)) ?: return false
-        return snap.guideTables != null && (guide.bosses.isNotEmpty() || guide.bossesFor != null)
+        return (snap.guideTables != null || guide.world != null) && (guide.bosses.isNotEmpty() || guide.bossesFor != null)
     }
 
     private fun blTarget(rom: LittleEndianReader, at: Int): Int? {

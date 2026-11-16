@@ -270,6 +270,8 @@ object MgbaCore {
     /** EXP SHARE on the DS (Gen 4, melonDS: pk_nds.cpp's expShareTick): [mode] 0 off / 1 SPLIT / 2 FULL EXP, [mask] the
      * party slots that aren't eggs. Emu thread. */
     external fun pkNdsExpShare(mode: Int, mask: Int)
+    /** LEVEL CAP on the DS (pk_nds_field.cpp): 1..99, 0 = none. Emu thread. */
+    external fun pkNdsLevelCap(level: Int)
 
     /** A DS game's screens fading by master brightness (towards black or white): the factor 0-16, the top screen's in
      * bits 0-7, the touch screen's in 8-15; 0 = no fade. Emu thread, after [pkRunFrame]. */

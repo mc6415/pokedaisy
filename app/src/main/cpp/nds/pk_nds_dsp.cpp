@@ -548,6 +548,7 @@ void pk_ndsd_set_cpu_boost(bool) {}
 
 // EXP SHARE: melonDS's alone (its FULL EXP patches the battle overlay's code, which DSperate's recompiler wouldn't see).
 void pk_ndsd_set_exp_share(int, uint32_t) {}
+void pk_ndsd_set_level_cap(int) {}
 
 int pk_ndsd_set_cheats(const uint32_t* words, int nWords, const int32_t* lengths, int nCheats)
 {

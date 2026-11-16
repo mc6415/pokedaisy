@@ -1686,6 +1686,12 @@ Java_com_pokedaisy_app_MgbaCore_pkNdsExpShare(JNIEnv* env, jobject thiz, jint mo
     if (pk_nds_active()) pk_nds_set_exp_share((int) mode, (uint32_t) mask);
 }
 
+// LEVEL CAP on the DS (pk_nds.cpp's levelCapTick): 1..99, 0 = none. Emu thread.
+JNIEXPORT void JNICALL
+Java_com_pokedaisy_app_MgbaCore_pkNdsLevelCap(JNIEnv* env, jobject thiz, jint level) {
+    if (pk_nds_active()) pk_nds_set_level_cap((int) level);
+}
+
 // DS LAYOUT floats the X menu on one screen: it comes back after a menu screen left by touch. Emu thread.
 JNIEXPORT void JNICALL
 Java_com_pokedaisy_app_MgbaCore_pkNdsKeepStartMenu(JNIEnv* env, jobject thiz, jboolean on) {

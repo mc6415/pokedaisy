@@ -49,6 +49,7 @@ using namespace melonDS;
 
 static void reusableTmsTick(void);   // REUSABLE TMS, after every frame (below)
 static void expShareTick(void);   // EXP SHARE, after every frame (below)
+static void levelCapTick(void);   // LEVEL CAP, after every frame (below)
 
 namespace {
 
@@ -82,6 +83,8 @@ struct Ds {
     bool keepStartMenu = false;              // DS LAYOUT floats the X menu: it comes back after a screen left by touch
     int expShare = 0;                        // EXP SHARE: 0 off, 1 SPLIT, 2 FULL EXP (expShareTick)
     uint32_t expMask = 0;                    // the party slots that aren't eggs (sideGetExpMask's bits)
+    int levelCap = 0;                        // LEVEL CAP: 1..99, 0 = none (levelCapTick)
+    int levelCapIn = 0;                      // the cap the battle's checks hold now (0 = the game's own)
     bool expPatched = false;                 // FULL EXP's patch is ours, so taking it out puts the game's back
     bool cpuBoost = false;                   // DS CPU BOOST: the ARM9 at twice the DS's clock (setArm9Shift)
     int menuLitFrames = 0;                   // frames this menu screen has been lit (its closing fade comes after)
@@ -340,6 +343,7 @@ void pk_ndsm_run_frame(void)
     ds->fieldBits = pk_ndsm_field_bits();
     reusableTmsTick();
     expShareTick();
+    levelCapTick();
     pk_nds_call_frame(nds, ds->field);
     if (ds->wide) {
         // The overworld only: the field map on screen with nothing over it (a text box keeps it) - or a battle that's
@@ -664,6 +668,18 @@ static void expShareTick(void)
 {
     if (!ds || !ds->field) return;
     ds->expPatched = pk_nds_exp_share_tick(ds->field, ds->expShare, ds->expMask, ds->expPatched, mainRead32, mainWrite32, expWrite16);
+}
+
+// LEVEL CAP (pk_nds_level_cap_tick): the battle's EXP checks at the cap while its code is loaded.
+static void levelCapTick(void)
+{
+    if (!ds || !ds->field) return;
+    ds->levelCapIn = pk_nds_level_cap_tick(ds->field, ds->levelCap, ds->levelCapIn, mainRead32, expWrite16);
+}
+
+void pk_ndsm_set_level_cap(int level)
+{
+    if (ds) ds->levelCap = level;
 }
 
 void pk_ndsm_set_exp_share(int mode, uint32_t mask)

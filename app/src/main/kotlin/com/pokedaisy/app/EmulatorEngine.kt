@@ -1554,6 +1554,8 @@ class EmulatorEngine(
                     MgbaCore.pkNdsCpuBoost(ndsCpuBoost)
                     // EXP SHARE (Gen 4): the native side marks the battle's party and patches FULL EXP's division.
                     MgbaCore.pkNdsExpShare(if (expShareFound?.ds == true) expShareMode.id else 0, expShareMask)
+                    // LEVEL CAP: the battle's EXP checks, patched natively while its code is loaded.
+                    MgbaCore.pkNdsLevelCap(if (levelCapFound?.ds == true) levelCapLevel else 0)
                 }
                 fieldState = when {
                     nds -> MgbaCore.pkFieldState(false, wildKeep)
@@ -2076,7 +2078,13 @@ class EmulatorEngine(
         option("reusable TMs", reusableTms && sites.isNotEmpty()) {
             sites.all { MgbaCore.pkRomPatch(it.at, it.expect, it.branch, it.value) }
         }
-        // A Game Boy cart: REUSABLE TMS alone (ReusableTms.gbSites); the rest are GBA patches.
+        // LEVEL CAP: the GBA's getexp (LevelCap) or a Game Boy cart's EXP cap (LevelCapGb); a DS game's is native.
+        val cap = levelCapFound
+        val capLevel = levelCapLevel
+        option("level cap $capLevel", cap != null && !cap.ds && capLevel in 1..99) {
+            com.pokedaisy.app.companion.data.LevelCap.writes(cap!!, capLevel).all { MgbaCore.pkRomPatch(it.addr, it.expect, it.addr, it.value) }
+        }
+        // A Game Boy cart: REUSABLE TMS and LEVEL CAP alone; the rest are GBA patches.
         if (!gba) return
         val text = textPatch
         option("instant text", instantText && text != null) {
@@ -2089,11 +2097,6 @@ class EmulatorEngine(
         val exp = expShareFound
         option("exp share full", expShareMode == com.pokedaisy.app.companion.data.ExpShare.Mode.FULL && exp != null) {
             exp!!.full.all { MgbaCore.pkRomPatch(it.addr, it.expect, it.addr, it.value) }
-        }
-        val cap = levelCapFound
-        val capLevel = levelCapLevel
-        option("level cap $capLevel", cap != null && capLevel in 1..99) {
-            com.pokedaisy.app.companion.data.LevelCap.writes(cap!!, capLevel).all { MgbaCore.pkRomPatch(it.addr, it.expect, it.addr, it.value) }
         }
     }
 

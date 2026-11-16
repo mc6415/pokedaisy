@@ -82,6 +82,8 @@ void pk_nds_set_reusable_tms(bool on);
 void pk_nds_set_keep_start_menu(bool on);
 /** EXP SHARE (Gen 4, melonDS): 0 off, 1 SPLIT, 2 FULL EXP; [mask] the party slots that aren't eggs. Emu thread. */
 void pk_nds_set_exp_share(int mode, uint32_t mask);
+/** LEVEL CAP (Platinum, HG / SS, Black / White / Black 2 / White 2 US; melonDS): 1..99, 0 = none. Emu thread. */
+void pk_nds_set_level_cap(int level);
 /** DS CPU BOOST: the ARM9 at twice the DS's clock (fewer of a game's own slow frames). Emu thread, between frames. */
 void pk_nds_set_cpu_boost(bool on);
 // Action Replay DS codes into melonDS's AREngine (it runs them on the ARM7's VBlank), replacing the ones before:

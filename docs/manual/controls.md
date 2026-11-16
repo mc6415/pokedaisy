@@ -285,7 +285,7 @@ A Pokémon at the cap gains nothing from a win until you beat that boss. One tha
 
 Only EXP from battles is capped: items that raise a level and the day care still work. Pair it with `EXP SHARE` to keep the whole team at the cap.
 
-It works in FireRed, LeafGreen and Emerald, in every language and release PokeDaisy supports, and in many hacks built on their code. Where it can't work, or the game has no NEXT BOSS page to follow, the row shows `N/A`. Turning it off puts the game back as it was.
+It works in FireRed, LeafGreen and Emerald, in every language and release PokeDaisy supports, in many hacks built on their code, in the English Red, Blue, Yellow, Gold, Silver and Crystal, in the American Platinum, HeartGold and SoulSilver, and in the American and European Black, White, Black 2 and White 2 (with `DS CORE` on melonDS). A Pokémon that's already past the cap (from an item or a catch) keeps its level and just stops growing until the cap catches up. Where it can't work, or the game has no NEXT BOSS page to follow, the row shows `N/A`. Turning it off puts the game back as it was.
 
 ## NO HMS NEEDED
 

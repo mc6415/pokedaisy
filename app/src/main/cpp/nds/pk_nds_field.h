@@ -128,6 +128,14 @@ int pk_nds_battle_command(const PkNdsFieldGame* game, uint32_t (*read32)(uint32_
 bool pk_nds_exp_share_tick(const PkNdsFieldGame* game, int mode, uint32_t mask, bool patched, uint32_t (*read32)(uint32_t),
                            void (*write32)(uint32_t, uint32_t), void (*write16)(uint32_t, uint16_t));
 
+/**
+ * LEVEL CAP on the DS (Platinum, HeartGold / SoulSilver, Black / White / Black 2 / White 2 US), after every frame: [cap]
+ * 1..99 (0 = none) put into the battle's EXP checks while its code is loaded, [written] the cap in now (as this returned last
+ * time). Returns the cap in now (0 = the game's own 100 everywhere).
+ */
+int pk_nds_level_cap_tick(const PkNdsFieldGame* game, int cap, int written, uint32_t (*read32)(uint32_t),
+                          void (*write16)(uint32_t, uint16_t));
+
 /** The running battle's BattleContext (Gen 4's battle engine: Platinum, HeartGold / SoulSilver), or 0: no battle, or not that engine. */
 uint32_t pk_nds_battle_context(const PkNdsFieldGame* game, uint32_t (*read32)(uint32_t addr));
 /** Gen 5's battle touch screen as the touch rules read it: [out] = the panel's kind, whether it takes taps, the screen

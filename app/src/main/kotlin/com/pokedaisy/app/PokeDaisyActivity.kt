@@ -2858,6 +2858,12 @@ class PokeDaisyActivity : Activity() {
             if (tmSites.isNotEmpty()) Log.i("pokedaisy", "reusable TMs: Game Boy ConsumeTM found")
             if (::engine.isInitialized) engine.setReusableTms(tmSites, Prefs(this).reusableTms)
         }
+        // LEVEL CAP on the English carts: the EXP routine's cap at the next boss's top level (LevelCapGb; none = N/A).
+        if (gbRom != null && gbSha1 != null && romBlocked == null) {
+            levelCapFound = com.pokedaisy.app.companion.data.LevelCapGb.find(gbSha1, gbRom)
+            Log.i("pokedaisy", "level cap: ${if (levelCapFound != null) "found (Game Boy)" else "not found"}")
+            syncLevelCap()
+        }
         ffMusicRenderer = when {
             gba -> FfMusicRenderer(r, crc, ffMusicCache, clickSound, unlockSound).also { it.start() }
             gen1Music != null -> Gen1MusicRenderer(r, gen1Music!!, ffMusicCache).also { it.start() }
@@ -6262,6 +6268,10 @@ class PokeDaisyActivity : Activity() {
             expShareFound = com.pokedaisy.app.companion.data.ExpShare.dsFind(romCode, romRev, dsperate, hack)
             Log.i("pokedaisy", "exp share: ${if (expShareFound != null) "found (DS)" else "not found"}")
             syncExpShare()
+            // LEVEL CAP on the DS: the same carts' battle EXP checks (LevelCap.dsFind; none = N/A).
+            levelCapFound = com.pokedaisy.app.companion.data.LevelCap.dsFind(romCode, romRev, dsperate, hack)
+            Log.i("pokedaisy", "level cap: ${if (levelCapFound != null) "found (DS)" else "not found"}")
+            syncLevelCap()
         }
     }
 

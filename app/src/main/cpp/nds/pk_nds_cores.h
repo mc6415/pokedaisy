@@ -30,6 +30,7 @@
     X(void, set_reusable_tms, (bool on), (on)) \
     X(void, set_keep_start_menu, (bool on), (on)) \
     X(void, set_exp_share, (int mode, uint32_t mask), (mode, mask)) \
+    X(void, set_level_cap, (int level), (level)) \
     X(void, set_cpu_boost, (bool on), (on)) \
     X(int, set_cheats, (const uint32_t* words, int nWords, const int32_t* lengths, int nCheats), (words, nWords, lengths, nCheats)) \
     X(int, bgm, (void), ()) \

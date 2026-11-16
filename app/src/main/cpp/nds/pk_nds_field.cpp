@@ -1057,6 +1057,65 @@ bool pk_nds_exp_share_tick(const PkNdsFieldGame* g, int mode, uint32_t mask, boo
     return mode == 2 && ours;
 }
 
+// LEVEL CAP on the DS: the battle's own "level 100" checks made the cap's.
+// Gen 4 (pret's pokeplatinum BattleScript_GetExpTask / pokeheartgold Task_GetExp): a Pokémon gets EXP only while its level
+// != MAX_POKEMON_LEVEL (`cmp r0, #100; bne`) -> `cmp r0, #cap; bcc`, so none at or past the cap; Pokemon_ShouldLevelUp /
+// Pokemon_TryLevelUp (ARM9) stops at 100 (`cmp r1, #100; bls`, the next level) -> the cap, so a win that crosses it stops
+// there. That ARM9 function is also the day care's: it's capped only while the battle's overlay holds our bytes, and put
+// back as soon as it doesn't (the day care runs on the field).
+// Gen 5 (no decomp; Black's overlay 93 read by hand): the EXP loop skips a Pokémon whose level >= 100 (`cmp r0, #100;
+// bge`) and the level-up step (one level a call) stops at 100 (`cmp r2, #100; blo`), returning without adding the rest of
+// the EXP - so the cap there is GBA's rule exactly: nothing at the cap, a crossing win's rest lost. White is Black's code
+// 0x20 higher, Black 2's overlay 167 by the same bytes, White 2 Black 2's 0x40 higher.
+namespace {
+struct CapSite { uint32_t addr; uint16_t orig; uint16_t patched; bool imm; bool arm9; };   // imm: the cap into the low byte
+struct CapGame { int callSet; CapSite sites[3]; int n; };
+const CapGame CAP_GAMES[] = {
+    {1, {{0x02249008, 0x2864, 0x2800, true, false}, {0x0224900A, 0xD100, 0xD300, false, false}, {0x02076B68, 0x2964, 0x2900, true, true}}, 3},
+    {2, {{0x02245A2C, 0x2864, 0x2800, true, false}, {0x02245A2E, 0xD100, 0xD300, false, false}, {0x02070E08, 0x2964, 0x2900, true, true}}, 3},
+    {3, {{0x021C5384, 0x2864, 0x2800, true, false}, {0x021D69C4, 0x2A64, 0x2A00, true, false}}, 2},   // Black (overlay 93)
+    {4, {{0x021C53A4, 0x2864, 0x2800, true, false}, {0x021D69E4, 0x2A64, 0x2A00, true, false}}, 2},   // White
+    {5, {{0x021A8E9C, 0x2864, 0x2800, true, false}, {0x021BC1C4, 0x2A64, 0x2A00, true, false}}, 2},   // Black 2 (overlay 167)
+    {6, {{0x021A8EDC, 0x2864, 0x2800, true, false}, {0x021BC204, 0x2A64, 0x2A00, true, false}}, 2},   // White 2
+};
+uint16_t capValue(const CapSite& s, int cap) { return s.imm ? (uint16_t) (s.patched | (cap & 0xFF)) : s.patched; }
+}
+
+int pk_nds_level_cap_tick(const PkNdsFieldGame* g, int cap, int written, uint32_t (*read32)(uint32_t),
+                          void (*write16)(uint32_t, uint16_t))
+{
+    if (!g) return 0;
+    const CapGame* e = nullptr;
+    for (const CapGame& x : CAP_GAMES) if (x.callSet == g->callSet) e = &x;
+    if (!e) return 0;
+    if (cap < 1 || cap > 99) cap = 0;
+    auto r16 = [&](uint32_t a) { return (uint16_t) (read32(a & ~3u) >> ((a & 2) * 8)); };
+    // The battle's sites (an overlay: there only in a battle) as the game has them, or ours at the written cap.
+    bool orig = true, ours = written != 0;
+    for (int k = 0; k < e->n; k++) {
+        if (e->sites[k].arm9) continue;
+        const uint16_t now = r16(e->sites[k].addr);
+        orig &= now == e->sites[k].orig;
+        ours &= written && now == capValue(e->sites[k], written);
+    }
+    auto arm9Ok = [&](int c) {   // every ARM9 site the game's (c = 0) or ours at c
+        for (int k = 0; k < e->n; k++)
+            if (e->sites[k].arm9 && r16(e->sites[k].addr) != (c ? capValue(e->sites[k], c) : e->sites[k].orig)) return false;
+        return true;
+    };
+    if (cap && (orig || (ours && written != cap)) && (arm9Ok(0) || (written && arm9Ok(written)))) {
+        for (int k = 0; k < e->n; k++) write16(e->sites[k].addr, capValue(e->sites[k], cap));
+        return cap;
+    }
+    if (cap && ours && written == cap) return cap;
+    // Off, or the battle's code gone: ours out (the overlay's bytes go with it; ARM9's are put back).
+    if (written) {
+        if (ours) for (int k = 0; k < e->n; k++) if (!e->sites[k].arm9) write16(e->sites[k].addr, e->sites[k].orig);
+        if (arm9Ok(written)) for (int k = 0; k < e->n; k++) if (e->sites[k].arm9) write16(e->sites[k].addr, e->sites[k].orig);
+    }
+    return 0;
+}
+
 uint32_t pk_nds_battle_context(const PkNdsFieldGame* g, uint32_t (*read32)(uint32_t))
 {
     if (!g || g->gen == 5 || g->battleManagerPtr || !g->offBattleContext) return 0;
