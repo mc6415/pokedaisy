@@ -233,6 +233,17 @@ class GbRandomizerTest {
     }
 
     @Test
+    fun `GYM TYPES, RIVAL, WILD LEVELS and HABITATS do what they say`() = each { g, rom ->
+        val retail = GbRandomizer.view(rom, g)
+        for ((mode, seed) in listOf(RomRandomizer.BossTypes.OWN to 41L, RomRandomizer.BossTypes.RANDOM to 42L)) {
+            val made = GbRandomizer.randomize(rom, RunModesCheck.BOSSES.copy(bossTypes = mode), seed)!!
+            assertSame(g, GbRandomizer.recognise(made))
+            // Yellow's rival carries an Eevee, not a starter.
+            RunModesCheck.bosses(g.title, g.gen, retail, GbRandomizer.view(made, g), mode, rival = g.starters.isNotEmpty())
+        }
+    }
+
+    @Test
     fun `EVOLUTIONS moves every evolution's target and the starters still evolve twice`() = each { g, rom ->
         val made = GbRandomizer.randomize(rom, EVOLVE_ABILITIES, 31L)!!
         assertSame(g, GbRandomizer.recognise(made))

@@ -2720,8 +2720,9 @@ fun main(args: Array<String>) {
         Shot("library-randomize-style", tw, th, td, activity { LibraryActivity().apply { randomizer.wizard("ready", com.pokedaisy.app.RomRandomizeFlow.Page.STYLE) } }),
         Shot("library-randomize-style-phone", 1080, 2400, 2.625f, activity { LibraryActivity().apply { randomizer.wizard("ready", com.pokedaisy.app.RomRandomizeFlow.Page.STYLE) } }),
         Shot("library-randomize-pokemon", tw, th, td, activity { LibraryActivity().apply { randomizer.wizard("ready", com.pokedaisy.app.RomRandomizeFlow.Page.POKEMON) } }),
-        Shot("library-randomize-wild", tw, th, td, activity { LibraryActivity().apply { randomizer.wizard("ready", com.pokedaisy.app.RomRandomizeFlow.Page.POKEMON) } }) {
-            onNodeWithText("WILD POKéMON").performClick()
+        Shot("library-randomize-wild-page", tw, th, td, activity { LibraryActivity().apply { randomizer.wizard("ready", com.pokedaisy.app.RomRandomizeFlow.Page.WILD) } }),
+        Shot("library-randomize-wild", tw, th, td, activity { LibraryActivity().apply { randomizer.wizard("ready", com.pokedaisy.app.RomRandomizeFlow.Page.WILD) } }) {
+            onAllNodesWithText("WILD POKéMON")[1].performClick()
         },
         Shot("library-randomize-extras-phone", 1080, 2400, 2.625f, activity { LibraryActivity().apply { randomizer.wizard("ready", com.pokedaisy.app.RomRandomizeFlow.Page.EXTRAS) } }),
         Shot("library-randomize-rules", tw, th, td, activity { LibraryActivity().apply { randomizer.wizard("ready", com.pokedaisy.app.RomRandomizeFlow.Page.RULES) } }),

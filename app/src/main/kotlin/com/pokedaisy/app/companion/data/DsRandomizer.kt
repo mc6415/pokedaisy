@@ -55,6 +55,10 @@ object DsRandomizer {
         val text: StarterText? = null,
         /** The item balls' scripts ([Balls]), or null. */
         val balls: Balls? = null,
+        /** GYM TYPES: the trainer classes of the Gym Leaders, the Elite Four and the Champion (trdata's +1). */
+        val bossClasses: Set<Int> = emptySet(),
+        /** RIVAL: the classes of the rival(s) who carry a starter. */
+        val rivalClasses: Set<Int> = emptySet(),
     )
 
     /**
@@ -126,7 +130,7 @@ object DsRandomizer {
 
     val GAMES = listOf(
         Game(
-            "CPUE", 1, "Platinum", "5d5cabda01a05c31d9fa94864ddecc82d254d8f3", "7f22ca5f3cd545efc6b5218d6fdc6169ba2ec0fd",
+            "CPUE", 1, "Platinum", "5d5cabda01a05c31d9fa94864ddecc82d254d8f3", "aac272136dd5607ae0cbeb126788253d848cbf0e",
             starterOverlay = 78, starterOffsets = listOf(0x1BC0, 0x1BC4, 0x1BC8),
             encounters = "/fielddata/encountdata/pl_enc_data.narc",
             trainers = "/poketool/trainer/trdata.narc", trainerParties = "/poketool/trainer/trpoke.narc",
@@ -137,10 +141,12 @@ object DsRandomizer {
             sprites = SpritePatch(at = 0x690, len = 42, getSpecies = 0x021D291C, makeSprite = 0x021D1468),
             text = StarterText("/msgdata/pl_msg.narc", bank = 360, lines = listOf(1, 2, 3), names = 412),
             balls = Balls("/fielddata/script/scr_seq.narc", 404, events = "/fielddata/eventdata/zone_event.narc"),
+            // pret/pokeplatinum's trainer classes: the leaders, the Elite Four, CYNTHIA; the rival (Barry).
+            bossClasses = setOf(62, 64, 65, 66, 67, 68, 69) + (74..79), rivalClasses = setOf(63),
         ),
     ) + listOf(
-        Triple("IPKE", "HeartGold", "eae1ff0c304d5649a415f6cab09ae525b2a9dd46" to "96bf66f401859ad91bcf864914b5fb3f7df0fb68"),
-        Triple("IPGE", "SoulSilver", "c952be7a10f9b8d4ffd299ccc6d0fada08ab5402" to "69c1b999e7026407daa3e9fd1be73ed30c706b9d"),
+        Triple("IPKE", "HeartGold", "eae1ff0c304d5649a415f6cab09ae525b2a9dd46" to "07d7b3c921a5e9a4b899ac463ef91ed920c782ed"),
+        Triple("IPGE", "SoulSilver", "c952be7a10f9b8d4ffd299ccc6d0fada08ab5402" to "f0b8196269b7663d1ce0a9beeec7cad078d16121"),
     ).map { (code, title, hashes) ->
         // pret/pokeheartgold: choose_starter.c's species (ARM9), choose_starter_app.c's sSpecies (overlay 61), msg_0190.
         Game(
@@ -149,10 +155,12 @@ object DsRandomizer {
             personal = "/a/0/0/2", evolutions = "/a/0/3/4", learnsets = "/a/0/3/3", moves = "/a/0/1/1", speciesCount = 493,
             text = StarterText("/a/0/2/7", bank = 190, lines = listOf(1, 2, 3), names = 237, inBall = listOf(4, 5, 6), hgss = true),
             balls = Balls("/a/0/1/2", 141, events = "/a/0/3/2"),
+            // pret/pokeheartgold's TRAINERCLASS_*: the Johto and Kanto leaders, the Elite Four, the Champion, RED; the rival.
+            bossClasses = setOf(66, 67, 70, 72, 73, 74, 75, 76, 86, 87, 88, 89, 98) + (103..110) + setOf(112), rivalClasses = setOf(23),
         )
     } + listOf(
-        Triple("IRBO", "Black", "0755b5db26c5b4ba029c3490b46e16681a667526" to "e98e7187b41e1a5e17c1f8d95853822c179a15a6"),
-        Triple("IRAO", "White", "d374a4cd16883bba0bbed6858a2110b88f9a45e0" to "1b5f78c58d4a6e1da627b14e8b19085831a8ed37"),
+        Triple("IRBO", "Black", "0755b5db26c5b4ba029c3490b46e16681a667526" to "c83532883d42091842fec63eb59050caff7ab49b"),
+        Triple("IRAO", "White", "d374a4cd16883bba0bbed6858a2110b88f9a45e0" to "dfd0373012ab9eae4e6de84c834c8d34df570c90"),
     ).map { (code, title, hashes) ->
         // No decomp: the archives from the cart (scripts/gen_gen5_guide.py's FILES_BW), the choice screen overlay 223's list.
         Game(
@@ -161,10 +169,12 @@ object DsRandomizer {
             encounters = "/a/1/2/6", trainers = "/a/0/9/2", trainerParties = "/a/0/9/3",
             personal = "/a/0/1/6", evolutions = "/a/0/1/9", learnsets = "/a/0/1/8", moves = "/a/0/2/1", speciesCount = 649,
             balls = Balls("/a/0/5/7", 864, at = 2, events = "/a/1/2/5"),
+            // Read off the carts (the GUIDE's bosses' trainers): the leaders, the Elite Four, ALDER; Cheren and Bianca.
+            bossClasses = setOf(10, 11, 12, 19, 20, 21, 22, 23, 54, 55, 56, 78, 79, 80, 81, 89), rivalClasses = setOf(37, 38),
         )
     } + listOf(
-        Triple("IREO", "Black 2", "88ce3290c2ef6b921388ffea79166a14905e5488" to "660454df848c25979ae55e256f79c63095162264"),
-        Triple("IRDO", "White 2", "219c256de4c963766639d41436fffdfa5f01851d" to "accda40c58fe5b86a2b095ae8e60903d740fad2c"),
+        Triple("IREO", "Black 2", "88ce3290c2ef6b921388ffea79166a14905e5488" to "771d0f9fd21299a5a4e07e9f8440672b57bf0f6b"),
+        Triple("IRDO", "White 2", "219c256de4c963766639d41436fffdfa5f01851d" to "1bacb4014bd8c9982550874993e92f2ad1f4cd45"),
     ).map { (code, title, hashes) ->
         // pret has no decomp of these: the archives from the cart (scripts/gen_gen5_guide.py reads the same ones).
         Game(
@@ -173,6 +183,8 @@ object DsRandomizer {
             encounters = "/a/1/2/7", trainers = "/a/0/9/1", trainerParties = "/a/0/9/2",
             personal = "/a/0/1/6", evolutions = "/a/0/1/9", learnsets = "/a/0/1/8", moves = "/a/0/2/1", speciesCount = 649,
             balls = Balls("/a/0/5/6", 1240, at = 2, events = "/a/1/2/6"),
+            // Read off the carts: the leaders, the Elite Four, IRIS; Hugh.
+            bossClasses = (112..119).toSet() + setOf(78, 79, 80, 81, 193), rivalClasses = setOf(145),
         )
     }
 
@@ -188,6 +200,9 @@ object DsRandomizer {
     private val GOOD_ROD = water(336)
     private val SUPER_ROD = water(380)
     private val ENCOUNTER_SPECIES = GRASS + TIMED + SURF + OLD_ROD + GOOD_ROD + SUPER_ROD
+
+    // Platinum's surfing and fishing tables (the unused one at 248 left out): each WaterEncounter's two levels.
+    private val WATER_TABLES = listOf(204, 292, 336, 380)
 
     // HeartGold / SoulSilver's EncounterData (include/wild_encounter.h), 0xC4 bytes: every u16 species word.
     private val HG_MORNING = (0 until 12).map { 0x14 + it * 2 }
@@ -214,6 +229,46 @@ object DsRandomizer {
     private fun itemAt(gen: Int, type: Int) = if (type and 2 != 0) (if (gen == 5) 8 else 6) else -1
     private fun movesAt(gen: Int, type: Int) = if (type and 1 != 0) (if (gen == 5) 8 else 6) + (if (type and 2 != 0) 2 else 0) else -1
     private fun speciesMask(gen: Int) = if (gen == 5) 0x7FF else 0x3FF
+
+    /**
+     * WILD LEVELS: every level byte in encounter archive [narc]. Platinum: each grass slot's (the s8 before its species) and
+     * each water slot's two (max, min); HeartGold / SoulSilver: the twelve land levels the times share (+8) and each water /
+     * rock slot's min and max; Gen 5: each slot's min and max (after its species word).
+     */
+    private fun levelSites(gen: Int, narc: Narc, hgss: Boolean, each: (at: Int) -> Unit) {
+        for (m in 0 until narc.size) {
+            val start = narc.start(m)
+            val size = narc.end(m) - start
+            if (hgss) {
+                if (size < 0xC4) continue
+                for (i in 0 until 12) each(start + 8 + i)
+                for (s in HG_SURF + HG_ROCK + HG_OLD_ROD + HG_GOOD_ROD + HG_SUPER_ROD) { each(start + s - 2); each(start + s - 1) }
+            } else if (gen == 5) {
+                for (b in 0 until size / GEN5_BLOCK) for (i in 0 until GEN5_SLOTS) {
+                    val at = start + b * GEN5_BLOCK + 8 + i * 4
+                    each(at + 2); each(at + 3)
+                }
+            } else {
+                if (size < 0x1A8) continue
+                for (s in GRASS) each(start + s - 4)
+                for (base in WATER_TABLES) for (i in 0 until 5) { each(start + base + 4 + i * 8); each(start + base + 5 + i * 8) }
+            }
+        }
+    }
+
+    /** HABITATS: where an encounter species word [rel] bytes into its member is - water (surfing, fishing), a smashed rock
+     * (HeartGold / SoulSilver), else land (DS caves aren't told apart). */
+    private fun habitatAt(gen: Int, hgss: Boolean, rel: Int): SpeciesPicker.Habitat = when {
+        hgss -> when (rel) {
+            in HG_SURF, in HG_OLD_ROD, in HG_GOOD_ROD, in HG_SUPER_ROD, 0xBE, HG_NIGHT_FISH, 0xC2 -> SpeciesPicker.Habitat.WATER
+            in HG_ROCK -> SpeciesPicker.Habitat.ROCKS
+            else -> SpeciesPicker.Habitat.LAND
+        }
+        // Gen 5's 56 slots: grass, dark grass and rustling grass (12 each), then surfing, rippling surf, fishing, rippling fishing.
+        gen == 5 -> if (((rel - 8) % GEN5_BLOCK) / 4 >= 36) SpeciesPicker.Habitat.WATER else SpeciesPicker.Habitat.LAND
+        rel in SURF || rel in OLD_ROD || rel in GOOD_ROD || rel in SUPER_ROD -> SpeciesPicker.Habitat.WATER
+        else -> SpeciesPicker.Habitat.LAND
+    }
 
     /** Every species word in encounter archive [narc]: its place and width (Platinum's are u32, Gen 5's u16). */
     private fun encounterSites(gen: Int, narc: Narc, each: (member: Int, at: Int, width: Int) -> Unit, hgss: Boolean = false) {
@@ -407,6 +462,7 @@ object DsRandomizer {
                 for (at in g.starterOffsets) for (i in 0 until 4) o[at + i] = 0
                 g.sprites?.let { sp -> for (i in 0 until sp.len) o[sp.at + i] = 0 }
                 encounterSites(g.gen, Narc(e), { _, at, width -> for (i in 0 until width) e[at + i] = 0 }, g.hgss)
+                levelSites(g.gen, Narc(e), g.hgss) { at -> e[at] = 0 }
                 trainerMons(Narc(p)) { at, moves ->
                     p[at + 2] = 0
                     p[at + 4] = 0; p[at + 5] = 0
@@ -515,7 +571,13 @@ object DsRandomizer {
         }
 
         /** Each trainer Pokémon in [narc] (trpoke): its record and its moves' place (-1 none), as absolute places in it. */
-        fun trainerMons(narc: Narc, each: (at: Int, moves: Int) -> Unit) {
+        fun trainerMons(narc: Narc, each: (at: Int, moves: Int) -> Unit) = trainerMonsOf(narc) { _, at, moves -> each(at, moves) }
+
+        /** A trainer's class (trdata's +1). */
+        fun trainerClass(t: Int): Int = trdata.member(t).let { if (it.size > 1) it[1].toInt() and 0xFF else -1 }
+
+        /** [trainerMons] with each one's trainer number. */
+        fun trainerMonsOf(narc: Narc, each: (t: Int, at: Int, moves: Int) -> Unit) {
             for (t in 0 until minOf(trdata.size, narc.size)) {
                 val head = trdata.member(t)
                 if (head.size < 4) continue
@@ -525,7 +587,7 @@ object DsRandomizer {
                 if (narc.end(t) - narc.start(t) < count * stride) continue
                 for (i in 0 until count) {
                     val at = narc.start(t) + i * stride
-                    each(at, movesAt(g.gen, type).let { if (it < 0) -1 else at + it })
+                    each(t, at, movesAt(g.gen, type).let { if (it < 0) -1 else at + it })
                 }
             }
         }
@@ -661,7 +723,24 @@ object DsRandomizer {
             if (s in 1..g.speciesCount) wild.getOrPut(m) { ArrayList() } += s
         })
         val trainers = ArrayList<Pair<Int, Int>>()
-        f.trainerMons(Narc(f.parties)) { at, _ -> trainers += (u16(f.parties, at + 4) and speciesMask(g.gen)) to (f.parties[at + 2].toInt() and 0xFF) }
+        val bosses = ArrayList<String?>()
+        val rivals = ArrayList<Boolean>()
+        f.trainerMonsOf(Narc(f.parties)) { t, at, _ ->
+            trainers += (u16(f.parties, at + 4) and speciesMask(g.gen)) to (f.parties[at + 2].toInt() and 0xFF)
+            val cls = f.trainerClass(t)
+            bosses += cls.toString().takeIf { cls in g.bossClasses }
+            rivals += cls in g.rivalClasses
+        }
+        val encNarc = Narc(f.enc)
+        val wildLevels = ArrayList<Int>().also { l -> levelSites(g.gen, encNarc, g.hgss) { l += f.enc[it].toInt() and 0xFF } }
+        val water = ArrayList<Int>()
+        encounterSites(g.gen, encNarc, hgss = g.hgss, each = { m, at, width ->
+            val s = (if (width == 4) u32(f.enc, at) else u16(f.enc, at)) and speciesMask(g.gen)
+            if (s in 1..g.speciesCount && habitatAt(g.gen, g.hgss, at - encNarc.start(m)) == SpeciesPicker.Habitat.WATER) water += s
+        })
+        val starters = g.packedStarters?.let { ps ->
+            (0 until 3).map { i -> if (ps.width == 2) u16(f.packedOverlay!!, ps.overlayOffset + i * 2) else u32(f.packedOverlay!!, ps.overlayOffset + i * 4) }
+        } ?: g.starterOffsets.map { u32(f.overlay, it) }
         val personal = Narc(f.personal)
         val evolutions = ArrayList<Triple<Int, Int, Int>>().also { l -> f.evolutionTargets(f.evo) { s, at -> l += Triple(s, u16(f.evo, at - 4), u16(f.evo, at)) } }
         val abilities = LinkedHashMap<Int, MutableList<Int>>()
@@ -671,7 +750,7 @@ object DsRandomizer {
         }
         CartView(wild.values.toList(), trainers, { s ->
             if (s !in 1..g.speciesCount) emptySet() else personal.member(s).let { m -> setOf(m[6].toInt() and 0xFF, m[7].toInt() and 0xFF) }
-        }, evolutions, abilities)
+        }, evolutions, abilities, wildLevels, water, bosses, rivals, starters)
     }
 
     /** [path]'s gift / static Pokémon: the species at each of each one's places (tests). */
@@ -790,6 +869,47 @@ object DsRandomizer {
         )
         val pool get() = picker.pool
 
+        /** RIVAL: the starters as the cart had them (grass, fire, water: before EVOLUTIONS and STARTERS), and their lines. */
+        val oldStarters: List<Int> = g.packedStarters?.let { ps ->
+            (0 until 3).map { i -> if (ps.width == 2) u16(f.packedOverlay!!, ps.overlayOffset + i * 2) else u32(f.packedOverlay!!, ps.overlayOffset + i * 4) }
+        } ?: g.starterOffsets.map { u32(f.overlay, it) }
+        val oldLines = oldStarters.map { s -> SpeciesPicker.chain(s) { evolvesTo[it].orEmpty() } }
+        var newStarters = oldStarters
+
+        /** RIVAL: [SpeciesPicker.rivalSwap] for trainer [t]'s Pokémon, or null. */
+        fun rivalNew(t: Int, species: Int): Int? =
+            if (!o.rivalStarter || f.trainerClass(t) !in g.rivalClasses || oldLines.size < 3) null
+            else SpeciesPicker.rivalSwap(species, oldLines, newStarters.map { s -> SpeciesPicker.chain(s) { evolvesTo[it].orEmpty() } })
+
+        /** RIVAL: each of the rival's starter-line Pokémon's record, its new species and its moves' place. */
+        var rivalPlan: Map<Int, Pair<Int, Int>> = emptyMap()
+
+        fun planRivals() {
+            val plan = HashMap<Int, Pair<Int, Int>>()
+            f.trainerMonsOf(Narc(f.parties)) { t, at, moves ->
+                rivalNew(t, u16(f.parties, at + 4) and speciesMask(g.gen))?.let { plan[at] = it to moves }
+            }
+            rivalPlan = plan
+        }
+
+        /** RIVAL: the planned Pokémon made the new starters' (their moves as the game picks them). */
+        fun rivals() {
+            for ((at, p) in rivalPlan) {
+                val (now, moves) = p
+                put16(f.parties, at + 4, now)
+                if (g.gen == 5) put16(f.parties, at + 6, 0)
+                if (moves >= 0) {
+                    val list = movesAt(now, f.parties[at + 2].toInt() and 0xFF)
+                    for (k in 0 until 4) put16(f.parties, moves + k * 2, list.getOrElse(k) { 0 })
+                }
+            }
+        }
+
+        /** WILD LEVELS: every wild level byte raised. */
+        fun wildLevels() {
+            levelSites(g.gen, Narc(f.enc), g.hgss) { at -> f.enc[at] = SpeciesPicker.scaled(f.enc[at].toInt() and 0xFF, o.wildLevelScale).toByte() }
+        }
+
         fun all() {
             // Stats and learnsets first: the strength match keeps working (the totals stay) and trainers' moves follow.
             if (o.baseStats) baseStats()
@@ -799,9 +919,13 @@ object DsRandomizer {
             if (o.evolutions) evolutions()
             starters()
             wild()
+            if (o.wildLevelScale > 0) wildLevels()
             if (o.gifts) gifts()
             if (o.levelScale > 0) levels()
+            // RIVAL's slots from the teams as the cart has them (TRAINERS may put a starter line's Pokémon anywhere).
+            planRivals()
             if (o.trainers) trainers()
+            rivals()
             if (o.trainerItems) trainerItems()
             if (o.fieldItems) fieldItems()
         }
@@ -898,6 +1022,7 @@ object DsRandomizer {
                 })
             }.toMutableList()
             val three = List(3) { from.random(rnd).also { from.remove(it) } }
+            newStarters = three
             g.starterOffsets.forEachIndexed { i, at -> put32(f.overlay, at, three[i]) }
             f.scripts?.let { sc -> for ((at, which) in f.scriptSites(sc)) put16(sc, at, three[which]) }
             g.packedStarters?.let { ps ->
@@ -1006,18 +1131,22 @@ object DsRandomizer {
                 for (s in all) global[s] = picker.pick(s, from = left.ifEmpty { pool }, wild = true).also { left.remove(it) }
             }
             // An area is an encounter archive member; NO DUPLICATES avoids what it already has.
-            var area = HashMap<Int, Int>()
+            var area = HashMap<Pair<Int, SpeciesPicker.Habitat>, Int>()
             var used = HashSet<Int>()
             var member = -1
-            encounterSites(g.gen, Narc(f.enc), hgss = g.hgss, each = { m, at, width ->
+            val narc = Narc(f.enc)
+            encounterSites(g.gen, narc, hgss = g.hgss, each = { m, at, width ->
                 if (m != member) { area = HashMap(); used = HashSet(); member = m }
                 val raw = if (width == 4) u32(f.enc, at) else u16(f.enc, at)
                 val was = raw and speciesMask(g.gen)
                 if (was !in 1..g.speciesCount) return@encounterSites
                 val avoid = if (o.noDuplicates) used else emptySet<Int>()
+                // HABITATS: surfing and fishing slots (and HeartGold's smashed rocks).
+                val habitat = if (o.habitats) habitatAt(g.gen, g.hgss, at - narc.start(m)) else SpeciesPicker.Habitat.LAND
+                val only = habitat.types(g.gen)
                 val now = when (o.wild) {
-                    RomRandomizer.Wild.RANDOM -> picker.pick(was, avoid, wild = true)
-                    RomRandomizer.Wild.PER_AREA -> area.getOrPut(was) { picker.pick(was, avoid, wild = true) }
+                    RomRandomizer.Wild.RANDOM -> picker.pick(was, avoid, wild = true, only = only)
+                    RomRandomizer.Wild.PER_AREA -> area.getOrPut(was to habitat) { picker.pick(was, avoid, wild = true, only = only) }
                     else -> global.getValue(was)
                 }
                 used += now
@@ -1027,10 +1156,20 @@ object DsRandomizer {
         }
 
         fun trainers() {
-            f.trainerMons(Narc(f.parties)) { at, moves ->
+            // GYM TYPES: each boss's type (every DS boss has a class of their own), from the teams as they are now.
+            val teams = LinkedHashMap<Int, MutableList<Int>>()
+            f.trainerMonsOf(Narc(f.parties)) { t, at, _ ->
+                val cls = f.trainerClass(t)
+                if (cls in g.bossClasses) teams.getOrPut(cls) { ArrayList() } += u16(f.parties, at + 4) and speciesMask(g.gen)
+            }
+            val themes = picker.themes(teams, o.bossTypes, PokeType.entries.map { it.id(g.gen)!! })
+            f.trainerMonsOf(Narc(f.parties)) { t, at, moves ->
                 val was = u16(f.parties, at + 4) and speciesMask(g.gen)
-                if (was !in 1..g.speciesCount) return@trainerMons
-                val now = picker.pick(was, keepType = o.trainersKeepType)
+                if (was !in 1..g.speciesCount) return@trainerMonsOf
+                // RIVAL's starter line: [rivals] gives it the new starters'.
+                if (at in rivalPlan) return@trainerMonsOf
+                val theme = themes[f.trainerClass(t)]
+                val now = picker.pick(was, keepType = o.trainersKeepType, only = theme?.let { setOf(it) })
                 put16(f.parties, at + 4, now)
                 // Gen 5's form is its own word: the new species' plain form.
                 if (g.gen == 5) put16(f.parties, at + 6, 0)

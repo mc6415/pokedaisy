@@ -88,25 +88,33 @@ object GbRandomizer {
     }
 
     val GAMES = listOf(
-        Game("Red", "ea9bcae617fdf159b045185467ae58b2e4a48b9a", "8f822b56992eafb8790eb145ce2515bd1dfb66b2", 1, listOf(0xCEEB), 0x39D3B, 47, 0x383DE, 0x3B05C,
+        Game("Red", "ea9bcae617fdf159b045185467ae58b2e4a48b9a", "9be7ad21c3c62f5f5194a96751d29f1ebebdf3e5", 1, listOf(0xCEEB), 0x39D3B, 47, 0x383DE, 0x3B05C,
             dexOrder = 0x41024, mewStats = 0x425B, starters = red(blue = false), trainersEnd = 0x3A52E, moves = 0x38000,
             field = redField(0x76688)),
-        Game("Blue", "d7037c83e1ae5b39bde3c30787637ba1d4c48ce2", "43b05b9a5be2250ac478df7a21ad470b87db6129", 1, listOf(0xCEEB), 0x39D3B, 47, 0x383DE, 0x3B05C,
+        Game("Blue", "d7037c83e1ae5b39bde3c30787637ba1d4c48ce2", "02860b473d2fe6822706d641100d27db0e4b5e2c", 1, listOf(0xCEEB), 0x39D3B, 47, 0x383DE, 0x3B05C,
             dexOrder = 0x41024, mewStats = 0x425B, starters = red(blue = true), trainersEnd = 0x3A52E, moves = 0x38000,
             field = redField(0x76689)),
-        Game("Yellow", "cc7d03262ebfaf2f06772c1a480c7d9d5f4a38e1", "8d0655abf7ac34eeef3ad23a76ea7bed87665b5a", 1, listOf(0xCB95), 0x39DD1, 47, 0x383DE, 0x3B1E5,
+        Game("Yellow", "cc7d03262ebfaf2f06772c1a480c7d9d5f4a38e1", "2363a42659fb3688dea07683ccb1f11754244f97", 1, listOf(0xCB95), 0x39DD1, 47, 0x383DE, 0x3B1E5,
             dexOrder = 0x410B1, trainersEnd = 0x3A5B2, moves = 0x38000,
             field = Field(0xFC1F2, 0xE6DD, 0xFC3E4, 0xF268D, 0, 0x75F74, 0xC892, 0x75FAA)),
-        Game("Gold", "d8b8a3600a465308c9953dfa04f0081c05bdcb94", "b6c74ce9a1d50ade378bebcc2a6cbea6f300edfa", 2,
+        Game("Gold", "d8b8a3600a465308c9953dfa04f0081c05bdcb94", "b04a379e25dea7e1b66bd2f414dba018f2cc186f", 2,
             listOf(0x2AB35, 0x2B7C0, 0x2BE1C, -0x2B669, -0x2BD43, -0x2BED9), 0x3993E, 66, 0x51B0B, 0x427BD,
             starters = elm(0x1800D2, 0x180114, 0x180150), moves = 0x41AFE, field = Field(0x940ED, 0x68A0)),
-        Game("Silver", "49b163f7e57702bc939d642a18f591de55d92dae", "7164165d08bf869a681225bbc9a20bf0f2587508", 2,
+        Game("Silver", "49b163f7e57702bc939d642a18f591de55d92dae", "d42e66790e3007a1393629cac6b6098013511d72", 2,
             listOf(0x2AB35, 0x2B7C0, 0x2BE1C, -0x2B669, -0x2BD43, -0x2BED9), 0x3993E, 66, 0x51B0B, 0x427BD,
             starters = elm(0x1800D2, 0x180114, 0x180150), moves = 0x41AFE, field = Field(0x940ED, 0x68A0)),
-        Game("Crystal", "f2f52230b536214ef7c9924f483392993e226cfb", "78bbb66e64c0fd0391962b1528bfc4da2230e355", 2,
+        Game("Crystal", "f2f52230b536214ef7c9924f483392993e226cfb", "f771b93a2ac72eb398ce30ed2bb109d53d11d91e", 2,
             listOf(0x2A5E9, 0x2B274, 0x2B8D0, -0x2B11D, -0x2B7F7, -0x2B92F), 0x39999, 67, 0x51424, 0x425B1,
             starters = elm(0x78C7F, 0x78CC1, 0x78CFD), moves = 0x41AFB, field = Field(0x94000, 0x67C1)),
     )
+
+    // Trainer classes (pret's pokered / pokecrystal constants; Gold's are Crystal's). Gen 1: each leader a class of their
+    // own (Giovanni's, BRUNO .. SABRINA), the Elite Four, the rival's three (the last the Champion). Gen 2: the Johto and
+    // Kanto leaders, the Elite Four, LANCE (CHAMPION), RED; the rival's two.
+    private val GEN1_BOSSES = setOf(0x1D) + (0x21..0x28) + setOf(0x2B, 0x2C, 0x2E, 0x2F)
+    private val GEN1_RIVALS = setOf(0x19, 0x2A, 0x2B)
+    private val GEN2_BOSSES = (1..8).toSet() + setOf(11, 13, 14, 15, 16, 17, 18, 19, 21, 26, 35, 46, 63, 64)
+    private val GEN2_RIVALS = setOf(9, 42)
 
     /** More map headers than any Game Boy game has (Crystal: ~400): past it the table isn't one. */
     private const val MAX_MAP_HEADERS = 2048
@@ -174,20 +182,29 @@ object GbRandomizer {
         }
         val levels = ArrayList<Int>().also { l -> r.trainerLevels { l += it } }
         val trainers = ArrayList<Pair<Int, Int>>()
-        r.trainerMons { at, _ ->
+        val bosses = ArrayList<String?>()
+        val rivals = ArrayList<Boolean>()
+        r.trainerMonsOf { at, _, cls, _ ->
             // Its level: the byte before it, or a Gen 1 party's one level for all (the last level place before it).
-            val lv = levels.filter { it < at }.maxOrNull() ?: return@trainerMons
+            val lv = levels.filter { it < at }.maxOrNull() ?: return@trainerMonsOf
             trainers += r.u8(at) to r.u8(lv)
+            bosses += cls.toString().takeIf { cls in r.bossClasses }
+            rivals += cls in r.rivalClasses
         }
         val evolutions = ArrayList<Triple<Int, Int, Int>>().also { l -> r.evolutionTargets { id, at, method -> l += Triple(id, method, r.u8(at)) } }
-        return CartView(wild, trainers, { s -> if (r.species(s)) r.types(s) else emptySet() }, evolutions)
+        val wildLevels = ArrayList<Int>().also { l -> r.wildSlots { l += r.u8(it - 1) } }
+        val water = ArrayList<Int>().also { l -> r.wildLists { at, isWater, _ -> if (isWater && r.species(r.u8(at))) l += r.u8(at) } }
+        val starters = (0 until 3).mapNotNull { which -> g.starters.firstOrNull { it.first == which }?.second?.let(r::u8) }
+        return CartView(wild, trainers, { s -> if (r.species(s)) r.types(s) else emptySet() }, evolutions,
+            wildLevels = wildLevels, waterWild = water, bosses = bosses, rivals = rivals, starters = starters)
     }
 
     internal fun sites(rom: ByteArray, g: Game): List<Int> {
         val r = Reader(rom, g)
         val out = ArrayList<Int>()
         for ((_, at) in g.starters) out += at
-        r.wildSlots { out += it }
+        // Each wild slot's level (WILD LEVELS: the byte before its species) and species.
+        r.wildSlots { out += it; out += it - 1 }
         r.trainerMons { species, moves -> out += species; if (moves >= 0) for (k in 0 until 4) out += moves + k }
         r.trainerLevels { out += it }
         for (one in statics(g)) for (at in one) out += at
@@ -281,18 +298,23 @@ object GbRandomizer {
         fun species(id: Int) = id in 1 until dex.size && dex[id] != 0
 
         /** Each wild slot's species byte. */
-        fun wildSlots(each: (Int) -> Unit) {
+        fun wildSlots(each: (Int) -> Unit) = wildLists { at, _, _ -> each(at) }
+
+        /** [wildSlots] with each list's water (else grass) and whether its map is a cave ([isCave]). */
+        fun wildLists(each: (at: Int, water: Boolean, cave: Boolean) -> Unit) {
             if (g.gen == 1) {
                 val seen = HashSet<Int>()
                 var p = g.wild[0]
                 while (u16(p) != 0xFFFF) {
                     val at = ptr(p)
+                    val map = (p - g.wild[0]) / 2
                     p += 2
                     if (!seen.add(at)) continue
                     var q = at
-                    repeat(2) {
+                    // Grass, then water.
+                    for (water in listOf(false, true)) {
                         val rate = u8(q++)
-                        if (rate != 0) { for (i in 0 until 10) each(q + i * 2 + 1); q += 20 }
+                        if (rate != 0) { for (i in 0 until 10) each(q + i * 2 + 1, water, !water && isCave(map)); q += 20 }
                     }
                 }
             } else {
@@ -300,12 +322,30 @@ object GbRandomizer {
                     val grass = t > 0
                     var a = kotlin.math.abs(t)
                     while (u8(a) != 0xFF) {
-                        if (grass) { for (i in 0 until 21) each(a + 5 + i * 2 + 1); a += 5 + 42 }
-                        else { for (i in 0 until 3) each(a + 3 + i * 2 + 1); a += 3 + 6 }
+                        val cave = grass && isCave(u8(a) shl 8 or u8(a + 1))
+                        if (grass) { for (i in 0 until 21) each(a + 5 + i * 2 + 1, false, cave); a += 5 + 42 }
+                        else { for (i in 0 until 3) each(a + 3 + i * 2 + 1, true, false); a += 3 + 6 }
                     }
                 }
             }
         }
+
+        /** HABITATS: a map is a cave - Gen 1's (by map id) with the CAVERN tileset, Gen 2's (group << 8 | number) a CAVE or
+         * DUNGEON environment; false when its header can't be read. */
+        fun isCave(map: Int): Boolean = runCatching {
+            val f = g.field ?: return false
+            if (g.gen == 1) {
+                val bank = u8(f.mapBanks + map)
+                val p = u16(f.maps + map * 2)
+                bank != 0 && p in 0x4000 until 0x8000 && u8(far(bank, p)) == 0x11
+            } else {
+                val group = map shr 8
+                val num = map and 0xFF
+                if (group == 0 || num == 0) return false
+                val h = far(f.maps / 0x4000, u16(f.maps + (group - 1) * 2)) + (num - 1) * 9
+                u8(h + 2) == 4 || u8(h + 2) == 7
+            }
+        }.getOrDefault(false)
 
         /** Each species' base stats: where they start and how many (Gen 1: HP, ATTACK, DEFENSE, SPEED, SPECIAL; Gen 2: six). */
         fun statSites(each: (at: Int, count: Int) -> Unit) {
@@ -489,20 +529,27 @@ object GbRandomizer {
 
         /** Each trainer Pokémon's species byte, and (Gen 2, a party with its own moves) where its four moves are, else -1.
          * A class's parties run to the next class's; one that doesn't read as a party ends its class. */
-        fun trainerMons(each: (species: Int, moves: Int) -> Unit) {
+        fun trainerMons(each: (species: Int, moves: Int) -> Unit) = trainerMonsOf { sp, mv, _, _ -> each(sp, mv) }
+
+        /** [trainerMons] with each one's trainer class (from 1) and its party's place (one party = one trainer). */
+        fun trainerMonsOf(each: (species: Int, moves: Int, cls: Int, party: Int) -> Unit) {
             val starts = (0 until g.trainerClasses).map { ptr(g.trainers + it * 2) }
             val order = starts.distinct().sorted()
             for ((i, start) in order.withIndex()) {
+                val cls = starts.indexOf(start) + 1
                 val end = order.getOrNull(i + 1) ?: if (g.trainersEnd > 0) g.trainersEnd else Int.MAX_VALUE
                 var a = start
                 while (a < end && a < b.size) {
                     val party = if (g.gen == 1) gen1Party(a) else gen2Party(a)
                     if (party == null) break
-                    party.first.forEach { (sp, mv) -> each(sp, mv) }
+                    party.first.forEach { (sp, mv) -> each(sp, mv, cls, a) }
                     a = party.second
                 }
             }
         }
+
+        val bossClasses get() = if (g.gen == 1) GEN1_BOSSES else GEN2_BOSSES
+        val rivalClasses get() = if (g.gen == 1) GEN1_RIVALS else GEN2_RIVALS
 
         /** A Gen 1 party at [a]: its Pokémon's species places, and where the next party starts; null if it isn't one. */
         private fun gen1Party(a: Int): Pair<List<Pair<Int, Int>>, Int>? {
@@ -688,6 +735,11 @@ object GbRandomizer {
         )
         val pool get() = picker.pool
 
+        /** RIVAL: the starters' lines as the cart had them (before EVOLUTIONS and STARTERS), by starter (Yellow: none). */
+        val oldStarters = (0 until 3).mapNotNull { which -> g.starters.firstOrNull { it.first == which }?.second?.let(::u8) }
+        val oldLines = oldStarters.map { s -> SpeciesPicker.chain(s) { evolvesTo[it].orEmpty() } }
+        var newStarters = oldStarters
+
         fun all() {
             // Stats and learnsets first: the strength match keeps working (the totals stay) and trainers' moves follow.
             if (o.baseStats) baseStats()
@@ -696,11 +748,46 @@ object GbRandomizer {
             if (o.evolutions) evolutions()
             starters()
             wild()
+            if (o.wildLevelScale > 0) wildLevels()
             if (o.gifts) gifts()
             if (o.levelScale > 0) levels()
+            // RIVAL's slots from the teams as the cart has them (TRAINERS may put a starter line's Pokémon anywhere).
+            planRivals()
             if (o.trainers) trainers()
+            rivals()
             if (o.trainerItems) trainerItems()
             if (o.fieldItems) fieldItems()
+        }
+
+        /** WILD LEVELS: every wild slot's level (the byte before its species) raised. */
+        fun wildLevels() {
+            wildSlots { at -> b[at - 1] = SpeciesPicker.scaled(u8(at - 1), o.wildLevelScale).toByte() }
+        }
+
+        /** RIVAL: [SpeciesPicker.rivalSwap] for a rival's Pokémon, or null. */
+        fun rivalNew(cls: Int, species: Int): Int? =
+            if (!o.rivalStarter || cls !in rivalClasses || oldLines.isEmpty()) null
+            else SpeciesPicker.rivalSwap(species, oldLines, newStarters.map { s -> SpeciesPicker.chain(s) { evolvesTo[it].orEmpty() } })
+
+        /** RIVAL: each of the rival's starter-line Pokémon's species byte, its new species and its moves' place. */
+        var rivalPlan: Map<Int, Pair<Int, Int>> = emptyMap()
+
+        fun planRivals() {
+            val plan = HashMap<Int, Pair<Int, Int>>()
+            trainerMonsOf { at, moves, cls, _ -> rivalNew(cls, u8(at))?.let { plan[at] = it to moves } }
+            rivalPlan = plan
+        }
+
+        /** RIVAL: the planned Pokémon made the new starters' (Gen 2's own moves as the game picks them). */
+        fun rivals() {
+            for ((at, p) in rivalPlan) {
+                val (now, moves) = p
+                b[at] = now.toByte()
+                if (moves >= 0) {
+                    val list = movesAt(now, u8(at - 1))
+                    for (k in 0 until 4) b[moves + k] = list.getOrElse(k) { 0 }.toByte()
+                }
+            }
         }
 
         /** EVOLUTIONS: every evolution's target ([SpeciesPicker.evolutions]); how it evolves stays. */
@@ -761,6 +848,7 @@ object GbRandomizer {
                 })
             }.toMutableList()
             val three = List(3) { from.random(rnd).also { from.remove(it) } }
+            newStarters = three
             for ((which, at) in g.starters) b[at] = three[which].toByte()
         }
 
@@ -773,18 +861,26 @@ object GbRandomizer {
             }
             // PER_AREA: a map's lists share one swap (a slot's place says which map: they come map by map); NO DUPLICATES
             // avoids what the map already has.
-            var area = HashMap<Int, Int>()
+            var area = HashMap<Pair<Int, SpeciesPicker.Habitat>, Int>()
             var used = HashSet<Int>()
             var last = -1
-            wildSlots { at ->
+            wildLists { at, water, cave ->
                 if (last < 0 || at - last > 2) { area = HashMap(); used = HashSet() }
                 last = at
                 val was = u8(at)
-                if (!species(was)) return@wildSlots
+                if (!species(was)) return@wildLists
                 val avoid = if (o.noDuplicates) used else emptySet<Int>()
+                // HABITATS: the water lists, a cave's grass.
+                val habitat = when {
+                    !o.habitats -> SpeciesPicker.Habitat.LAND
+                    water -> SpeciesPicker.Habitat.WATER
+                    cave -> SpeciesPicker.Habitat.CAVE
+                    else -> SpeciesPicker.Habitat.LAND
+                }
+                val only = habitat.types(g.gen)
                 val now = when (o.wild) {
-                    RomRandomizer.Wild.RANDOM -> picker.pick(was, avoid, wild = true)
-                    RomRandomizer.Wild.PER_AREA -> area.getOrPut(was) { picker.pick(was, avoid, wild = true) }
+                    RomRandomizer.Wild.RANDOM -> picker.pick(was, avoid, wild = true, only = only)
+                    RomRandomizer.Wild.PER_AREA -> area.getOrPut(was to habitat) { picker.pick(was, avoid, wild = true, only = only) }
                     else -> global.getValue(was)
                 }
                 used += now
@@ -810,8 +906,15 @@ object GbRandomizer {
         }
 
         fun trainers() {
-            trainerMons { at, moves ->
-                val now = picker.pick(u8(at), keepType = o.trainersKeepType)
+            // GYM TYPES: each boss's type (Gen 1 / 2 give every boss a class of their own), from the teams as they are now.
+            val teams = LinkedHashMap<Int, MutableList<Int>>()
+            trainerMonsOf { at, _, cls, _ -> if (cls in bossClasses) teams.getOrPut(cls) { ArrayList() } += u8(at) }
+            val themes = picker.themes(teams, o.bossTypes, PokeType.entries.mapNotNull { it.id(g.gen) })
+            trainerMonsOf { at, moves, cls, _ ->
+                // RIVAL's starter line: [rivals] gives it the new starters'.
+                if (at in rivalPlan) return@trainerMonsOf
+                val theme = themes[cls]
+                val now = picker.pick(u8(at), keepType = o.trainersKeepType, only = theme?.let { setOf(it) })
                 b[at] = now.toByte()
                 if (moves >= 0) {
                     val list = movesAt(now, u8(at - 1))

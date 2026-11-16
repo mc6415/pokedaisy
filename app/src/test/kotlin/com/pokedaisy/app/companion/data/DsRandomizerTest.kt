@@ -253,6 +253,8 @@ class DsRandomizerTest {
         }
         RunModesCheck.themed(g.title, g.gen, retail, made(RunModesCheck.THEMED, 21L, "themed"))
         RunModesCheck.spread(g.title, retail, made(RunModesCheck.SPREAD, 22L, "spread"), made(RunModesCheck.SPREAD.copy(allCatchable = false), 22L, "without"))
+        for ((mode, seed) in listOf(RomRandomizer.BossTypes.OWN to 41L, RomRandomizer.BossTypes.RANDOM to 42L))
+            RunModesCheck.bosses(g.title, g.gen, retail, made(RunModesCheck.BOSSES.copy(bossTypes = mode), seed, "bosses-$mode"), mode)
     }
 
     @Test

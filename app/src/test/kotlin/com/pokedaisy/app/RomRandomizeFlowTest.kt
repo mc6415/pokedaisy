@@ -31,6 +31,26 @@ class RomRandomizeFlowTest {
         // EVOLUTIONS and ABILITIES (CHAOS has both): a setup saved before them (fifteen fields) reads with them off.
         assertTrue(o.evolutions && o.abilities)
         assertEquals(o.copy(evolutions = false, abilities = false), RomRandomizeFlow.decode(RomRandomizeFlow.encode(o).split(',').take(15).joinToString(",")))
+        // GYM TYPES, RIVAL, WILD LEVELS and HABITATS: kept, and off in a setup saved before them (seventeen fields).
+        val bosses = o.copy(bossTypes = com.pokedaisy.app.companion.data.RomRandomizer.BossTypes.RANDOM, rivalStarter = true,
+            wildLevelScale = 50, habitats = true)
+        assertEquals(bosses, RomRandomizeFlow.decode(RomRandomizeFlow.encode(bosses)))
+        assertEquals(o, RomRandomizeFlow.decode(RomRandomizeFlow.encode(bosses).split(',').take(17).joinToString(",")))
+    }
+
+    @Test
+    fun `CLASSIC keeps the leaders' types and the rival's starter, and READY says so`() {
+        val classic = RomRandomizeFlow.optionsOf(RomRandomizeFlow.Style.CLASSIC)
+        assertEquals(com.pokedaisy.app.companion.data.RomRandomizer.BossTypes.OWN, classic.bossTypes)
+        assertTrue(classic.rivalStarter)
+        val red = RomRandomizeFlow.Base(java.io.File("red.gb"), "Pokémon Red", "Red", gb = true)
+        val lines = RomRandomizeFlow.summary(classic.copy(wildLevelScale = 25, habitats = true), red)
+        for (line in listOf("Leaders keep their own types", "Your rival carries a new starter", "Pokémon fit where they live"))
+            assertTrue(line, lines.contains(com.pokedaisy.app.companion.i18n.tr(line)))
+        assertTrue(lines.contains(com.pokedaisy.app.companion.i18n.tr("Wild levels up {0}%", 25)))
+        // Yellow's rival carries no starter: not promised there.
+        val yellow = RomRandomizeFlow.Base(java.io.File("yellow.gb"), "Pokémon Yellow", "Yellow", gb = true)
+        assertTrue(!RomRandomizeFlow.summary(classic, yellow).contains(com.pokedaisy.app.companion.i18n.tr("Your rival carries a new starter")))
     }
 
     @Test

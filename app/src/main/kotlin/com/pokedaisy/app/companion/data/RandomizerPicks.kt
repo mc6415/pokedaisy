@@ -53,9 +53,15 @@ internal class SpeciesPicker(
      * when [keepType] (unless ONE TYPE already decides); for a wild slot ([wild]) one not placed yet when EVERY POKéMON
      * asks; then about [like]'s strength when SIMILAR STRENGTH asks.
      */
-    fun pick(like: Int, avoid: Collection<Int> = emptyList(), keepType: Boolean = false, wild: Boolean = false, from: List<Int> = pool): Int {
+    fun pick(
+        like: Int, avoid: Collection<Int> = emptyList(), keepType: Boolean = false, wild: Boolean = false, from: List<Int> = pool,
+        /** Only Pokémon with one of these types (a boss's theme, a habitat), while there are any; ONE TYPE wins over it. */
+        only: Set<Int>? = null,
+    ): Int {
         var cands = from.filter { it !in avoid }.ifEmpty { from }
-        if (keepType && !monotyped) {
+        if (only != null && !monotyped) {
+            cands.filter { s -> types(s).any { it in only } }.takeIf { it.isNotEmpty() }?.let { cands = it }
+        } else if (keepType && !monotyped) {
             val mine = types(like)
             cands.filter { s -> types(s).any { it in mine } }.takeIf { it.isNotEmpty() }?.let { cands = it }
         }
@@ -110,7 +116,65 @@ internal class SpeciesPicker(
         return out.toList()
     }
 
+    /**
+     * GYM TYPES: a type for each boss ([teams]: their key - a class, or a class and name - to the species of every team
+     * they have), by [mode]: [RomRandomizer.BossTypes.OWN] the type most of their Pokémon have (on a tie, not NORMAL), and
+     * [RomRandomizer.BossTypes.RANDOM] one picked for each from [choices] (the generation's types with a few Pokémon in the
+     * pool), none twice while there are others. Nothing while ONE TYPE decides.
+     */
+    fun <K> themes(teams: Map<K, List<Int>>, mode: RomRandomizer.BossTypes, choices: List<Int>): Map<K, Int> {
+        if (mode == RomRandomizer.BossTypes.OFF || monotyped) return emptyMap()
+        val usable = choices.filter { t -> pool.count { t in types(it) } >= 4 }
+        if (usable.isEmpty()) return emptyMap()
+        val left = usable.toMutableList()
+        return teams.mapValues { (_, species) ->
+            if (mode == RomRandomizer.BossTypes.OWN) ownType(species, types) ?: usable.random(rnd)
+            else (left.ifEmpty { usable.toMutableList().also { left.addAll(it) } }).random(rnd).also { left.remove(it) }
+        }
+    }
+
+    /** Where a wild table is ([RomRandomizer.Options.habitats]): what its swaps lean to. */
+    enum class Habitat(private val kinds: List<PokeType>) {
+        LAND(emptyList()),
+        WATER(listOf(PokeType.WATER)),
+        CAVE(listOf(PokeType.ROCK, PokeType.GROUND, PokeType.POISON, PokeType.STEEL, PokeType.DARK)),
+        ROCKS(listOf(PokeType.ROCK, PokeType.GROUND));
+
+        /** The types as generation [gen] numbers them; null: anything goes ([LAND]). */
+        fun types(gen: Int): Set<Int>? = kinds.mapNotNull { it.id(gen) }.toSet().ifEmpty { null }
+    }
+
     companion object {
+        /** A boss's own type: the one most of [species] have (each Pokémon's types counted once); on a tie, not NORMAL. */
+        fun ownType(species: List<Int>, types: (Int) -> Set<Int>): Int? {
+            val count = HashMap<Int, Int>()
+            for (s in species) for (t in types(s)) count[t] = (count[t] ?: 0) + 1
+            val best = count.values.maxOrNull() ?: return null
+            val top = count.filterValues { it == best }.keys.sorted()
+            return top.firstOrNull { it != PokeType.NORMAL.gen3 } ?: top.first()
+        }
+
+        /** [s]'s line from it: itself, what it evolves into first, and what that evolves into first ([evolvesTo]). */
+        fun chain(s: Int, evolvesTo: (Int) -> List<Int>): List<Int> {
+            val out = mutableListOf(s)
+            while (out.size < 3) out += evolvesTo(out.last()).firstOrNull()?.takeIf { it !in out } ?: break
+            return out
+        }
+
+        /**
+         * RIVAL: for a species in one of the old starters' lines ([oldLines], by starter), the new starter's line member at
+         * the same stage ([newLines], the line's last when it's shorter); null when [species] is in none.
+         */
+        fun rivalSwap(species: Int, oldLines: List<List<Int>>, newLines: List<List<Int>>): Int? {
+            for ((i, line) in oldLines.withIndex()) {
+                val stage = line.indexOf(species)
+                if (stage < 0) continue
+                val now = newLines.getOrNull(i) ?: return null
+                return now.getOrNull(stage) ?: now.last()
+            }
+            return null
+        }
+
         /**
          * ABILITIES ([RomRandomizer.Options.abilities]) never hands these out (by the games' shared ability numbers):
          * WONDER GUARD (25: only super-effective hits land), the ones that hold their own Pokémon back (TRUANT 54, SLOW START
@@ -145,8 +209,12 @@ internal class SpeciesPicker(
 }
 
 /** A cart as the run modes' tests look at it: each area's wild species, every trainer Pokémon (species, level), types; and
- * (EVOLUTIONS / ABILITIES) every evolution as (species, method, target) and each species' ability slots (none on the Game Boy). */
+ * (EVOLUTIONS / ABILITIES) every evolution as (species, method, target) and each species' ability slots (none on the Game Boy).
+ * For GYM TYPES, RIVAL, WILD LEVELS and HABITATS: every wild level byte, the species in water slots, each trainer Pokémon's
+ * boss key (null: not a boss) and whether it's the rival's (both in [trainers]' order), and the starters (by starter). */
 internal class CartView(
     val wild: List<List<Int>>, val trainers: List<Pair<Int, Int>>, val types: (Int) -> Set<Int>,
     val evolutions: List<Triple<Int, Int, Int>> = emptyList(), val abilities: Map<Int, List<Int>> = emptyMap(),
+    val wildLevels: List<Int> = emptyList(), val waterWild: List<Int> = emptyList(),
+    val bosses: List<String?> = emptyList(), val rivals: List<Boolean> = emptyList(), val starters: List<Int> = emptyList(),
 )

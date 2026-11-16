@@ -194,6 +194,16 @@ class RomRandomizerTest {
     }
 
     @Test
+    fun `GYM TYPES, RIVAL, WILD LEVELS and HABITATS do what they say`() = each { g, rom ->
+        val retail = RomRandomizer.view(rom, g)
+        for ((mode, seed) in listOf(RomRandomizer.BossTypes.OWN to 41L, RomRandomizer.BossTypes.RANDOM to 42L)) {
+            val made = RomRandomizer.randomize(rom, RunModesCheck.BOSSES.copy(bossTypes = mode), seed)!!
+            assertEquals(g.title, g, RomRandomizer.recognise(made))
+            RunModesCheck.bosses(g.title, 3, retail, RomRandomizer.view(made, g), mode)
+        }
+    }
+
+    @Test
     fun `EVOLUTIONS and ABILITIES do what they say, and the starters still evolve twice`() = each { g, rom ->
         val made = RomRandomizer.randomize(rom, EVOLVE_ABILITIES, 31L)!!
         assertEquals(g.title, g, RomRandomizer.recognise(made))

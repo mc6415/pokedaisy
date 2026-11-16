@@ -122,21 +122,24 @@ RANDOMIZE asks three things, a page each. `BACK` (or the arrow at the top) goes 
 
 | Style | What it shuffles |
 | --- | --- |
-| `CLASSIC` | New starters that evolve twice, wild Pokémon area by area, gift Pokémon and trainers' teams, each swap close in strength, no legendaries. |
+| `CLASSIC` | New starters that evolve twice, wild Pokémon area by area, gift Pokémon and trainers' teams, each swap close in strength, no legendaries. The leaders keep their own types and your rival carries one of the new starters. |
 | `WILD ONLY` | The same starters, wild and gift Pokémon, but trainers keep their teams. |
 | `CHAOS` | Everything: any Pokémon as a starter, a random one in every encounter, gift Pokémon, trainers' teams and held items, the items lying around, base stats, abilities, the moves Pokémon learn and what they evolve into, legendaries allowed. |
 | `LAST TIME` | The settings you used the last time you made a game. It shows once you've made one. |
-| `CUSTOM` | Pick every setting yourself, on five short pages: `POKéMON`, `RULES`, `TRAINERS`, `ITEMS` and `EXTRAS` (below). |
+| `CUSTOM` | Pick every setting yourself, on six short pages: `POKéMON`, `WILD POKéMON`, `RULES`, `TRAINERS`, `ITEMS` and `EXTRAS` (below). |
 
 4. **Ready.** The last page says in plain words what will change. `GAME` and `STYLE` take you back to change them, and `SEED` is the number the shuffle is made from: the same game, settings and seed always make the same game, so a friend can play the same run. Tap it for another number. Then tap `RANDOMIZE`. When it's done, the new game is in your library as, for example, "Pokémon Ruby (Randomized, seed 123456)", so two runs of one game are easy to tell apart, and `PLAY` starts it.
 
-`CUSTOM`'s pages. Under each row a short line says what its setting does right now, and the `STARTERS` and `WILD POKéMON` lists say what each choice does too:
+`CUSTOM`'s pages. Under each row a short line says what its setting does right now, and the `STARTERS`, `WILD POKéMON` and `GYM TYPES` lists say what each choice does too. The `POKéMON` and `WILD POKéMON` pages:
 
 | Row | What it does |
 | --- | --- |
 | `STARTERS` | The three Pokémon you choose your partner from. `EVOLVE TWICE` (the default) picks Pokémon that evolve two times, like the real ones; `ANY POKéMON` can be anything but a legendary; `AS THEY ARE` keeps them. In FireRed and LeafGreen the professor names the new ones when you choose; in Platinum the briefcase and in HeartGold and SoulSilver Professor Elm's machine show them, each with its name, and in Red, Blue, Black, White, Black 2 and White 2 every scene that names your starter (your rival's pick too) names the new ones. In Black and White the screen you choose on shows the new three as outlines and names each one, but the picture when you pick a ball, and its type, are still the original partner's. In Yellow your partner and your rival's stay as they are, since the story is built around them. |
+| `RIVAL` | `ON` makes your rival carry the new starter the game gives them, at the stage their old one was, so it evolves as the story goes on. Their other Pokémon are shuffled like any trainer's. Not in Yellow, whose rival never had a starter. |
 | `WILD POKéMON` | What you meet in the grass, caves, water and with a rod. `PER AREA` (the default) swaps each kind of Pokémon for another on each route, so a route still has its common and rare ones. `EVERY ENCOUNTER` picks anew for every slot, `SWAPPED EVERYWHERE` swaps each kind for one other kind across the whole game, and `AS THEY ARE` keeps them. |
 | `GIFTS` | `SHUFFLED` swaps the Pokémon the game gives you or leaves waiting for you: gifts, Game Corner prizes, fossils and the ones that sit on the map until you battle them. Every place the game names one (its cry, its picture, the battle) follows. Pokémon that roam aren't swapped. On by default in `CLASSIC`, `WILD ONLY` and `CHAOS`. |
+| `WILD LEVELS` | Raises every wild Pokémon's level by `+10%`, `+25%` or `+50%` (never past level 100), for a harder run or one that moves faster. It works with `WILD POKéMON` set to `AS THEY ARE` too. |
+| `HABITATS` | `ON` makes the wild swaps fit the place: Water types in the water and on a rod, Rock and Ground types in the rocks you smash, and Rock, Ground, Poison, Steel and Dark types in caves. Grass and everywhere else can have anything. On the DS games caves aren't told apart. It works with `PER AREA` and `EVERY ENCOUNTER`; `SWAPPED EVERYWHERE` swaps each kind once for the whole game, so it doesn't follow it. |
 | `SIMILAR STRENGTH` | Keeps each swap close in strength to what it replaces (their base stats added up), so an early route doesn't fill with fully evolved Pokémon. |
 
 The `RULES` page, for run rules like a Nuzlocke's:
@@ -154,6 +157,7 @@ The `TRAINERS` page:
 | --- | --- |
 | `TEAMS` | `SHUFFLED` gives every trainer, the leaders and your rival too, a new team at the same levels. Trainers who had moves picked for them get the moves their new Pokémon know by then. |
 | `KEEP TYPES` | `ON` gives each trainer's new Pokémon a type the old one had, so a leader keeps their theme (a water gym stays water). |
+| `GYM TYPES` | For the Gym Leaders, the Elite Four and the Champion, when `TEAMS` is `SHUFFLED`. `OWN TYPE` keeps each one's whole new team to one type, the one most of their old team had (a water gym's leader gets Water types only). `RANDOM TYPE` gives each one a type picked for them instead, a different one each while there are types left. A leader you battle again keeps the same type. `AS THEY ARE` lets their new teams be any type. `ONE TYPE` wins over it. |
 | `LEVELS` | Raises every trainer's Pokémon by `+10%`, `+25%` or `+50%` (never past level 100), for a harder run. |
 
 The `ITEMS` page (`HELD ITEMS` is there for every game but Red, Blue and Yellow, whose trainers' Pokémon hold nothing):

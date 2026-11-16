@@ -27,6 +27,44 @@ internal object RunModesCheck {
         }
     }
 
+    /** GYM TYPES (each boss's own type), RIVAL, WILD LEVELS +25% and HABITATS, a random Pokémon in every encounter (the
+     * strength match off, so any Pokémon of a type can be picked). */
+    val BOSSES = RomRandomizer.Options(
+        RomRandomizer.Starters.THREE_STAGE, RomRandomizer.Wild.RANDOM, true, similarStrength = false,
+        bossTypes = RomRandomizer.BossTypes.OWN, rivalStarter = true, wildLevelScale = 25, habitats = true,
+    )
+
+    /**
+     * [BOSSES] (or its RANDOM [mode]) read back: every boss's Pokémon share a type - their own, as [SpeciesPicker.ownType]
+     * finds it in the retail teams, for OWN - the rival's starter-line Pokémon are the new starters' at the same stage
+     * ([rival]: the cart has a rival with one), every wild level raised 25%, and every water slot's Pokémon a Water type.
+     */
+    fun bosses(title: String, gen: Int, retail: CartView, made: CartView, mode: RomRandomizer.BossTypes, rival: Boolean = true) {
+        assertEquals(title, retail.trainers.size, made.trainers.size)
+        fun line(view: CartView, s: Int) = SpeciesPicker.chain(s) { x -> view.evolutions.filter { it.first == x }.map { it.third } }
+        val oldLines = retail.starters.map { line(retail, it) }
+        val newLines = made.starters.map { line(made, it) }
+        val swapped = made.trainers.indices.filter { i -> made.rivals[i] && oldLines.any { retail.trainers[i].first in it } }
+        if (rival) assertTrue("$title: no rival Pokémon in a starter line", swapped.isNotEmpty())
+        for (i in swapped) assertEquals("$title rival Pokémon $i", SpeciesPicker.rivalSwap(retail.trainers[i].first, oldLines, newLines), made.trainers[i].first)
+        val keys = made.bosses.withIndex().filter { it.value != null && it.index !in swapped }.groupBy({ it.value!! }, { it.index })
+        assertTrue("$title has no bosses", keys.isNotEmpty())
+        for ((key, idx) in keys) {
+            val common = idx.map { made.types(made.trainers[it].first) }.reduce { a, b -> a intersect b }
+            assertTrue("$title boss $key's team shares no type: ${idx.map { made.trainers[it].first }}", common.isNotEmpty())
+            if (mode == RomRandomizer.BossTypes.OWN) {
+                val own = SpeciesPicker.ownType(idx.map { retail.trainers[it].first }, retail.types)
+                assertTrue("$title boss $key: their own type $own, the team's $common", own in common)
+            }
+        }
+        assertEquals(title, retail.wildLevels.size, made.wildLevels.size)
+        assertTrue("$title has no wild levels", retail.wildLevels.isNotEmpty())
+        for ((i, lv) in made.wildLevels.withIndex()) assertEquals("$title wild level $i", SpeciesPicker.scaled(retail.wildLevels[i], 25), lv)
+        val water = PokeType.WATER.id(gen)!!
+        assertTrue("$title has no water slots", made.waterWild.isNotEmpty())
+        for (s in made.waterWild) assertTrue("$title: $s in the water isn't WATER", water in made.types(s))
+    }
+
     fun spread(title: String, retail: CartView, made: CartView, without: CartView) {
         for ((i, t) in made.trainers.withIndex()) {
             val was = retail.types(retail.trainers[i].first)
