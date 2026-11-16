@@ -204,6 +204,21 @@ class RomRandomizerTest {
     }
 
     @Test
+    fun `a randomized FireRed or LeafGreen evolves past the first 151 before the National Dex`() = each { g, rom ->
+        assertNull("${g.title} retail", EvolutionUnlock.find(rom))
+        val made = RomRandomizer.randomize(rom, RomRandomizer.Options(), 61L)!!
+        val patch = EvolutionUnlock.find(made)
+        if (g.code != "BPRE" && g.code != "BPGE") return@each assertNull(g.title, patch)
+        assertNotNull(g.title, patch)
+        // The two scene checks' `ble` and the trade check's `bhi`, each on the cart's own bytes.
+        assertEquals(g.title, listOf("14dd", "0fdd", "07d8"), patch!!.writes.map { it.expect.joinToString("") { b -> "%02x".format(b) } })
+        for (w in patch.writes) {
+            val at = (w.addr - 0x08000000L).toInt()
+            assertArrayEquals(g.title, made.copyOfRange(at, at + 2), w.expect)
+        }
+    }
+
+    @Test
     fun `ZONES give every area one type`() = each { g, rom ->
         for ((mode, seed) in listOf(RomRandomizer.Zones.RANDOM to 51L, RomRandomizer.Zones.TERRAIN to 52L)) {
             val made = RomRandomizer.randomize(rom, RunModesCheck.zonesOptions(mode), seed)!!

@@ -203,6 +203,15 @@ class EmulatorEngine(
     @Volatile private var hmPatch: com.pokedaisy.app.companion.data.HmFree.Patch? = null
     @Volatile private var hmFree = false
 
+    /** A RANDOMIZE-made FireRed / LeafGreen's evolutions past the first 151 before the National Dex
+     * ([com.pokedaisy.app.companion.data.EvolutionUnlock]), on whenever found. */
+    @Volatile private var evoUnlock: com.pokedaisy.app.companion.data.HmFree.Patch? = null
+
+    fun setEvolutionUnlock(patch: com.pokedaisy.app.companion.data.HmFree.Patch?) {
+        evoUnlock = patch
+        tmPatchDirty = true
+    }
+
     fun setHmFree(patch: com.pokedaisy.app.companion.data.HmFree.Patch?, on: Boolean) {
         hmPatch = patch
         hmFree = on
@@ -2074,6 +2083,10 @@ class EmulatorEngine(
         val hm = hmPatch
         option("no HMs needed", hmFree && hm != null) {
             hm!!.writes.all { MgbaCore.pkRomPatch(it.addr, it.expect, it.addr, it.value) }
+        }
+        val evo = evoUnlock
+        option("evolutions before the National Dex", evo != null) {
+            evo!!.writes.all { MgbaCore.pkRomPatch(it.addr, it.expect, it.addr, it.value) }
         }
         val exp = expShareFound
         option("exp share full", expShareMode == com.pokedaisy.app.companion.data.ExpShare.Mode.FULL && exp != null) {

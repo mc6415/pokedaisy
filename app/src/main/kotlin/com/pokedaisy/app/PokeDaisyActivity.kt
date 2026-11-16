@@ -236,6 +236,8 @@ class PokeDaisyActivity : Activity() {
 
     /** NO HMS NEEDED: the ROM's patch ([com.pokedaisy.app.companion.data.HmFree]; null = the row shows N/A). */
     private var hmPatch: com.pokedaisy.app.companion.data.HmFree.Patch? = null
+    /** A RANDOMIZE-made FireRed / LeafGreen's evolutions before the National Dex (EvolutionUnlock): null elsewhere. */
+    private var evoUnlock: com.pokedaisy.app.companion.data.HmFree.Patch? = null
 
     /** NO HMS NEEDED on the engine, and FLY / FREE FLIGHT / FLASH told whether to ask for the move (HmFree.active). */
     private fun syncHmFree(on: Boolean = Prefs(this).hmFree) {
@@ -2789,6 +2791,8 @@ class PokeDaisyActivity : Activity() {
         if (::engine.isInitialized) engine.setInstantText(null, false)
         hmPatch = null
         syncHmFree(false)
+        evoUnlock = null
+        if (::engine.isInitialized) engine.setEvolutionUnlock(null)
         centerFound = null
         expShareFound = null
         syncExpShare()
@@ -2818,6 +2822,9 @@ class PokeDaisyActivity : Activity() {
             // LEVEL CAP: the same getexp's two level checks.
             val levelCap = com.pokedaisy.app.companion.data.LevelCap.find(r.toOkioPath())
             Log.i("pokedaisy", "level cap: ${if (levelCap != null) "found" else "not found"}")
+            // A RANDOMIZE-made FireRed / LeafGreen: evolutions past the first 151 before the National Dex.
+            val evo = com.pokedaisy.app.companion.data.EvolutionUnlock.find(r.toOkioPath())
+            Log.i("pokedaisy", "evolution unlock: ${if (evo != null) "found" else "not needed"}")
             val center = com.pokedaisy.app.companion.data.PokemonCenter.find(r.toOkioPath())
             Log.i("pokedaisy", "pokemon center: ${center?.let { "heal, nickname ${it.nickname != null}, forget ${it.forget != null}, relearn ${it.relearn != null}" } ?: "not found"}")
             runOnUiThread {
@@ -2835,6 +2842,8 @@ class PokeDaisyActivity : Activity() {
                 syncExpShare()
                 levelCapFound = levelCap
                 syncLevelCap()
+                evoUnlock = evo
+                if (::engine.isInitialized) engine.setEvolutionUnlock(evo)
             }
         }, "wild-encounters").start()
         Prefs(this).let { p ->
@@ -3175,6 +3184,7 @@ class PokeDaisyActivity : Activity() {
         e.setReusableTms(tmSites, p.reusableTms)
         e.setInstantText(textPatch, p.instantText)
         e.setHmFree(hmPatch, p.hmFree)
+        e.setEvolutionUnlock(evoUnlock)
         e.setExpShare(expShareFound, if (expShareFound != null) com.pokedaisy.app.companion.data.ExpShare.Mode.of(p.expShare) else com.pokedaisy.app.companion.data.ExpShare.Mode.OFF)
         e.setLevelCap(levelCapFound, if (levelCapFound != null && p.levelCap) levelCapNow?.level ?: 0 else 0)
         e.setShinyTarget(shinyTarget)
