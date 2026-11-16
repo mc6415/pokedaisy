@@ -210,8 +210,8 @@ class RomRandomizerTest {
         val patch = EvolutionUnlock.find(made)
         if (g.code != "BPRE" && g.code != "BPGE") return@each assertNull(g.title, patch)
         assertNotNull(g.title, patch)
-        // The two scene checks' `ble` and the trade check's `bhi`, each on the cart's own bytes.
-        assertEquals(g.title, listOf("14dd", "0fdd", "07d8"), patch!!.writes.map { it.expect.joinToString("") { b -> "%02x".format(b) } })
+        // The two scene checks' `ble`, the trade check's `bhi` and the stone check's `bls`, each on the cart's own bytes.
+        assertEquals(g.title, listOf("14dd", "0fdd", "07d8", "08d9"), patch!!.writes.map { it.expect.joinToString("") { b -> "%02x".format(b) } })
         for (w in patch.writes) {
             val at = (w.addr - 0x08000000L).toInt()
             assertArrayEquals(g.title, made.copyOfRange(at, at + 2), w.expect)
