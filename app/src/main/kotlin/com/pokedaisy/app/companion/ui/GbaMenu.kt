@@ -753,9 +753,10 @@ fun OptionOverlay(onDismiss: () -> Unit, modifier: Modifier = Modifier, content:
             onDispose { starts.entries -= entry }
         }
     }
-    if (stack != null) {
-        val dismiss by androidx.compose.runtime.rememberUpdatedState(onDismiss)
-        val e = remember { OverlayStack.Entry({ dismiss() }, stack.lastClicked) }
+    val dismiss by androidx.compose.runtime.rememberUpdatedState(onDismiss)
+    val entry = if (stack != null) remember { OverlayStack.Entry({ dismiss() }, stack.lastClicked) } else null
+    if (stack != null && entry != null) {
+        val e = entry
         androidx.compose.runtime.DisposableEffect(e) {
             stack.entries += e
             onDispose {
@@ -780,7 +781,9 @@ fun OptionOverlay(onDismiss: () -> Unit, modifier: Modifier = Modifier, content:
     ) {
         Box(
             modifier
-                .focusProperties { exit = { FocusRequester.Cancel } }
+                // The focus stays in while this is the newest pop-up; one opened from it (a pick-list over RANDOMIZE's
+                // wizard) can take it.
+                .focusProperties { exit = { if (stack == null || stack.entries.lastOrNull() === entry) FocusRequester.Cancel else FocusRequester.Default } }
                 .focusGroup()
                 .focusProperties { canFocus = false }
                 .clickable(interactionSource = noRipple, indication = null, onClick = {}),
