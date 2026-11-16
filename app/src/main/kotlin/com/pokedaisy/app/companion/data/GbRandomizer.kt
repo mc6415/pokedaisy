@@ -170,6 +170,9 @@ object GbRandomizer {
     }.getOrNull()
 
     /** Every byte the tool may write (found through tables it never writes). */
+    /** ZONES' areas of [rom] (tests). */
+    internal fun zoneAreas(rom: ByteArray, g: Game) = Reader(rom, g).zoneAreas()
+
     /** [rom] as the run modes' tests look at it ([CartView]): species as the cart numbers them. */
     internal fun view(rom: ByteArray, g: Game): CartView {
         val r = Reader(rom, g)
@@ -195,8 +198,13 @@ object GbRandomizer {
         val wildLevels = ArrayList<Int>().also { l -> r.wildSlots { l += r.u8(it - 1) } }
         val water = ArrayList<Int>().also { l -> r.wildLists { at, isWater, _ -> if (isWater && r.species(r.u8(at))) l += r.u8(at) } }
         val starters = (0 until 3).mapNotNull { which -> g.starters.firstOrNull { it.first == which }?.second?.let(r::u8) }
+        val zoned = LinkedHashMap<String, MutableList<Int>>()
+        r.wildMaps { at, isWater, _, map ->
+            if (r.species(r.u8(at))) zoned.getOrPut("${r.place(map)}:" + if (isWater) "water" else "land") { ArrayList() } += r.u8(at)
+        }
+        val caves = r.zoneAreas().filter { it.terrain == SpeciesPicker.Habitat.CAVE }.map { "${it.key}:land" }.toSet()
         return CartView(wild, trainers, { s -> if (r.species(s)) r.types(s) else emptySet() }, evolutions,
-            wildLevels = wildLevels, waterWild = water, bosses = bosses, rivals = rivals, starters = starters)
+            wildLevels = wildLevels, waterWild = water, bosses = bosses, rivals = rivals, starters = starters, zoned = zoned, caves = caves)
     }
 
     internal fun sites(rom: ByteArray, g: Game): List<Int> {
@@ -301,7 +309,10 @@ object GbRandomizer {
         fun wildSlots(each: (Int) -> Unit) = wildLists { at, _, _ -> each(at) }
 
         /** [wildSlots] with each list's water (else grass) and whether its map is a cave ([isCave]). */
-        fun wildLists(each: (at: Int, water: Boolean, cave: Boolean) -> Unit) {
+        fun wildLists(each: (at: Int, water: Boolean, cave: Boolean) -> Unit) = wildMaps { at, water, cave, _ -> each(at, water, cave) }
+
+        /** [wildLists] with each list's map (Gen 1's map id, Gen 2's group << 8 | number). */
+        fun wildMaps(each: (at: Int, water: Boolean, cave: Boolean, map: Int) -> Unit) {
             if (g.gen == 1) {
                 val seen = HashSet<Int>()
                 var p = g.wild[0]
@@ -314,7 +325,7 @@ object GbRandomizer {
                     // Grass, then water.
                     for (water in listOf(false, true)) {
                         val rate = u8(q++)
-                        if (rate != 0) { for (i in 0 until 10) each(q + i * 2 + 1, water, !water && isCave(map)); q += 20 }
+                        if (rate != 0) { for (i in 0 until 10) each(q + i * 2 + 1, water, !water && isCave(map), map); q += 20 }
                     }
                 }
             } else {
@@ -322,11 +333,82 @@ object GbRandomizer {
                     val grass = t > 0
                     var a = kotlin.math.abs(t)
                     while (u8(a) != 0xFF) {
-                        val cave = grass && isCave(u8(a) shl 8 or u8(a + 1))
-                        if (grass) { for (i in 0 until 21) each(a + 5 + i * 2 + 1, false, cave); a += 5 + 42 }
-                        else { for (i in 0 until 3) each(a + 3 + i * 2 + 1, true, false); a += 3 + 6 }
+                        val map = u8(a) shl 8 or u8(a + 1)
+                        val cave = grass && isCave(map)
+                        if (grass) { for (i in 0 until 21) each(a + 5 + i * 2 + 1, false, cave, map); a += 5 + 42 }
+                        else { for (i in 0 until 3) each(a + 3 + i * 2 + 1, true, false, map); a += 3 + 6 }
                     }
                 }
+            }
+        }
+
+        /** Gen 1: a map's header (by map id), or -1 for an unused slot. */
+        fun gen1Header(map: Int): Int {
+            val f = g.field ?: return -1
+            if (map !in 0 until 0xF8) return -1
+            val bank = u8(f.mapBanks + map)
+            val p = u16(f.maps + map * 2)
+            if (bank == 0 || p !in 0x4000 until 0x8000) return -1
+            val h = far(bank, p)
+            return if (u8(h) < 0x18 && u8(h + 1) != 0 && u8(h + 2) != 0) h else -1
+        }
+
+        /** Gen 2: a map's 9-byte header (group << 8 | number), or -1. */
+        fun gen2Header(map: Int): Int {
+            val f = g.field ?: return -1
+            val group = map shr 8
+            val num = map and 0xFF
+            if (group == 0 || num == 0) return -1
+            return far(f.maps / 0x4000, u16(f.maps + (group - 1) * 2)) + (num - 1) * 9
+        }
+
+        /** ZONES: a map's town map place: Gen 1's first map with its town map name ([gen1Area]), Gen 2's landmark (its
+         * header's +5) + 0x10000. */
+        fun place(map: Int): Int =
+            if (g.gen == 1) gen1Area(map) else runCatching { 0x10000 + u8(gen2Header(map) + 5) }.getOrDefault(map)
+
+        /** ZONES: the maps a map's edges lead into: Gen 1's header connections (flags at +9, 11-byte records from +10, the
+         * map id first), Gen 2's map attributes' (flags at +11, 12-byte records from +12, group and number first). */
+        fun joinedMaps(map: Int): List<Int> = runCatching {
+            if (g.gen == 1) {
+                val h = gen1Header(map)
+                if (h < 0) return emptyList()
+                val n = Integer.bitCount(u8(h + 9) and 0xF)
+                (0 until n).map { u8(h + 10 + it * 11) }
+            } else {
+                val h = gen2Header(map)
+                if (h < 0) return emptyList()
+                val attrs = far(u8(h), u16(h + 3))
+                val n = Integer.bitCount(u8(attrs + 11) and 0xF)
+                (0 until n).map { u8(attrs + 12 + it * 12) shl 8 or u8(attrs + 13 + it * 12) }
+            }
+        }.getOrDefault(emptyList())
+
+        /** ZONES: the cart's wild areas ([place]s, in its lists' order): a cave when one of its maps is, the water when it
+         * has no grass, joined to the places its maps' edges lead into (and on through a town without wild Pokémon). */
+        fun zoneAreas(): List<SpeciesPicker.Zone<Int>> {
+            val maps = LinkedHashMap<Int, MutableSet<Int>>()
+            val land = HashSet<Int>()
+            val caves = HashSet<Int>()
+            wildMaps { _, water, cave, map ->
+                val at = place(map)
+                maps.getOrPut(at) { LinkedHashSet() } += map
+                if (!water) land += at
+                if (cave) caves += at
+            }
+            return maps.map { (at, own) ->
+                val next = HashSet<Int>()
+                for (m in own) for (j in joinedMaps(m)) {
+                    val jp = place(j)
+                    next += jp
+                    if (jp !in maps) for (k in joinedMaps(j)) next += place(k)
+                }
+                val terrain = when {
+                    at in caves -> SpeciesPicker.Habitat.CAVE
+                    at in land -> SpeciesPicker.Habitat.LAND
+                    else -> SpeciesPicker.Habitat.WATER
+                }
+                SpeciesPicker.Zone(at, terrain, next - at)
             }
         }
 
@@ -864,23 +946,26 @@ object GbRandomizer {
             var area = HashMap<Pair<Int, SpeciesPicker.Habitat>, Int>()
             var used = HashSet<Int>()
             var last = -1
-            wildLists { at, water, cave ->
+            // ZONES: each place's type.
+            val zones = if (o.zones == RomRandomizer.Zones.OFF) emptyMap() else picker.zones(zoneAreas(), o.zones, g.gen)
+            wildMaps { at, water, cave, map ->
                 if (last < 0 || at - last > 2) { area = HashMap(); used = HashSet() }
                 last = at
                 val was = u8(at)
-                if (!species(was)) return@wildLists
+                if (!species(was)) return@wildMaps
                 val avoid = if (o.noDuplicates) used else emptySet<Int>()
+                val need = zones[place(map)]?.let { picker.zoneNeed(it, water, g.gen) }
                 // HABITATS: the water lists, a cave's grass.
                 val habitat = when {
-                    !o.habitats -> SpeciesPicker.Habitat.LAND
+                    !o.habitats || need != null -> SpeciesPicker.Habitat.LAND
                     water -> SpeciesPicker.Habitat.WATER
                     cave -> SpeciesPicker.Habitat.CAVE
                     else -> SpeciesPicker.Habitat.LAND
                 }
                 val only = habitat.types(g.gen)
                 val now = when (o.wild) {
-                    RomRandomizer.Wild.RANDOM -> picker.pick(was, avoid, wild = true, only = only)
-                    RomRandomizer.Wild.PER_AREA -> area.getOrPut(was to habitat) { picker.pick(was, avoid, wild = true, only = only) }
+                    RomRandomizer.Wild.RANDOM -> picker.pick(was, avoid, wild = true, only = only, need = need)
+                    RomRandomizer.Wild.PER_AREA -> area.getOrPut(was to habitat) { picker.pick(was, avoid, wild = true, only = only, need = need) }
                     else -> global.getValue(was)
                 }
                 used += now

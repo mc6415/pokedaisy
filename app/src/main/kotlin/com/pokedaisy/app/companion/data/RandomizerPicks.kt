@@ -57,9 +57,13 @@ internal class SpeciesPicker(
         like: Int, avoid: Collection<Int> = emptyList(), keepType: Boolean = false, wild: Boolean = false, from: List<Int> = pool,
         /** Only Pokémon with one of these types (a boss's theme, a habitat), while there are any; ONE TYPE wins over it. */
         only: Set<Int>? = null,
+        /** Only Pokémon with every one of these types (a zone's, [zoneNeed]), while there are any; ONE TYPE wins over it. */
+        need: Set<Int>? = null,
     ): Int {
         var cands = from.filter { it !in avoid }.ifEmpty { from }
-        if (only != null && !monotyped) {
+        if (need != null && !monotyped) {
+            cands.filter { s -> types(s).containsAll(need) }.takeIf { it.isNotEmpty() }?.let { cands = it }
+        } else if (only != null && !monotyped) {
             cands.filter { s -> types(s).any { it in only } }.takeIf { it.isNotEmpty() }?.let { cands = it }
         } else if (keepType && !monotyped) {
             val mine = types(like)
@@ -133,18 +137,72 @@ internal class SpeciesPicker(
         }
     }
 
-    /** Where a wild table is ([RomRandomizer.Options.habitats]): what its swaps lean to. */
-    enum class Habitat(private val kinds: List<PokeType>) {
-        LAND(emptyList()),
-        WATER(listOf(PokeType.WATER)),
-        CAVE(listOf(PokeType.ROCK, PokeType.GROUND, PokeType.POISON, PokeType.STEEL, PokeType.DARK)),
-        ROCKS(listOf(PokeType.ROCK, PokeType.GROUND));
+    /** Where a wild table is ([RomRandomizer.Options.habitats]): what its swaps lean to; and for ZONES BY TERRAIN the
+     * types an area of it may get ([zoneKinds]). */
+    enum class Habitat(private val kinds: List<PokeType>, private val zoneKinds: List<PokeType>) {
+        LAND(emptyList(), emptyList()),
+        WATER(listOf(PokeType.WATER), listOf(PokeType.WATER, PokeType.ICE, PokeType.FLYING)),
+        CAVE(
+            listOf(PokeType.ROCK, PokeType.GROUND, PokeType.POISON, PokeType.STEEL, PokeType.DARK),
+            listOf(PokeType.ROCK, PokeType.GROUND, PokeType.GHOST, PokeType.DARK, PokeType.STEEL),
+        ),
+        ROCKS(listOf(PokeType.ROCK, PokeType.GROUND), listOf(PokeType.ROCK, PokeType.GROUND));
 
         /** The types as generation [gen] numbers them; null: anything goes ([LAND]). */
         fun types(gen: Int): Set<Int>? = kinds.mapNotNull { it.id(gen) }.toSet().ifEmpty { null }
+
+        /** ZONES BY TERRAIN: the types an area of this kind may get, as [gen] numbers them; null: any. */
+        fun zoneTypes(gen: Int): Set<Int>? = zoneKinds.mapNotNull { it.id(gen) }.toSet().ifEmpty { null }
+    }
+
+    /** ZONES: one area of a cart's wild tables (a town map place): its [key], what it is ([Habitat.CAVE], [Habitat.WATER]
+     * with no land at all, else [Habitat.LAND]) and the areas it's joined to. */
+    class Zone<K>(val key: K, val terrain: Habitat, val next: Set<K>)
+
+    /**
+     * ZONES ([RomRandomizer.Options.zones]): a type for each area, in [areas]' order. Only types with [MIN_ZONE] Pokémon in
+     * the pool or more (Gen 1's Dragon or Ghost would be one line); each picked as often as the pool has Pokémon of it (the
+     * games' own spread: Water, Normal, Bug lead); never an area's neighbour's while another is left; by TERRAIN a cave's
+     * from Rock, Ground, Ghost, Dark, Steel and the water's from Water, Ice, Flying. Nothing while ONE TYPE decides.
+     */
+    fun <K> zones(areas: List<Zone<K>>, mode: RomRandomizer.Zones, gen: Int): Map<K, Int> {
+        if (mode == RomRandomizer.Zones.OFF || monotyped) return emptyMap()
+        val count = PokeType.entries.mapNotNull { it.id(gen) }.distinct()
+            .associateWith { t -> pool.count { t in types(it) } }.filterValues { it >= MIN_ZONE }
+        if (count.isEmpty()) return emptyMap()
+        // Joined both ways, whichever side named the other.
+        val joined = HashMap<K, MutableSet<K>>()
+        for (a in areas) for (n in a.next) if (n != a.key) {
+            joined.getOrPut(a.key) { HashSet() } += n
+            joined.getOrPut(n) { HashSet() } += a.key
+        }
+        val out = LinkedHashMap<K, Int>()
+        for (a in areas) {
+            if (a.key in out) continue
+            var cands = count.keys.toList()
+            if (mode == RomRandomizer.Zones.TERRAIN) {
+                a.terrain.zoneTypes(gen)?.let { kinds -> cands.filter { it in kinds }.takeIf { it.isNotEmpty() }?.let { cands = it } }
+            }
+            val taken = joined[a.key].orEmpty().mapNotNull { out[it] }.toSet()
+            cands.filter { it !in taken }.takeIf { it.isNotEmpty() }?.let { cands = it }
+            var roll = rnd.nextInt(cands.sumOf { count.getValue(it) })
+            out[a.key] = cands.first { t -> roll -= count.getValue(t); roll < 0 }
+        }
+        return out
+    }
+
+    /** ZONES: what a slot of an area of [type] asks for: that type; in the water that type and Water while the pool has a
+     * couple of both (a Grass pond's Lotad line), else Water. */
+    fun zoneNeed(type: Int, water: Boolean, gen: Int): Set<Int> {
+        val w = PokeType.WATER.id(gen)!!
+        if (!water || type == w) return setOf(type)
+        return if (pool.count { s -> types(s).let { type in it && w in it } } >= 2) setOf(type, w) else setOf(w)
     }
 
     companion object {
+        /** ZONES: the fewest Pokémon of a type in the pool for an area to get it. */
+        const val MIN_ZONE = 6
+
         /** A boss's own type: the one most of [species] have (each Pokémon's types counted once); on a tie, not NORMAL. */
         fun ownType(species: List<Int>, types: (Int) -> Set<Int>): Int? {
             val count = HashMap<Int, Int>()
@@ -211,10 +269,13 @@ internal class SpeciesPicker(
 /** A cart as the run modes' tests look at it: each area's wild species, every trainer Pokémon (species, level), types; and
  * (EVOLUTIONS / ABILITIES) every evolution as (species, method, target) and each species' ability slots (none on the Game Boy).
  * For GYM TYPES, RIVAL, WILD LEVELS and HABITATS: every wild level byte, the species in water slots, each trainer Pokémon's
- * boss key (null: not a boss) and whether it's the rival's (both in [trainers]' order), and the starters (by starter). */
+ * boss key (null: not a boss) and whether it's the rival's (both in [trainers]' order), and the starters (by starter); for
+ * ZONES each area's species ([zoned]). */
 internal class CartView(
     val wild: List<List<Int>>, val trainers: List<Pair<Int, Int>>, val types: (Int) -> Set<Int>,
     val evolutions: List<Triple<Int, Int, Int>> = emptyList(), val abilities: Map<Int, List<Int>> = emptyMap(),
     val wildLevels: List<Int> = emptyList(), val waterWild: List<Int> = emptyList(),
     val bosses: List<String?> = emptyList(), val rivals: List<Boolean> = emptyList(), val starters: List<Int> = emptyList(),
+    /** ZONES: each area's wild species, land and water apart ("<area>:land" / "<area>:water"), and the areas that are caves. */
+    val zoned: Map<String, List<Int>> = emptyMap(), val caves: Set<String> = emptySet(),
 )

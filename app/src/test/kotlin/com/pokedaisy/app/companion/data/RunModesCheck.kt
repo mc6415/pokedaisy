@@ -65,6 +65,30 @@ internal object RunModesCheck {
         for (s in made.waterWild) assertTrue("$title: $s in the water isn't WATER", water in made.types(s))
     }
 
+    /** ZONES (or ZONES BY TERRAIN) with a random Pokémon in every encounter, the strength match off. */
+    fun zonesOptions(mode: RomRandomizer.Zones) = RomRandomizer.Options(
+        RomRandomizer.Starters.OFF, RomRandomizer.Wild.RANDOM, false, similarStrength = false, zones = mode,
+    )
+
+    /**
+     * [zonesOptions] read back: every area's land Pokémon share a type, and so do its water ones (its type and Water, or
+     * Water); the areas don't all get one type; by TERRAIN a cave's type is a cave's ([SpeciesPicker.Habitat.CAVE]).
+     */
+    fun zones(title: String, gen: Int, made: CartView, mode: RomRandomizer.Zones) {
+        assertTrue("$title has no zones", made.zoned.isNotEmpty())
+        val landTypes = HashSet<Int>()
+        for ((key, species) in made.zoned) {
+            val common = species.map { made.types(it) }.reduce { a, b -> a intersect b }
+            assertTrue("$title $key shares no type: $species", common.isNotEmpty())
+            if (key.endsWith(":land")) landTypes += common
+            if (mode == RomRandomizer.Zones.TERRAIN && key in made.caves) {
+                val cave = SpeciesPicker.Habitat.CAVE.zoneTypes(gen)!!
+                assertTrue("$title cave $key's type $common", common.any { it in cave })
+            }
+        }
+        assertTrue("$title: only ${landTypes.size} zone types", landTypes.size >= 5)
+    }
+
     fun spread(title: String, retail: CartView, made: CartView, without: CartView) {
         for ((i, t) in made.trainers.withIndex()) {
             val was = retail.types(retail.trainers[i].first)

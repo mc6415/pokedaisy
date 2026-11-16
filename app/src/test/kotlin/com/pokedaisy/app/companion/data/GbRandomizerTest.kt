@@ -244,6 +244,18 @@ class GbRandomizerTest {
     }
 
     @Test
+    fun `ZONES give every area one type`() = each { g, rom ->
+        for ((mode, seed) in listOf(RomRandomizer.Zones.RANDOM to 51L, RomRandomizer.Zones.TERRAIN to 52L)) {
+            val made = GbRandomizer.randomize(rom, RunModesCheck.zonesOptions(mode), seed)!!
+            assertSame(g, GbRandomizer.recognise(made))
+            RunModesCheck.zones(g.title, g.gen, GbRandomizer.view(made, g), mode)
+        }
+        val areas = GbRandomizer.zoneAreas(rom, g)
+        assertTrue("${g.title}: ${areas.count { it.next.isNotEmpty() }} of ${areas.size} joined", areas.count { it.next.isNotEmpty() } * 2 > areas.size)
+        assertTrue("${g.title} has no caves", areas.any { it.terrain == SpeciesPicker.Habitat.CAVE })
+    }
+
+    @Test
     fun `EVOLUTIONS moves every evolution's target and the starters still evolve twice`() = each { g, rom ->
         val made = GbRandomizer.randomize(rom, EVOLVE_ABILITIES, 31L)!!
         assertSame(g, GbRandomizer.recognise(made))

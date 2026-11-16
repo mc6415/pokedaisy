@@ -130,7 +130,7 @@ RANDOMIZE asks three things, a page each. `BACK` (or the arrow at the top) goes 
 
 4. **Ready.** The last page says in plain words what will change. `GAME` and `STYLE` take you back to change them, and `SEED` is the number the shuffle is made from: the same game, settings and seed always make the same game, so a friend can play the same run. Tap it for another number. Then tap `RANDOMIZE`. When it's done, the new game is in your library as, for example, "Pokémon Ruby (Randomized, seed 123456)", so two runs of one game are easy to tell apart, and `PLAY` starts it.
 
-`CUSTOM`'s pages. Under each row a short line says what its setting does right now, and the `STARTERS`, `WILD POKéMON` and `GYM TYPES` lists say what each choice does too. The `POKéMON` and `WILD POKéMON` pages:
+`CUSTOM`'s pages. Under each row a short line says what its setting does right now, and the `STARTERS`, `WILD POKéMON`, `WILD TYPES` and `GYM TYPES` lists say what each choice does too. The `POKéMON` and `WILD POKéMON` pages:
 
 | Row | What it does |
 | --- | --- |
@@ -139,8 +139,18 @@ RANDOMIZE asks three things, a page each. `BACK` (or the arrow at the top) goes 
 | `WILD POKéMON` | What you meet in the grass, caves, water and with a rod. `PER AREA` (the default) swaps each kind of Pokémon for another on each route, so a route still has its common and rare ones. `EVERY ENCOUNTER` picks anew for every slot, `SWAPPED EVERYWHERE` swaps each kind for one other kind across the whole game, and `AS THEY ARE` keeps them. |
 | `GIFTS` | `SHUFFLED` swaps the Pokémon the game gives you or leaves waiting for you: gifts, Game Corner prizes, fossils and the ones that sit on the map until you battle them. Every place the game names one (its cry, its picture, the battle) follows. Pokémon that roam aren't swapped. On by default in `CLASSIC`, `WILD ONLY` and `CHAOS`. |
 | `WILD LEVELS` | Raises every wild Pokémon's level by `+10%`, `+25%` or `+50%` (never past level 100), for a harder run or one that moves faster. It works with `WILD POKéMON` set to `AS THEY ARE` too. |
-| `HABITATS` | `ON` makes the wild swaps fit the place: Water types in the water and on a rod, Rock and Ground types in the rocks you smash, and Rock, Ground, Poison, Steel and Dark types in caves. Grass and everywhere else can have anything. On the DS games caves aren't told apart. It works with `PER AREA` and `EVERY ENCOUNTER`; `SWAPPED EVERYWHERE` swaps each kind once for the whole game, so it doesn't follow it. |
+| `WILD TYPES` | What types the wild swaps keep to, place by place. `OFF` (the default) lets any Pokémon turn up anywhere. `HABITATS` makes them fit the place: Water types in the water and on a rod, Rock and Ground types in the rocks you smash, and Rock, Ground, Poison, Steel and Dark types in caves, with grass and everywhere else open to anything. `ZONES` gives every area one type of its own, picked at random: a whole route of Fire types, the next one Grass. `ZONES BY TERRAIN` does the same with a type that suits the place: caves get Rock, Ground, Ghost, Dark or Steel, the sea and lakes Water, Ice or Flying, and grass routes anything. More on zones below. |
 | `SIMILAR STRENGTH` | Keeps each swap close in strength to what it replaces (their base stats added up), so an early route doesn't fill with fully evolved Pokémon. |
+
+How zones work:
+
+- An area is a place on the town map, so a cave's floors all share one type, and so do a town's pond and its fishing spots.
+- Two areas whose edges meet get different types, so you notice when you walk into a new one. A town with no wild Pokémon between two routes counts as a join too.
+- On the DS games each map is its own area (a cave's floors can differ), and an area only avoids the type of the one the game lists before it, which is usually but not always the one next door.
+- A type only comes up when the game has a few Pokémon of it, so a whole route of one family can't happen. Common types like Water, Normal, Bug and Grass come up more often, as they do in the real games.
+- On the water an area keeps its type where there are Pokémon of that type that also swim (a Grass area's pond gets Pokémon that are Grass and Water). Where there are none, the water falls back to Water types.
+- On the DS games caves aren't told apart yet, so `ZONES BY TERRAIN` treats them like grass routes there.
+- Zones work with `PER AREA` and `EVERY ENCOUNTER`, but not with `SWAPPED EVERYWHERE` or `ONE TYPE`.
 
 The `RULES` page, for run rules like a Nuzlocke's:
 

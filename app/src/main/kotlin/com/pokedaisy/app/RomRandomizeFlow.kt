@@ -376,7 +376,7 @@ class RomRandomizeFlow(
         fun encode(o: RomRandomizer.Options): String = listOf(
             o.starters.name, o.wild.name, o.trainers, o.similarStrength, o.noLegendaries, o.fieldItems, o.trainerItems, o.baseStats, o.learnsets,
             o.levelScale, o.noDuplicates, o.allCatchable, o.trainersKeepType, o.monotype?.name ?: "", o.gifts, o.evolutions, o.abilities,
-            o.bossTypes.name, o.rivalStarter, o.wildLevelScale, o.habitats,
+            o.bossTypes.name, o.rivalStarter, o.wildLevelScale, o.habitats, o.zones.name,
         ).joinToString(",")
 
         fun decode(s: String?): RomRandomizer.Options? = runCatching {
@@ -396,6 +396,8 @@ class RomRandomizeFlow(
                 bossTypes = f.getOrNull(17)?.let { RomRandomizer.BossTypes.valueOf(it) } ?: RomRandomizer.BossTypes.OFF,
                 rivalStarter = f.getOrNull(18)?.toBooleanStrict() ?: false,
                 wildLevelScale = f.getOrNull(19)?.toInt() ?: 0, habitats = f.getOrNull(20)?.toBooleanStrict() ?: false,
+                // ZONES (off in a setup saved before it).
+                zones = f.getOrNull(21)?.let { RomRandomizer.Zones.valueOf(it) } ?: RomRandomizer.Zones.OFF,
             )
         }.getOrNull()
 
@@ -425,8 +427,12 @@ class RomRandomizeFlow(
             if (o.rivalStarter && o.starters != RomRandomizer.Starters.OFF && takesRival(b)) add(tr("Your rival carries a new starter"))
             if (o.levelScale > 0) add(tr("Trainers' levels up {0}%", o.levelScale))
             if (o.wildLevelScale > 0) add(tr("Wild levels up {0}%", o.wildLevelScale))
-            if (o.habitats && o.monotype == null && (o.wild == RomRandomizer.Wild.RANDOM || o.wild == RomRandomizer.Wild.PER_AREA))
-                add(tr("Pokémon fit where they live"))
+            if (o.monotype == null && (o.wild == RomRandomizer.Wild.RANDOM || o.wild == RomRandomizer.Wild.PER_AREA)) when (placesOf(o)) {
+                Places.HABITATS -> add(tr("Pokémon fit where they live"))
+                Places.ZONES -> add(tr("Each area has a type of its own"))
+                Places.TERRAIN_ZONES -> add(tr("Each area has a type that suits it"))
+                Places.OFF -> Unit
+            }
             if (o.wild != RomRandomizer.Wild.OFF && o.wild != RomRandomizer.Wild.GLOBAL && o.noDuplicates) add(tr("No Pokémon twice in one area"))
             if (o.wild != RomRandomizer.Wild.OFF && o.allCatchable) add(tr("As many kinds as possible in the wild"))
             if (swaps && o.similarStrength) add(tr("Swaps keep to Pokémon of similar strength"))
@@ -437,6 +443,39 @@ class RomRandomizeFlow(
             if (o.abilities && takesAbilities(b)) add(tr("Random abilities"))
             if (o.learnsets) add(tr("Random moves learned by level"))
             if (o.evolutions) add(tr("Random evolutions"))
+        }
+
+        /** WILD TYPES' choices: HABITATS ([RomRandomizer.Options.habitats]) or ZONES ([RomRandomizer.Options.zones]). */
+        enum class Places { OFF, HABITATS, ZONES, TERRAIN_ZONES }
+
+        fun placesOf(o: RomRandomizer.Options) = when {
+            o.zones == RomRandomizer.Zones.RANDOM -> Places.ZONES
+            o.zones == RomRandomizer.Zones.TERRAIN -> Places.TERRAIN_ZONES
+            o.habitats -> Places.HABITATS
+            else -> Places.OFF
+        }
+
+        fun withPlaces(o: RomRandomizer.Options, p: Places) = o.copy(
+            habitats = p == Places.HABITATS,
+            zones = when (p) {
+                Places.ZONES -> RomRandomizer.Zones.RANDOM
+                Places.TERRAIN_ZONES -> RomRandomizer.Zones.TERRAIN
+                else -> RomRandomizer.Zones.OFF
+            },
+        )
+
+        fun placesLabel(p: Places) = when (p) {
+            Places.OFF -> tk("OFF")
+            Places.HABITATS -> tk("HABITATS")
+            Places.ZONES -> tk("ZONES")
+            Places.TERRAIN_ZONES -> tk("ZONES BY TERRAIN")
+        }
+
+        fun placesInfo(p: Places) = when (p) {
+            Places.OFF -> tk("Any Pokémon can turn up anywhere.")
+            Places.HABITATS -> tk("Water types in the water, Rock and Ground types in caves.")
+            Places.ZONES -> tk("Each area's wild Pokémon share a random type.")
+            Places.TERRAIN_ZONES -> tk("Each area gets a type that suits the place.")
         }
 
         /** RIVAL: every game but Yellow, whose rival carries an Eevee rather than a starter. */
@@ -609,6 +648,11 @@ fun RandomizeWindow(flow: RomRandomizeFlow, m: GbaTextMetrics, small: GbaTextMet
             onPick = { flow.options = flow.options.copy(bossTypes = it); choosing = null }, onDismiss = { choosing = null },
             description = { RomRandomizeFlow.bossTypesInfo(it) },
         )
+        "WILD TYPES" -> OptionSelector(
+            tr("WILD TYPES"), RomRandomizeFlow.Companion.Places.entries, RomRandomizeFlow.placesOf(flow.options), { tr(RomRandomizeFlow.placesLabel(it)) }, m,
+            onPick = { flow.options = RomRandomizeFlow.withPlaces(flow.options, it); choosing = null }, onDismiss = { choosing = null },
+            description = { RomRandomizeFlow.placesInfo(it) },
+        )
         "STARTERS" -> OptionSelector(
             tr("STARTERS"), RomRandomizer.Starters.entries, flow.options.starters, { tr(RomRandomizeFlow.startersLabel(it)) }, m,
             onPick = { flow.options = flow.options.copy(starters = it); choosing = null }, onDismiss = { choosing = null },
@@ -683,9 +727,9 @@ private fun WizardPage(
                 if (o.wildLevelScale > 0) tr("Wild Pokémon {0}% higher.", o.wildLevelScale) else tk("The game's own levels.")) {
                 choose("WILD LEVELS")
             }
-            row(tr("HABITATS"), onOff(o.habitats),
-                if (o.habitats) tk("Water types in the water, Rock and Ground types in caves.") else tk("Any Pokémon can turn up anywhere."), last = true) {
-                flow.options = o.copy(habitats = !o.habitats)
+            val places = RomRandomizeFlow.placesOf(o)
+            row(tr("WILD TYPES"), tr(RomRandomizeFlow.placesLabel(places)), RomRandomizeFlow.placesInfo(places), last = true) {
+                choose("WILD TYPES")
             }
         }
         // The run modes.

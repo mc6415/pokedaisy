@@ -256,6 +256,22 @@ object DsRandomizer {
         }
     }
 
+    /** ZONES: the encounter archive's members with Pokémon, in order: the water when none of its Pokémon is on land, each
+     * joined to the member before it (the DS games' maps aren't read for their places or edges). */
+    private fun zoneAreas(g: Game, f: Files, narc: Narc): List<SpeciesPicker.Zone<Int>> {
+        val land = LinkedHashMap<Int, Boolean>()
+        encounterSites(g.gen, narc, hgss = g.hgss, each = { m, at, width ->
+            val s = (if (width == 4) u32(f.enc, at) else u16(f.enc, at)) and speciesMask(g.gen)
+            if (s !in 1..g.speciesCount) return@encounterSites
+            val onLand = habitatAt(g.gen, g.hgss, at - narc.start(m)) != SpeciesPicker.Habitat.WATER
+            land[m] = (land[m] ?: false) || onLand
+        })
+        var last: Int? = null
+        return land.map { (m, l) ->
+            SpeciesPicker.Zone(m, if (l) SpeciesPicker.Habitat.LAND else SpeciesPicker.Habitat.WATER, setOfNotNull(last)).also { last = m }
+        }
+    }
+
     /** HABITATS: where an encounter species word [rel] bytes into its member is - water (surfing, fishing), a smashed rock
      * (HeartGold / SoulSilver), else land (DS caves aren't told apart). */
     private fun habitatAt(gen: Int, hgss: Boolean, rel: Int): SpeciesPicker.Habitat = when {
@@ -748,9 +764,15 @@ object DsRandomizer {
         ArrayList<Int>().also { l -> f.abilitySites(f.personal) { l += it } }.chunked(slots).forEachIndexed { i, one ->
             abilities[i + 1] = one.map { f.personal[it].toInt() and 0xFF }.toMutableList()
         }
+        val zoned = LinkedHashMap<String, MutableList<Int>>()
+        encounterSites(g.gen, encNarc, hgss = g.hgss, each = { m, at, width ->
+            val s = (if (width == 4) u32(f.enc, at) else u16(f.enc, at)) and speciesMask(g.gen)
+            val w = habitatAt(g.gen, g.hgss, at - encNarc.start(m)) == SpeciesPicker.Habitat.WATER
+            if (s in 1..g.speciesCount) zoned.getOrPut("$m:" + if (w) "water" else "land") { ArrayList() } += s
+        })
         CartView(wild.values.toList(), trainers, { s ->
             if (s !in 1..g.speciesCount) emptySet() else personal.member(s).let { m -> setOf(m[6].toInt() and 0xFF, m[7].toInt() and 0xFF) }
-        }, evolutions, abilities, wildLevels, water, bosses, rivals, starters)
+        }, evolutions, abilities, wildLevels, water, bosses, rivals, starters, zoned)
     }
 
     /** [path]'s gift / static Pokémon: the species at each of each one's places (tests). */
@@ -1135,18 +1157,22 @@ object DsRandomizer {
             var used = HashSet<Int>()
             var member = -1
             val narc = Narc(f.enc)
+            // ZONES: each member's type (a member is a map's encounters; the one before it its neighbour).
+            val zones = if (o.zones == RomRandomizer.Zones.OFF) emptyMap() else picker.zones(zoneAreas(g, f, narc), o.zones, g.gen)
             encounterSites(g.gen, narc, hgss = g.hgss, each = { m, at, width ->
                 if (m != member) { area = HashMap(); used = HashSet(); member = m }
                 val raw = if (width == 4) u32(f.enc, at) else u16(f.enc, at)
                 val was = raw and speciesMask(g.gen)
                 if (was !in 1..g.speciesCount) return@encounterSites
                 val avoid = if (o.noDuplicates) used else emptySet<Int>()
+                val place = habitatAt(g.gen, g.hgss, at - narc.start(m))
+                val need = zones[m]?.let { picker.zoneNeed(it, place == SpeciesPicker.Habitat.WATER, g.gen) }
                 // HABITATS: surfing and fishing slots (and HeartGold's smashed rocks).
-                val habitat = if (o.habitats) habitatAt(g.gen, g.hgss, at - narc.start(m)) else SpeciesPicker.Habitat.LAND
+                val habitat = if (o.habitats && need == null) place else SpeciesPicker.Habitat.LAND
                 val only = habitat.types(g.gen)
                 val now = when (o.wild) {
-                    RomRandomizer.Wild.RANDOM -> picker.pick(was, avoid, wild = true, only = only)
-                    RomRandomizer.Wild.PER_AREA -> area.getOrPut(was to habitat) { picker.pick(was, avoid, wild = true, only = only) }
+                    RomRandomizer.Wild.RANDOM -> picker.pick(was, avoid, wild = true, only = only, need = need)
+                    RomRandomizer.Wild.PER_AREA -> area.getOrPut(was to habitat) { picker.pick(was, avoid, wild = true, only = only, need = need) }
                     else -> global.getValue(was)
                 }
                 used += now

@@ -204,6 +204,19 @@ class RomRandomizerTest {
     }
 
     @Test
+    fun `ZONES give every area one type`() = each { g, rom ->
+        for ((mode, seed) in listOf(RomRandomizer.Zones.RANDOM to 51L, RomRandomizer.Zones.TERRAIN to 52L)) {
+            val made = RomRandomizer.randomize(rom, RunModesCheck.zonesOptions(mode), seed)!!
+            assertEquals(g.title, g, RomRandomizer.recognise(made))
+            RunModesCheck.zones(g.title, 3, RomRandomizer.view(made, g), mode)
+        }
+        // Most places are joined to another (a route through a town counts).
+        val areas = RomRandomizer.zoneAreas(rom, g)
+        assertTrue("${g.title}: ${areas.count { it.next.isNotEmpty() }} of ${areas.size} joined", areas.count { it.next.isNotEmpty() } * 2 > areas.size)
+        assertTrue("${g.title} has no caves", areas.any { it.terrain == SpeciesPicker.Habitat.CAVE })
+    }
+
+    @Test
     fun `EVOLUTIONS and ABILITIES do what they say, and the starters still evolve twice`() = each { g, rom ->
         val made = RomRandomizer.randomize(rom, EVOLVE_ABILITIES, 31L)!!
         assertEquals(g.title, g, RomRandomizer.recognise(made))
